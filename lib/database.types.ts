@@ -101,6 +101,7 @@ export type PrescrizioneRow = {
   os_raggio: number | null;
   os_diametro: number | null;
   validita_mesi: number;
+  attiva: boolean;
   note: string | null;
   created_at: string;
   updated_at: string;
@@ -152,6 +153,7 @@ export type OrdineLacRow = {
   acconto: number;
   data_arrivo_prevista: string | null;
   data_consegna: string | null;
+  avvisato_il: string | null;
   note: string | null;
   created_at: string;
   updated_at: string;
@@ -204,6 +206,10 @@ export type OrdineOcchialiRow = {
 type Auto = "id" | "created_at" | "updated_at";
 type Ins<R> = Omit<Partial<R>, Auto> & { id?: string };
 type Upd<R> = Omit<Partial<R>, Auto>;
+
+/** Patch tipizzati per le update delle server action ordini. */
+export type OrdineLacUpdate = Upd<OrdineLacRow>;
+export type OrdineOcchialiUpdate = Upd<OrdineOcchialiRow>;
 
 /* ── Database (la shape che supabase-js si aspetta) ────────────────── */
 
