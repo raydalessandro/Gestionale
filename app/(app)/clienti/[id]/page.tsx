@@ -11,6 +11,7 @@ import {
   Vuoto,
 } from "@/components/ui";
 import PrescrizioneCard from "@/components/PrescrizioneCard";
+import { PillStato } from "@/components/OrdiniUI";
 import { fmtData, ETICHETTE_FONTE } from "@/lib/utils";
 
 export default async function ClientePage({
@@ -21,17 +22,37 @@ export default async function ClientePage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const [{ data: cliente }, { data: prescrizioni }] = await Promise.all([
-    supabase.from("clienti").select("*").eq("id", id).maybeSingle(),
-    supabase
-      .from("prescrizioni")
-      .select("*")
-      .eq("cliente_id", id)
-      .order("data_visita", { ascending: false })
-      .order("created_at", { ascending: false }),
-  ]);
+  const [{ data: cliente }, { data: prescrizioni }, { data: lac }, { data: buste }] =
+    await Promise.all([
+      supabase.from("clienti").select("*").eq("id", id).maybeSingle(),
+      supabase
+        .from("prescrizioni")
+        .select("*")
+        .eq("cliente_id", id)
+        .order("data_visita", { ascending: false })
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("ordini_lac")
+        .select("id, numero, stato, created_at")
+        .eq("cliente_id", id)
+        .order("created_at", { ascending: false })
+        .limit(5),
+      supabase
+        .from("ordini_occhiali")
+        .select("id, numero, stato, created_at")
+        .eq("cliente_id", id)
+        .order("created_at", { ascending: false })
+        .limit(5),
+    ]);
 
   if (!cliente) notFound();
+
+  const ordini = [
+    ...(lac ?? []).map((o) => ({ ...o, tipo: "lac" as const })),
+    ...(buste ?? []).map((o) => ({ ...o, tipo: "buste" as const })),
+  ]
+    .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
+    .slice(0, 5);
 
   const contatti = [
     cliente.telefono && { icona: Phone, testo: cliente.telefono },
@@ -140,6 +161,42 @@ export default async function ClientePage({
             </Link>
           }
         />
+      )}
+
+      <div className="mb-3 mt-8 flex items-center justify-between gap-2">
+        <h2 className="f-serif text-lg font-semibold text-inchiostro">Ordini</h2>
+        <div className="flex gap-2">
+          <ButtonLink href={`/ordini/buste/nuova?cliente=${cliente.id}`} variante="ghost">
+            <Plus size={15} /> Nuova busta
+          </ButtonLink>
+          <ButtonLink href={`/ordini/lac/nuovo?cliente=${cliente.id}`} variante="ghost">
+            <Plus size={15} /> Nuovo ordine LAC
+          </ButtonLink>
+        </div>
+      </div>
+
+      {ordini.length > 0 ? (
+        <Card className="divide-y divide-linea !p-0">
+          {ordini.map((o) => (
+            <Link
+              key={`${o.tipo}-${o.id}`}
+              href={`/ordini/${o.tipo}/${o.id}`}
+              className="flex items-center justify-between gap-3 px-5 py-3 transition-colors hover:bg-carta"
+            >
+              <div className="flex items-center gap-2">
+                <span className="f-mono text-sm font-semibold text-inchiostro">
+                  {o.numero}
+                </span>
+                <span className="text-xs text-faint">{fmtData(o.created_at)}</span>
+              </div>
+              <PillStato stato={o.stato} tipo={o.tipo === "lac" ? "lac" : "busta"} />
+            </Link>
+          ))}
+        </Card>
+      ) : (
+        <p className="text-sm text-faint">
+          Ancora nessun ordine per questo cliente.
+        </p>
       )}
     </>
   );

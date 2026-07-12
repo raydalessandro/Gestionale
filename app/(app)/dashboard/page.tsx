@@ -35,8 +35,8 @@ export default async function DashboardPage() {
   const kpi = [
     { label: "Clienti in anagrafica", value: clienti.count ?? 0 },
     { label: "Prescrizioni · 30 gg", value: prescrizioni.count ?? 0 },
-    { label: "Ordini LAC attivi", value: lac.count ?? 0, nota: "modulo in arrivo · v0.2" },
-    { label: "Buste in lavorazione", value: buste.count ?? 0, nota: "modulo in arrivo · v0.2" },
+    { label: "Ordini LAC attivi", value: lac.count ?? 0, href: "/ordini?vista=lac" },
+    { label: "Buste in lavorazione", value: buste.count ?? 0, href: "/ordini?vista=buste" },
   ];
 
   return (
@@ -52,15 +52,29 @@ export default async function DashboardPage() {
       />
 
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
-        {kpi.map((k) => (
-          <Card key={k.label} className="!p-4">
-            <p className="f-mono text-3xl font-semibold tabular-nums text-inchiostro">
-              {k.value}
-            </p>
-            <p className="mt-1 text-xs font-medium text-soft">{k.label}</p>
-            {k.nota && <p className="mt-0.5 text-[10px] text-faint">{k.nota}</p>}
-          </Card>
-        ))}
+        {kpi.map((k) => {
+          const contenuto = (
+            <>
+              <p className="f-mono text-3xl font-semibold tabular-nums text-inchiostro">
+                {k.value}
+              </p>
+              <p className="mt-1 text-xs font-medium text-soft">{k.label}</p>
+            </>
+          );
+          return k.href ? (
+            <Link
+              key={k.label}
+              href={k.href}
+              className="rounded-2xl border border-linea bg-white p-4 shadow-[0_1px_2px_rgba(28,23,20,0.04)] transition-colors hover:border-faint hover:bg-carta"
+            >
+              {contenuto}
+            </Link>
+          ) : (
+            <Card key={k.label} className="!p-4">
+              {contenuto}
+            </Card>
+          );
+        })}
       </div>
 
       <h2 className="f-serif mb-3 text-lg font-semibold text-inchiostro">
