@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  background: #faf7f2;
+  color: #1c1714;
+}
+
+.f-ui    { font-family: var(--font-ui), system-ui, sans-serif; }
+.f-serif { font-family: var(--font-serif), Georgia, serif; }
+.f-mono  { font-family: var(--font-mono), monospace; }
+
+/* Input numerici delle diottrie: centrati e in mono, come al banco */
+input.diottria {
+  text-align: center;
+  font-family: var(--font-mono), monospace;
+  font-variant-numeric: tabular-nums;
+}
+
+::selection { background: #efe4d3; }
