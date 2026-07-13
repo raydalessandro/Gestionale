@@ -15,7 +15,7 @@ export const MODULI: ModuloGestionale[] = [
   { id: "dashboard", nome: "Dashboard", href: "/dashboard", icona: "dashboard", attivo: true },
   { id: "clienti", nome: "Clienti", href: "/clienti", icona: "clienti", attivo: true },
   { id: "ordini", nome: "Ordini & Buste", href: "/ordini", icona: "ordini", attivo: true },
-  { id: "magazzino", nome: "Magazzino", href: "/magazzino", icona: "magazzino", attivo: false, nota: "v0.3" },
+  { id: "magazzino", nome: "Magazzino", href: "/magazzino", icona: "magazzino", attivo: true },
   { id: "agenda", nome: "Agenda", href: "/agenda", icona: "agenda", attivo: false, nota: "v0.3" },
   { id: "cassa", nome: "Cassa", href: "/cassa", icona: "cassa", attivo: false, nota: "v0.4" },
 ];

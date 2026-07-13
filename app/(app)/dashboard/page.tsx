@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Plus, UserPlus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Card, PageHeader, ButtonLink, Badge, tintaFonte, Vuoto } from "@/components/ui";
+import { sottoScorta } from "@/components/MagazzinoUI";
 import { fmtData, ETICHETTE_FONTE } from "@/lib/utils";
 
 export default async function DashboardPage() {
@@ -11,7 +12,7 @@ export default async function DashboardPage() {
     .toISOString()
     .slice(0, 10);
 
-  const [clienti, prescrizioni, lac, buste, ultimi] = await Promise.all([
+  const [clienti, prescrizioni, lac, buste, ultimi, perScorta] = await Promise.all([
     supabase.from("clienti").select("*", { count: "exact", head: true }),
     supabase
       .from("prescrizioni")
@@ -30,7 +31,14 @@ export default async function DashboardPage() {
       .select("id, nome, cognome, fonte, created_at")
       .order("created_at", { ascending: false })
       .limit(5),
+    supabase
+      .from("prodotti")
+      .select("giacenza, scorta_minima, attivo")
+      .eq("attivo", true)
+      .gt("scorta_minima", 0),
   ]);
+
+  const nSottoScorta = (perScorta.data ?? []).filter((p) => sottoScorta(p)).length;
 
   const kpi = [
     { label: "Clienti in anagrafica", value: clienti.count ?? 0 },
@@ -76,6 +84,18 @@ export default async function DashboardPage() {
           );
         })}
       </div>
+
+      {nSottoScorta > 0 && (
+        <Link
+          href="/magazzino?vista=prodotti&filtro=sotto_scorta"
+          className="mb-6 flex items-center justify-between gap-2 rounded-xl border border-ambra/40 bg-ambra-soft px-4 py-3 text-sm font-medium text-ambra transition-colors hover:border-ambra"
+        >
+          <span>
+            {nSottoScorta} prodott{nSottoScorta === 1 ? "o" : "i"} sotto scorta
+          </span>
+          <span aria-hidden>→</span>
+        </Link>
+      )}
 
       <h2 className="f-serif mb-3 text-lg font-semibold text-inchiostro">
         Ultimi clienti

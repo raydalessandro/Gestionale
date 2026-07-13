@@ -33,8 +33,10 @@ export default function PrescrizioneForm({ clienteId }: { clienteId: string }) {
   const azioneBound = creaPrescrizione.bind(null, clienteId);
   const [stato, azione, inCorso] = useActionState(azioneBound, null);
 
-  const [tipo, setTipo] = useState<"occhiali" | "lac">("occhiali");
-  const [origine, setOrigine] = useState<"interna" | "esterna">("interna");
+  type TipoRx = "lontano" | "vicino" | "progressivo" | "bifocale" | "office" | "lac";
+  const [tipoRx, setTipoRx] = useState<TipoRx>("lontano");
+  const tipo: "occhiali" | "lac" = tipoRx === "lac" ? "lac" : "occhiali";
+  const [origine, setOrigine] = useState<"interna" | "esterna" | "lenti_precedenti">("interna");
   const [od, setOd] = useState<Occhio>(vuoto);
   const [os, setOs] = useState<Occhio>(vuoto);
   const [add, setAdd] = useState("");
@@ -104,25 +106,32 @@ export default function PrescrizioneForm({ clienteId }: { clienteId: string }) {
     <form action={azione} className="space-y-4">
       <Errore msg={stato?.errore} />
 
-      {/* Tipo + dati visita */}
+      {/* Tipo di prescrizione + dati visita */}
       <Card className="space-y-4">
         <input type="hidden" name="tipo" value={tipo} />
-        <div className="flex rounded-xl border border-linea bg-carta p-1">
-          {(["occhiali", "lac"] as const).map((t) => (
-            <button
-              key={t}
-              type="button"
-              onClick={() => setTipo(t)}
-              className={`flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
-                tipo === t
-                  ? "bg-inchiostro text-carta"
-                  : "text-soft hover:text-inchiostro"
-              }`}
-            >
-              {t === "occhiali" ? "Occhiali" : "Lenti a contatto"}
-            </button>
-          ))}
-        </div>
+        <input type="hidden" name="uso" value={tipoRx === "lac" ? "" : tipoRx} />
+
+        <Field
+          label="Tipo di prescrizione"
+          hint="Guida tutto il resto: griglia, prisma o geometria LAC, e a quali ordini si potrà collegare."
+        >
+          <select
+            className={inputCls}
+            value={tipoRx}
+            onChange={(e) => setTipoRx(e.target.value as TipoRx)}
+          >
+            <optgroup label="Occhiali">
+              <option value="lontano">Monofocale — lontano</option>
+              <option value="vicino">Monofocale — vicino</option>
+              <option value="progressivo">Progressivo</option>
+              <option value="bifocale">Bifocale</option>
+              <option value="office">Office</option>
+            </optgroup>
+            <optgroup label="Lenti a contatto">
+              <option value="lac">Lenti a contatto (LAC)</option>
+            </optgroup>
+          </select>
+        </Field>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label="Data visita">
@@ -138,13 +147,20 @@ export default function PrescrizioneForm({ clienteId }: { clienteId: string }) {
               name="origine"
               className={inputCls}
               value={origine}
-              onChange={(e) => setOrigine(e.target.value as "interna" | "esterna")}
+              onChange={(e) =>
+                setOrigine(
+                  e.target.value as "interna" | "esterna" | "lenti_precedenti"
+                )
+              }
             >
               <option value="interna">Rilevata in negozio</option>
               <option value="esterna">Ricetta esterna (oculista)</option>
+              <option value="lenti_precedenti">
+                Lenti del cliente (frontifocometro)
+              </option>
             </select>
           </Field>
-          {origine === "esterna" ? (
+          {origine === "esterna" && (
             <Field label="Esaminatore">
               <input
                 name="esaminatore"
@@ -152,31 +168,8 @@ export default function PrescrizioneForm({ clienteId }: { clienteId: string }) {
                 placeholder="Dr. Rossi"
               />
             </Field>
-          ) : (
-            <Field label="Uso">
-              <select name="uso" className={inputCls} defaultValue="">
-                <option value="">—</option>
-                <option value="lontano">Lontano</option>
-                <option value="vicino">Vicino</option>
-                <option value="progressivo">Progressivo</option>
-                <option value="bifocale">Bifocale</option>
-                <option value="office">Office</option>
-              </select>
-            </Field>
           )}
         </div>
-        {origine === "esterna" && (
-          <Field label="Uso" className="sm:max-w-[calc(33%-0.7rem)]">
-            <select name="uso" className={inputCls} defaultValue="">
-              <option value="">—</option>
-              <option value="lontano">Lontano</option>
-              <option value="vicino">Vicino</option>
-              <option value="progressivo">Progressivo</option>
-              <option value="bifocale">Bifocale</option>
-              <option value="office">Office</option>
-            </select>
-          </Field>
-        )}
       </Card>
 
       {/* Refrazione */}

@@ -126,3 +126,21 @@ export function rxValida(p: {
   scadenza.setMonth(scadenza.getMonth() + p.validita_mesi);
   return scadenza.getTime() >= Date.now();
 }
+
+/* ── Magazzino (fase 2) ────────────────────────────────────────────── */
+
+export const ETICHETTE_MOVIMENTO: Record<string, string> = {
+  carico: "Carico",
+  scarico: "Scarico",
+  ordine_cliente: "Ordine cliente",
+  rettifica: "Rettifica",
+  reso_fornitore: "Reso a fornitore",
+  danno: "Danno / smaltimento",
+  uso_interno: "Uso interno",
+};
+
+export const STATI_FERMO: StatoPipeline[] = [
+  { id: "attivo", label: "Attivo", bg: "#F7EEDD", fg: "#C98A2B" },
+  { id: "ritirato", label: "Ritirato", bg: "#F2F5F4", fg: "#274744" },
+  { id: "annullato", label: "Annullato", bg: "#F6E4E2", fg: "#B0483F" },
+];
