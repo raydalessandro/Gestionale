@@ -117,11 +117,12 @@ role. La numerazione per anno riparte da 1 a Capodanno (atteso).
    (`IN_CARICO_MANUALI`). Azione richiesta: l'agente manuali scrive i tre
    capitoli e, quando esistono, si toglie la voce dalla allowlist (la guardia
    scatterà da sola su qualunque futuro modulo attivo senza capitolo).
-2. Etichette vere (`Field label`/`aria-label`) sui `select` di
-   `components/AzioniMagazzino.tsx` e `components/AzioniRichiami.tsx`, e sul
-   campo **Descrizione** del `WizardVendita` (oggi solo `placeholder`): gli E2E
-   ripiegano su `getByPlaceholder`/`combobox`. Migliorerebbe anche
-   l'accessibilità. **Non applicato: da valutare.**
+2. ~~Etichette vere (`aria-label`) sui `select` di `AzioniMagazzino`/
+   `AzioniRichiami` e sul campo **Descrizione** del `WizardVendita`.~~
+   **APPLICATO (v0.6).** Aggiunti `aria-label` ai `select` direzione/tipo
+   movimento (`AzioniMagazzino`), canale/esito/tipo richiamo (`AzioniRichiami`)
+   e all'input descrizione riga (`WizardVendita`). Gli E2E possono ora usare
+   `getByLabel`; migliora anche l'accessibilità.
 3. `tsconfig.json` `exclude` di `tests`/`e2e` e `.gitignore` degli artefatti
    Playwright: **applicati dall'orchestratore** (fuori dalla proprietà dell'agente test).
 

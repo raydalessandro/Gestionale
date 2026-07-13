@@ -24,10 +24,13 @@ non documentati stampa fiscale reale, invio Sistema TS, saldi gift card.
 
 ## Incoerenze UI↔spec (segnalate, non corrette)
 
-1. **"Ripianifica" non esiste come bottone.** La spec Fase 3 §2.5 lo prevede
-   (esito "Da richiamare" → nuovo richiamo automatico a +3 gg); `registraEsitoRichiamo`
-   registra solo l'esito. Documentato il comportamento reale (poi "Nuovo
-   richiamo"/"Pianifica"). **Da decidere: implementare o allineare la spec.**
+1. ~~**"Ripianifica" non esiste come bottone.**~~ **RISOLTO (v0.6).** La spec
+   Fase 3 §2.5 lo prevede (esito "Da richiamare" → nuovo richiamo a +3 gg).
+   Implementato: nello storico, ogni riga con esito "Da richiamare" mostra il
+   bottone **"Ripianifica"** (componente `Ripianifica` in
+   `components/AzioniRichiami.tsx`) che riusa `creaRichiamo` con data default
+   +3 gg e riferimento/valore precompilati. Capitolo 06 aggiornato di
+   conseguenza.
 2. **Ingranaggio "Impostazioni" in `/cassa` senza etichetta** (solo icona);
    la spec §3.2 la chiama "Impostazioni".
 3. **Movimenti di cassa** stanno nel riquadro della home Cassa (form "Registra

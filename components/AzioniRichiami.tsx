@@ -24,13 +24,13 @@ function CampiEsito({ valore }: { valore: number | null }) {
   return (
     <>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <select name="canale" defaultValue="" required className={inputCls}>
+        <select name="canale" defaultValue="" required className={inputCls} aria-label="canale del richiamo">
           <option value="" disabled>Canale…</option>
           {Object.entries(CANALI_RICHIAMO).map(([id, l]) => (
             <option key={id} value={id}>{l}</option>
           ))}
         </select>
-        <select name="esito" defaultValue="" required className={inputCls}>
+        <select name="esito" defaultValue="" required className={inputCls} aria-label="esito del richiamo">
           <option value="" disabled>Esito…</option>
           {Object.entries(ESITI_RICHIAMO).map(([id, l]) => (
             <option key={id} value={id}>{l}</option>
@@ -130,6 +130,37 @@ export function PianificaProposta({ proposta }: { proposta: PropostaMini }) {
   );
 }
 
+export function Ripianifica({ proposta }: { proposta: PropostaMini }) {
+  const [aperto, setAperto] = useState(false);
+  const [stato, run, inCorso] = useActionState(creaRichiamo, null);
+  const [piu3] = useState(() => new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10));
+  if (!aperto) {
+    return (
+      <button type="button" onClick={() => setAperto(true)} className={`${btn} ${stili.ghost}`}>
+        Ripianifica
+      </button>
+    );
+  }
+  return (
+    <form action={run} className="w-full space-y-2 rounded-xl border border-linea bg-carta p-3">
+      <input type="hidden" name="tipo" value={proposta.tipo} />
+      <input type="hidden" name="cliente_id" value={proposta.cliente_id} />
+      <input type="hidden" name="riferimento" value={proposta.riferimento ?? ""} />
+      <input type="hidden" name="valore" value={proposta.valore ?? ""} />
+      <div className="flex items-center gap-2">
+        <label className="text-xs text-soft">Richiama di nuovo il</label>
+        <input name="da_fare_il" type="date" defaultValue={piu3} className={inputCls} aria-label="data ripianificazione" />
+      </div>
+      <p className="text-[11px] text-faint">Crea un nuovo richiamo: la riga di oggi resta nello storico.</p>
+      <Errore msg={stato?.errore} />
+      <div className="flex gap-2">
+        <button type="submit" disabled={inCorso} className={`${btn} ${stili.primary}`}>{inCorso ? "…" : "Ripianifica"}</button>
+        <button type="button" onClick={() => setAperto(false)} className={`${btn} ${stili.ghost}`}>Chiudi</button>
+      </div>
+    </form>
+  );
+}
+
 type ClienteMini = { id: string; nome: string; cognome: string };
 
 export function NuovoRichiamo() {
@@ -180,7 +211,7 @@ export function NuovoRichiamo() {
         </div>
       )}
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <select name="tipo" defaultValue="generico" className={inputCls}>
+        <select name="tipo" defaultValue="generico" className={inputCls} aria-label="tipo di richiamo">
           {Object.entries(TIPI_RICHIAMO).map(([id, l]) => (<option key={id} value={id}>{l}</option>))}
         </select>
         <input name="da_fare_il" type="date" defaultValue={oggi} className={inputCls} />

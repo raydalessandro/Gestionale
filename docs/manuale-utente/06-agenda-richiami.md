@@ -165,9 +165,12 @@ resta tutta.
   per mancanza di consenso marketing". Togli o rimetti il consenso dalla scheda
   cliente e le proposte spariscono o ricompaiono.
 - **Richiamare non è fallire.** Se registri esito "Da richiamare", il tentativo
-  resta nello storico. Per riprovare più avanti crea un nuovo richiamo per quel
-  cliente (con "Nuovo richiamo" o "Pianifica" dalla proposta): ogni tentativo è
-  una riga a sé, quello vecchio non si tocca.
+  resta nello storico e ti compare sotto un bottone **"Ripianifica"**: premilo,
+  ti propone già la data fra tre giorni (puoi cambiarla) e con un clic rimette
+  quel cliente in coda. Nasce un nuovo richiamo, con lo stesso riferimento e
+  valore di quello vecchio; la riga di oggi non si tocca, resta nello storico.
+  In alternativa puoi sempre crearne uno da zero con "Nuovo richiamo" o
+  "Pianifica" da una proposta: ogni tentativo è una riga a sé.
 - **La proposta non si ripresenta.** Appena registri l'esito o pianifichi un
   richiamo, quella proposta smette di comparire, così non richiami due volte la
   stessa persona. Se dopo un po' di tempo la situazione è ancora aperta,

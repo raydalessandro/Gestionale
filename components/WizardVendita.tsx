@@ -168,7 +168,7 @@ export default function WizardVendita({
         {righe.map((r, i) => (
           <div key={i} className="space-y-2 rounded-xl border border-linea p-3">
             <div className="flex items-start gap-2">
-              <input value={r.descrizione} onChange={(e) => setRiga(i, { descrizione: e.target.value })} placeholder="Descrizione" className={`${inputCls} flex-1`} />
+              <input value={r.descrizione} onChange={(e) => setRiga(i, { descrizione: e.target.value })} placeholder="Descrizione" className={`${inputCls} flex-1`} aria-label="descrizione riga" />
               {righe.length > 1 && (
                 <button type="button" onClick={() => setRighe((rr) => rr.filter((_, j) => j !== i))} className="mt-1 shrink-0 text-faint hover:text-rosso" aria-label="Rimuovi riga"><Trash2 size={16} /></button>
               )}
