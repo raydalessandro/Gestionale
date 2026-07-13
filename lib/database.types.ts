@@ -160,6 +160,55 @@ export type FermoRow = {
   updated_at: string;
 }
 
+export type AppuntamentoRow = {
+  id: string;
+  azienda_id: string;
+  cliente_id: string | null;
+  utente_id: string | null;
+  tipo:
+    | "controllo_vista"
+    | "consegna"
+    | "ritiro_lac"
+    | "prima_applicazione_lac"
+    | "altro";
+  inizio: string;
+  durata_minuti: number;
+  stato: "prenotato" | "completato" | "mancato" | "annullato";
+  riferimento: string | null;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type RichiamoRow = {
+  id: string;
+  azienda_id: string;
+  cliente_id: string;
+  utente_id: string | null;
+  tipo:
+    | "controllo_vista"
+    | "lac_esaurimento"
+    | "ritiro_sollecito"
+    | "fermo_scadenza"
+    | "promessa_ritardo"
+    | "generico";
+  da_fare_il: string;
+  canale: "telefono" | "whatsapp" | "sms" | "email" | "di_persona" | null;
+  esito:
+    | "appuntamento_fissato"
+    | "richiamare"
+    | "non_risponde"
+    | "non_interessato"
+    | "gestito"
+    | null;
+  fatto_il: string | null;
+  riferimento: string | null;
+  valore: number | null;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 /** Shape documentata di ordini_lac.righe (vedi schema.sql). */
 export type RigaOrdineLac = {
   prodotto_id?: string | null;
@@ -260,6 +309,8 @@ export type Database = {
       prodotti: { Row: ProdottoRow; Insert: Ins<ProdottoRow>; Update: Upd<ProdottoRow>; Relationships: [] };
       movimenti_magazzino: { Row: MovimentoMagazzinoRow; Insert: Omit<Partial<MovimentoMagazzinoRow>, "id" | "created_at"> & { id?: string }; Update: never; Relationships: [] };
       fermi: { Row: FermoRow; Insert: Ins<FermoRow>; Update: Upd<FermoRow>; Relationships: [] };
+      appuntamenti: { Row: AppuntamentoRow; Insert: Ins<AppuntamentoRow>; Update: Upd<AppuntamentoRow>; Relationships: [] };
+      richiami: { Row: RichiamoRow; Insert: Ins<RichiamoRow>; Update: Upd<RichiamoRow>; Relationships: [] };
       ordini_lac: { Row: OrdineLacRow; Insert: Ins<OrdineLacRow>; Update: Upd<OrdineLacRow>; Relationships: [] };
       ordini_occhiali: { Row: OrdineOcchialiRow; Insert: Ins<OrdineOcchialiRow>; Update: Upd<OrdineOcchialiRow>; Relationships: [] };
     };

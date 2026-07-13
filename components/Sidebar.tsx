@@ -9,6 +9,7 @@ import {
   Package,
   Boxes,
   CalendarDays,
+  PhoneCall,
   Receipt,
   LogOut,
   Lock,
@@ -22,6 +23,7 @@ const ICONE = {
   ordini: Package,
   magazzino: Boxes,
   agenda: CalendarDays,
+  richiami: PhoneCall,
   cassa: Receipt,
 } as const;
 

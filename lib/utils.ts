@@ -144,3 +144,52 @@ export const STATI_FERMO: StatoPipeline[] = [
   { id: "ritirato", label: "Ritirato", bg: "#F2F5F4", fg: "#274744" },
   { id: "annullato", label: "Annullato", bg: "#F6E4E2", fg: "#B0483F" },
 ];
+
+/* ── Agenda & Richiami (fase 3) ────────────────────────────────────── */
+
+export const TIPI_APPUNTAMENTO: Record<string, string> = {
+  controllo_vista: "Controllo vista",
+  consegna: "Consegna",
+  ritiro_lac: "Ritiro LAC",
+  prima_applicazione_lac: "Prima applicazione LAC",
+  altro: "Altro",
+};
+
+export const STATI_APPUNTAMENTO: StatoPipeline[] = [
+  { id: "prenotato", label: "Prenotato", bg: "#E7EAF6", fg: "#5B6DA8" },
+  { id: "completato", label: "Completato", bg: "#E2F0EE", fg: "#127E7A" },
+  { id: "mancato", label: "Non presentato", bg: "#F7EEDD", fg: "#C98A2B" },
+  { id: "annullato", label: "Annullato", bg: "#F6E4E2", fg: "#B0483F" },
+];
+
+export const TIPI_RICHIAMO: Record<string, string> = {
+  controllo_vista: "Controllo vista in scadenza",
+  lac_esaurimento: "LAC in esaurimento",
+  ritiro_sollecito: "Sollecito ritiro",
+  fermo_scadenza: "Fermo in scadenza",
+  promessa_ritardo: "Promessa in ritardo",
+  generico: "Richiamo",
+};
+
+export const ESITI_RICHIAMO: Record<string, string> = {
+  appuntamento_fissato: "Appuntamento fissato",
+  richiamare: "Da richiamare",
+  non_risponde: "Non risponde",
+  non_interessato: "Non interessato",
+  gestito: "Gestito",
+};
+
+export const CANALI_RICHIAMO: Record<string, string> = {
+  telefono: "Telefono",
+  whatsapp: "WhatsApp",
+  sms: "SMS",
+  email: "Email",
+  di_persona: "Di persona",
+};
+
+/** Data di scadenza di una prescrizione (data visita + validità). */
+export function scadenzaRx(p: { data_visita: string; validita_mesi: number }): Date {
+  const d = new Date(p.data_visita);
+  d.setMonth(d.getMonth() + p.validita_mesi);
+  return d;
+}

@@ -6,7 +6,7 @@ export interface ModuloGestionale {
   id: string;
   nome: string;
   href: string;
-  icona: "dashboard" | "clienti" | "prescrizioni" | "ordini" | "magazzino" | "cassa" | "agenda";
+  icona: "dashboard" | "clienti" | "prescrizioni" | "ordini" | "magazzino" | "cassa" | "agenda" | "richiami";
   attivo: boolean;
   nota?: string;
 }
@@ -16,6 +16,7 @@ export const MODULI: ModuloGestionale[] = [
   { id: "clienti", nome: "Clienti", href: "/clienti", icona: "clienti", attivo: true },
   { id: "ordini", nome: "Ordini & Buste", href: "/ordini", icona: "ordini", attivo: true },
   { id: "magazzino", nome: "Magazzino", href: "/magazzino", icona: "magazzino", attivo: true },
-  { id: "agenda", nome: "Agenda", href: "/agenda", icona: "agenda", attivo: false, nota: "v0.3" },
-  { id: "cassa", nome: "Cassa", href: "/cassa", icona: "cassa", attivo: false, nota: "v0.4" },
+  { id: "agenda", nome: "Agenda", href: "/agenda", icona: "agenda", attivo: true },
+  { id: "richiami", nome: "Richiami", href: "/richiami", icona: "richiami", attivo: true },
+  { id: "cassa", nome: "Cassa", href: "/cassa", icona: "cassa", attivo: false, nota: "v0.5" },
 ];
