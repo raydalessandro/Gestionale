@@ -131,3 +131,175 @@ describe("L4 · guardie statiche sul codice applicativo", () => {
     expect(src).toMatch(/rpc\(\s*["']prossimo_numero["']/);
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * L4b · GUARDIE DI COERENZA — colpiscono funzioni fantasma, bottoni mancati e
+ * codice morto: componenti mai importati, pagine di moduli attivi irraggiungibili,
+ * server action mai referenziate, moduli attivi senza capitolo di manuale.
+ *
+ * Filosofia: leggono il sorgente (nessuna rete) e scattano sui casi VERI. Dove
+ * un controllo simbolo-per-simbolo sarebbe troppo aggressivo, il trade-off è
+ * documentato e la guardia è resa tollerante ai falsi positivi noti (primitive
+ * del design-system in ui.tsx, mappe di costanti UPPER_CASE, moduli il cui
+ * capitolo di manuale è ancora in carico all'agente manuali).
+ * ════════════════════════════════════════════════════════════════════════ */
+
+const rel = (p: string) => p.replace(ROOT, "").replace(/^\//, "");
+
+/** Identificatori esportati (function/const/class, anche default). */
+function exportNames(src: string): string[] {
+  const re = /export\s+(?:default\s+)?(?:async\s+)?(?:function|const|class)\s+([A-Za-z0-9_]+)/g;
+  const out: string[] = [];
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(src))) out.push(m[1]);
+  return out;
+}
+
+/** Il simbolo `name` compare in qualche file diverso da `self`? */
+function referencedElsewhere(name: string, self: string, files: string[]): boolean {
+  const re = new RegExp(`\\b${name}\\b`);
+  for (const f of files) {
+    if (f === self) continue;
+    if (re.test(readFileSync(f, "utf8"))) return true;
+  }
+  return false;
+}
+
+/** Qualche file importa dal modulo che definisce `file` (default import, anche rinominato)? */
+function fileImportedSomewhere(file: string, files: string[]): boolean {
+  const base = file.replace(ROOT, "").replace(/^\//, "").replace(/\.(ts|tsx)$/, "");
+  // base es. "components/WizardVendita" → cerco un import che finisca con quel path.
+  const re = new RegExp(`from\\s+["']@?/?${base.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}["']`);
+  for (const f of files) {
+    if (f === file) continue;
+    if (re.test(readFileSync(f, "utf8"))) return true;
+  }
+  return false;
+}
+
+describe("L4b · guardie di coerenza (codice morto, orfani, fantasmi)", () => {
+  const compFiles = sorgenti("components");
+  const tuttoIlCodice = [...sorgenti("app"), ...sorgenti("components"), ...sorgenti("lib")];
+
+  it("G5 · nessun file in components/ è morto (almeno un export usato altrove)", () => {
+    const morti: string[] = [];
+    for (const f of compFiles) {
+      const nomi = exportNames(readFileSync(f, "utf8"));
+      const vivo =
+        fileImportedSomewhere(f, tuttoIlCodice) ||
+        nomi.some((n) => referencedElsewhere(n, f, tuttoIlCodice));
+      if (!vivo) morti.push(rel(f));
+    }
+    expect(morti, `componenti-file mai importati (codice morto): ${morti.join(", ")}`).toEqual([]);
+  });
+
+  it("G6 · ogni componente React esportato (PascalCase) è renderizzato/importato da qualche parte", () => {
+    // Trade-off documentato: si escludono le primitive del design-system in
+    // components/ui.tsx (esistono anche se non ancora usate) e le costanti
+    // UPPER_CASE (non sono componenti). Restano i componenti-bottone veri: uno
+    // costruito e mai agganciato a una pagina qui scatta.
+    const orfani: string[] = [];
+    for (const f of compFiles) {
+      if (f.endsWith("/ui.tsx")) continue;
+      for (const nome of exportNames(readFileSync(f, "utf8"))) {
+        if (!/^[A-Z]/.test(nome)) continue; // solo Componenti
+        if (/^[A-Z0-9_]+$/.test(nome)) continue; // salta le COSTANTI
+        const usato =
+          referencedElsewhere(nome, f, tuttoIlCodice) || fileImportedSomewhere(f, tuttoIlCodice);
+        if (!usato) orfani.push(`${rel(f)}→${nome}`);
+      }
+    }
+    expect(orfani, `componenti esportati mai usati: ${orfani.join(", ")}`).toEqual([]);
+  });
+
+  it("G7 · nessuna pagina di un modulo attivo è orfana (raggiungibile via link/redirect)", () => {
+    const modSrc = leggi("lib/modules.ts");
+    const oggetti = modSrc.match(/\{[^}]*\}/g) ?? [];
+    const hrefAttivi = oggetti
+      .filter((o) => /attivo:\s*true/.test(o))
+      .map((o) => o.match(/href:\s*"([^"]+)"/)?.[1])
+      .filter((h): h is string => Boolean(h));
+
+    // Solo le pagine sotto app/(app)/<modulo>/ (come da ordine di lavoro).
+    const pagine = sorgenti("app").filter(
+      (f) => /page\.tsx$/.test(f) && rel(f).startsWith("app/(app)/")
+    );
+    const routeOf = (f: string) => {
+      let r = rel(f).replace(/^app\//, "").replace(/\/page\.tsx$/, "");
+      r = r.replace(/\([^)]*\)\/?/g, ""); // via i route-group
+      return "/" + r.replace(/^\/+/, "");
+    };
+    const tuttoTesto = tuttoIlCodice.map((f) => readFileSync(f, "utf8")).join("\n");
+
+    const orfane: string[] = [];
+    for (const f of pagine) {
+      const route = routeOf(f);
+      const modulo = hrefAttivi.find((h) => route === h || route.startsWith(h + "/"));
+      if (!modulo) continue; // pagina fuori dai moduli attivi: non compete a questa guardia
+      if (route === modulo) continue; // indice del modulo: raggiungibile dalla Sidebar
+
+      const segs = route.split("/");
+      const dyn = segs.findIndex((s) => s.startsWith("["));
+      // Prefisso statico fino al primo segmento dinamico (i dettagli si linkano
+      // con `${id}`), oppure la route intera se non ha segmenti dinamici.
+      const needle = dyn === -1 ? route : segs.slice(0, dyn).join("/") + "/";
+      const re = new RegExp(needle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+      if (!re.test(tuttoTesto)) orfane.push(`${route} (cerco: ${needle})`);
+    }
+    expect(orfane, `pagine di moduli attivi non raggiungibili: ${orfane.join(", ")}`).toEqual([]);
+  });
+
+  it("G8 · nessuna server action fantasma in lib/actions.ts (ogni export è referenziato)", () => {
+    const src = leggi("lib/actions.ts");
+    const re = /export\s+async\s+function\s+([A-Za-z0-9_]+)/g;
+    const actionsFile = join(ROOT, "lib/actions.ts");
+    const fantasma: string[] = [];
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(src))) {
+      const nome = m[1];
+      if (!referencedElsewhere(nome, actionsFile, tuttoIlCodice)) fantasma.push(nome);
+    }
+    expect(fantasma, `server action mai referenziate: ${fantasma.join(", ")}`).toEqual([]);
+  });
+
+  it("G9 · ogni modulo attivo ha un capitolo di manuale (allineamento con l'agente manuali)", () => {
+    // Mappa modulo → parole-chiave che ne identificano il capitolo nel nome file.
+    const SINONIMI: Record<string, string[]> = {
+      dashboard: ["benvenuto", "dashboard", "home"],
+      clienti: ["clienti"],
+      prescrizioni: ["prescrizioni"],
+      ordini: ["ordini", "buste"],
+      magazzino: ["magazzino"],
+      agenda: ["agenda"],
+      richiami: ["richiami"],
+      cassa: ["cassa", "vendite", "vendita"],
+    };
+    // Allowlist DOCUMENTATA: capitoli ancora in carico all'agente manuali (Fasi
+    // 3–4). È un gancio reale, non un falso positivo → vedi report-test.md. La
+    // guardia resta verde su questi, ma scatta su QUALSIASI nuovo modulo attivo
+    // senza capitolo e non elencato qui.
+    // I capitoli di agenda/richiami/cassa ora esistono: la guardia li verifica.
+    // Aggiungere qui SOLO moduli attivi il cui capitolo è temporaneamente in
+    // carico all'agente manuali (allowlist esplicita, si svuota appena scritto).
+    const IN_CARICO_MANUALI = new Set<string>([]);
+
+    const modSrc = leggi("lib/modules.ts");
+    const oggetti = modSrc.match(/\{[^}]*\}/g) ?? [];
+    const attivi = oggetti
+      .filter((o) => /attivo:\s*true/.test(o))
+      .map((o) => o.match(/id:\s*"([^"]+)"/)?.[1])
+      .filter((id): id is string => Boolean(id));
+
+    const capitoli = readdirSync(join(ROOT, "docs/manuale-utente")).join("\n").toLowerCase();
+    const scoperti: string[] = [];
+    for (const id of attivi) {
+      if (IN_CARICO_MANUALI.has(id)) continue;
+      const kw = SINONIMI[id] ?? [id];
+      if (!kw.some((k) => capitoli.includes(k))) scoperti.push(id);
+    }
+    expect(
+      scoperti,
+      `moduli attivi senza capitolo di manuale (né in allowlist): ${scoperti.join(", ")}`
+    ).toEqual([]);
+  });
+});

@@ -124,6 +124,41 @@ export async function seedLacConsegnato(aziendaId: string, clienteId: string): P
   return numero;
 }
 
+/**
+ * Inserisce una busta "pronta" con prezzi di dettaglio e acconto: lo stato di
+ * partenza di Fase 4 · S3 (consegna con caparra + doppio incasso). Ritorna id e
+ * numero. La busta è avvisata (pronta): il dettaglio mostra "Consegna e incassa"
+ * quando il modulo cassa è attivo.
+ */
+export async function seedBustaProntaConAcconto(
+  aziendaId: string,
+  clienteId: string,
+  opts: { totale: number; acconto: number; prezzoMontatura?: number; prezzoLenti?: number } = {
+    totale: 965,
+    acconto: 780,
+  }
+): Promise<{ id: string; numero: string }> {
+  const svc = service();
+  const numero = `BL-SEED-${unico()}`;
+  const { data, error } = await svc
+    .from("ordini_occhiali")
+    .insert({
+      azienda_id: aziendaId,
+      cliente_id: clienteId,
+      numero,
+      stato: "pronta",
+      tipo_lavoro: "occhiale_completo",
+      totale: opts.totale,
+      acconto: opts.acconto,
+      prezzo_montatura: opts.prezzoMontatura ?? 0,
+      prezzo_lenti: opts.prezzoLenti ?? 0,
+    })
+    .select("id")
+    .single();
+  if (error) throw new Error(`seedBustaProntaConAcconto: ${error.message}`);
+  return { id: data.id as string, numero };
+}
+
 /** Attesa "morbida" su un valore che il server rivaluta (evita sleep fissi). */
 export async function attendi(page: Page, cond: () => Promise<boolean>, tent = 20): Promise<void> {
   for (let i = 0; i < tent; i++) {
