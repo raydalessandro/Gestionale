@@ -305,6 +305,7 @@ export async function creaOrdineLac(
     };
 
     righe.push({
+      prodotto_id: typeof r.prodotto_id === "string" ? r.prodotto_id : null,
       descrizione,
       occhio,
       parametri: {

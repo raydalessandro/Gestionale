@@ -22,7 +22,7 @@ export default async function ClientePage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const [{ data: cliente }, { data: prescrizioni }, { data: lac }, { data: buste }] =
+  const [{ data: cliente }, { data: prescrizioni }, { data: lac }, { data: buste }, fermiAttivi] =
     await Promise.all([
       supabase.from("clienti").select("*").eq("id", id).maybeSingle(),
       supabase
@@ -43,6 +43,11 @@ export default async function ClientePage({
         .eq("cliente_id", id)
         .order("created_at", { ascending: false })
         .limit(5),
+      supabase
+        .from("fermi")
+        .select("*", { count: "exact", head: true })
+        .eq("cliente_id", id)
+        .eq("stato", "attivo"),
     ]);
 
   if (!cliente) notFound();
@@ -161,6 +166,19 @@ export default async function ClientePage({
             </Link>
           }
         />
+      )}
+
+      {(fermiAttivi.count ?? 0) > 0 && (
+        <Link
+          href="/magazzino?vista=fermi&filtro=attivo"
+          className="mt-8 flex items-center justify-between gap-2 rounded-xl border border-ambra/40 bg-ambra-soft px-4 py-3 text-sm font-medium text-ambra transition-colors hover:border-ambra"
+        >
+          <span>
+            Ha {fermiAttivi.count} articol{fermiAttivi.count === 1 ? "o" : "i"} fermat
+            {fermiAttivi.count === 1 ? "o" : "i"} in negozio
+          </span>
+          <span aria-hidden>→</span>
+        </Link>
       )}
 
       <div className="mb-3 mt-8 flex items-center justify-between gap-2">

@@ -102,7 +102,7 @@ Il piano completo fase per fase è in [`docs/fasi/piano.md`](docs/fasi/piano.md)
 - **v0.2 — Ordini & Buste**: pipeline LAC e busta lavoro — ✅ **fatto**
   (spec: `docs/fasi/fase-1-ordini-buste.md` · verifica:
   `docs/fasi/fase-1-verifica-spec.md`).
-- **v0.3 — Catalogo & Magazzino**: **in codifica** (DB: migrazione 003 ·
+- **v0.3 — Catalogo & Magazzino**: ✅ **fatto** (DB: migrazione 003 ·
   spec: `docs/fasi/fase-2-catalogo-magazzino.md`).
 - **v0.4 — Agenda & Richiami**: appuntamenti, richiami dalle regole di dominio.
 - **v0.4 — Cassa**: vendite, incassi, prima base per il ROI reale.

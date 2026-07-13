@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { Search, Trash2, Plus, Wand2 } from "lucide-react";
+import { Search, Trash2, Plus, Wand2, PackageSearch } from "lucide-react";
 import { creaOrdineLac } from "@/lib/actions";
 import { createClient } from "@/lib/supabase/client";
 import type { PrescrizioneRow } from "@/lib/database.types";
@@ -17,6 +17,7 @@ type ClienteMini = {
 };
 
 type RigaState = {
+  prodotto_id: string | null;
   descrizione: string;
   occhio: "" | "OD" | "OS";
   sfero: string;
@@ -30,6 +31,7 @@ type RigaState = {
 };
 
 const rigaVuota: RigaState = {
+  prodotto_id: null,
   descrizione: "",
   occhio: "",
   sfero: "",
@@ -40,6 +42,16 @@ const rigaVuota: RigaState = {
   addizione: "",
   quantita: "1",
   prezzo: "0",
+};
+
+type ProdottoCatalogo = {
+  id: string;
+  marca: string | null;
+  nome: string;
+  prezzo: number;
+  tipo: string;
+  giacenza: number;
+  parametri: unknown;
 };
 
 function n(s: string): number | null {
@@ -68,6 +80,30 @@ export default function WizardOrdineLac({
   const [rxId, setRxId] = useState<string | null>(null);
 
   const [righe, setRighe] = useState<RigaState[]>([{ ...rigaVuota }]);
+
+  // Catalogo (Da catalogo)
+  const [catAperto, setCatAperto] = useState(false);
+  const [catTerm, setCatTerm] = useState("");
+  const [catRisultati, setCatRisultati] = useState<ProdottoCatalogo[]>([]);
+
+  useEffect(() => {
+    if (!catAperto || catTerm.trim().length < 2) {
+      setCatRisultati([]);
+      return;
+    }
+    const t = setTimeout(async () => {
+      const q = catTerm.trim().replace(/[%,]/g, "");
+      const { data } = await supabase
+        .from("prodotti")
+        .select("id, marca, nome, prezzo, tipo, giacenza, parametri")
+        .eq("attivo", true)
+        .in("tipo", ["lac", "soluzione"])
+        .or(`nome.ilike.%${q}%,marca.ilike.%${q}%,sku.ilike.%${q}%`)
+        .limit(8);
+      setCatRisultati((data ?? []) as ProdottoCatalogo[]);
+    }, 250);
+    return () => clearTimeout(t);
+  }, [catTerm, catAperto, supabase]);
 
   useEffect(() => {
     if (cliente || term.trim().length < 2) {
@@ -123,8 +159,25 @@ export default function WizardOrdineLac({
     0
   );
 
+  function daCatalogo(p: ProdottoCatalogo) {
+    const par = (p.parametri ?? {}) as Record<string, unknown>;
+    const conf = typeof par.confezione === "string" ? ` ${par.confezione}` : "";
+    setRighe((rr) => [
+      ...rr.filter((r) => r.descrizione.trim() !== "" || r.prodotto_id),
+      {
+        ...rigaVuota,
+        prodotto_id: p.id,
+        descrizione: `${[p.marca, p.nome].filter(Boolean).join(" ")}${conf}`.trim(),
+        prezzo: String(p.prezzo),
+        raggio: typeof par.raggio === "number" ? String(par.raggio) : "",
+        diametro: typeof par.diametro === "number" ? String(par.diametro) : "",
+      },
+    ]);
+  }
+
   const righeJson = JSON.stringify(
     righe.map((r) => ({
+      prodotto_id: r.prodotto_id,
       descrizione: r.descrizione,
       occhio: r.occhio || null,
       parametri: {
@@ -217,7 +270,7 @@ export default function WizardOrdineLac({
               <p className="text-xs font-semibold uppercase tracking-wide text-faint">
                 Righe ordine
               </p>
-              <div className="flex gap-1.5">
+              <div className="flex flex-wrap gap-1.5">
                 {rxSelezionata && (
                   <button
                     type="button"
@@ -229,6 +282,17 @@ export default function WizardOrdineLac({
                 )}
                 <button
                   type="button"
+                  onClick={() => setCatAperto((v) => !v)}
+                  className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${
+                    catAperto
+                      ? "border-inchiostro bg-inchiostro text-carta"
+                      : "border-ottone bg-ottone-soft text-ottone-scuro"
+                  }`}
+                >
+                  <PackageSearch size={13} /> Da catalogo
+                </button>
+                <button
+                  type="button"
                   onClick={() => setRighe((r) => [...r, { ...rigaVuota }])}
                   className="inline-flex items-center gap-1.5 rounded-full border border-linea bg-white px-3 py-1 text-xs font-medium text-soft hover:border-faint hover:text-inchiostro"
                 >
@@ -236,6 +300,47 @@ export default function WizardOrdineLac({
                 </button>
               </div>
             </div>
+
+            {catAperto && (
+              <div className="rounded-xl border border-linea bg-carta p-3">
+                <div className="relative">
+                  <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
+                  <input
+                    value={catTerm}
+                    onChange={(e) => setCatTerm(e.target.value)}
+                    placeholder="Cerca LAC o soluzione a catalogo…"
+                    className={`${inputCls} !pl-9`}
+                  />
+                </div>
+                {catRisultati.length > 0 && (
+                  <div className="mt-2 divide-y divide-linea rounded-xl border border-linea bg-white">
+                    {catRisultati.map((p) => (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => {
+                          daCatalogo(p);
+                          setCatTerm("");
+                          setCatRisultati([]);
+                          setCatAperto(false);
+                        }}
+                        className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-carta"
+                      >
+                        <span className="min-w-0 truncate font-medium text-inchiostro">
+                          {[p.marca, p.nome].filter(Boolean).join(" ")}
+                        </span>
+                        <span className="shrink-0 text-xs text-faint">
+                          {fmtEuro(p.prezzo)} · disp. {p.giacenza}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                {catTerm.trim().length >= 2 && catRisultati.length === 0 && (
+                  <p className="mt-2 text-xs text-faint">Nessun prodotto a catalogo.</p>
+                )}
+              </div>
+            )}
 
             {righe.map((r, i) => (
               <RigaEditor
