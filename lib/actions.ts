@@ -157,7 +157,10 @@ export async function creaPrescrizione(
   const supabase = await createClient();
 
   const tipo = (str(formData, "tipo") ?? "occhiali") as "occhiali" | "lac";
-  const origine = (str(formData, "origine") ?? "interna") as "interna" | "esterna";
+  const origine = (str(formData, "origine") ?? "interna") as
+    | "interna"
+    | "esterna"
+    | "lenti_precedenti";
 
   const asseValido = (v: number | null) =>
     v === null || (v >= 0 && v <= 180);

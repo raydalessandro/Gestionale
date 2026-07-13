@@ -119,6 +119,43 @@ export type ProdottoRow = {
   visibile_sito: boolean;
   attivo: boolean;
   parametri: Json;
+  giacenza: number;
+  scorta_minima: number;
+  costo: number | null;
+  fornitore: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type MovimentoMagazzinoRow = {
+  id: string;
+  azienda_id: string;
+  prodotto_id: string;
+  utente_id: string | null;
+  tipo:
+    | "carico"
+    | "scarico"
+    | "ordine_cliente"
+    | "rettifica"
+    | "reso_fornitore"
+    | "danno"
+    | "uso_interno";
+  quantita: number;
+  riferimento: string | null;
+  note: string | null;
+  created_at: string;
+}
+
+export type FermoRow = {
+  id: string;
+  azienda_id: string;
+  prodotto_id: string;
+  cliente_id: string;
+  utente_id: string | null;
+  quantita: number;
+  stato: "attivo" | "ritirato" | "annullato";
+  scade_il: string | null;
+  note: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -221,6 +258,8 @@ export type Database = {
       clienti: { Row: ClienteRow; Insert: Ins<ClienteRow>; Update: Upd<ClienteRow>; Relationships: [] };
       prescrizioni: { Row: PrescrizioneRow; Insert: Ins<PrescrizioneRow>; Update: Upd<PrescrizioneRow>; Relationships: [] };
       prodotti: { Row: ProdottoRow; Insert: Ins<ProdottoRow>; Update: Upd<ProdottoRow>; Relationships: [] };
+      movimenti_magazzino: { Row: MovimentoMagazzinoRow; Insert: Omit<Partial<MovimentoMagazzinoRow>, "id" | "created_at"> & { id?: string }; Update: never; Relationships: [] };
+      fermi: { Row: FermoRow; Insert: Ins<FermoRow>; Update: Upd<FermoRow>; Relationships: [] };
       ordini_lac: { Row: OrdineLacRow; Insert: Ins<OrdineLacRow>; Update: Upd<OrdineLacRow>; Relationships: [] };
       ordini_occhiali: { Row: OrdineOcchialiRow; Insert: Ins<OrdineOcchialiRow>; Update: Upd<OrdineOcchialiRow>; Relationships: [] };
     };
