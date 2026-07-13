@@ -99,7 +99,7 @@ function FormRettifica({ prodottoId, onFatto }: { prodottoId: string; onFatto: (
         <input type="hidden" name="tipo" value="rettifica" />
         <p className="text-xs font-semibold uppercase tracking-wide text-faint">Rettifica manuale</p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <select name="direzione" className={inputCls} defaultValue="+">
+          <select name="direzione" className={inputCls} defaultValue="+" aria-label="direzione rettifica">
             <option value="+">Aumenta (+)</option>
             <option value="-">Diminuisci (−)</option>
           </select>
@@ -126,7 +126,7 @@ function FormAltro({ prodottoId, onFatto }: { prodottoId: string; onFatto: () =>
       <form action={run} className="space-y-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-faint">Altro movimento (scarico)</p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <select name="tipo" className={inputCls} defaultValue="scarico">
+          <select name="tipo" className={inputCls} defaultValue="scarico" aria-label="tipo movimento">
             <option value="scarico">Scarico</option>
             <option value="reso_fornitore">Reso a fornitore</option>
             <option value="danno">Danno / smaltimento</option>

@@ -9,6 +9,7 @@ import {
   EsitoProposta,
   PianificaProposta,
   NuovoRichiamo,
+  Ripianifica,
 } from "@/components/AzioniRichiami";
 import { calcolaProposte } from "@/lib/richiami-proposte";
 import { fmtEuro, fmtQuando, fmtData, ESITI_RICHIAMO, CANALI_RICHIAMO } from "@/lib/utils";
@@ -61,7 +62,7 @@ export default async function RichiamiPage() {
       .order("da_fare_il"),
     supabase
       .from("richiami")
-      .select("id, cliente_id, tipo, canale, esito, valore, fatto_il, utente_id")
+      .select("id, cliente_id, tipo, canale, esito, valore, fatto_il, utente_id, riferimento")
       .not("esito", "is", null)
       .order("fatto_il", { ascending: false })
       .limit(50),
@@ -203,18 +204,25 @@ export default async function RichiamiPage() {
           {storicoRows.map((r) => {
             const c = r.cliente_id ? info.get(r.cliente_id) : null;
             return (
-              <div key={r.id} className="flex items-center justify-between gap-3 px-5 py-2.5 text-sm">
-                <div className="min-w-0">
-                  <span className="text-inchiostro">{etichettaTipoRichiamo(r.tipo)}</span>
-                  {c && <span className="text-soft"> · {c.cognome} {c.nome}</span>}
-                  <p className="text-[11px] text-faint">
-                    {r.fatto_il ? fmtQuando(r.fatto_il) : ""}
-                    {r.canale ? ` · ${CANALI_RICHIAMO[r.canale] ?? r.canale}` : ""}
-                    {r.esito ? ` · ${ESITI_RICHIAMO[r.esito] ?? r.esito}` : ""}
-                    {r.utente_id && nomeUtente.get(r.utente_id) ? ` · ${nomeUtente.get(r.utente_id)}` : ""}
-                  </p>
+              <div key={r.id} className="px-5 py-2.5 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <span className="text-inchiostro">{etichettaTipoRichiamo(r.tipo)}</span>
+                    {c && <span className="text-soft"> · {c.cognome} {c.nome}</span>}
+                    <p className="text-[11px] text-faint">
+                      {r.fatto_il ? fmtQuando(r.fatto_il) : ""}
+                      {r.canale ? ` · ${CANALI_RICHIAMO[r.canale] ?? r.canale}` : ""}
+                      {r.esito ? ` · ${ESITI_RICHIAMO[r.esito] ?? r.esito}` : ""}
+                      {r.utente_id && nomeUtente.get(r.utente_id) ? ` · ${nomeUtente.get(r.utente_id)}` : ""}
+                    </p>
+                  </div>
+                  {r.valore != null && <span className="f-mono text-xs tabular-nums text-soft">{fmtEuro(r.valore)}</span>}
                 </div>
-                {r.valore != null && <span className="f-mono text-xs tabular-nums text-soft">{fmtEuro(r.valore)}</span>}
+                {r.esito === "richiamare" && r.cliente_id && (
+                  <div className="mt-1.5">
+                    <Ripianifica proposta={{ tipo: r.tipo, cliente_id: r.cliente_id, riferimento: r.riferimento, valore: r.valore }} />
+                  </div>
+                )}
               </div>
             );
           })}
