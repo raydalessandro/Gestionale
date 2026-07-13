@@ -12,7 +12,8 @@ import {
 } from "@/components/ui";
 import PrescrizioneCard from "@/components/PrescrizioneCard";
 import { PillStato } from "@/components/OrdiniUI";
-import { fmtData, ETICHETTE_FONTE } from "@/lib/utils";
+import { etichettaTipoRichiamo, etichettaTipoApp, oraDi } from "@/components/AgendaUI";
+import { fmtData, ETICHETTE_FONTE, ESITI_RICHIAMO } from "@/lib/utils";
 
 export default async function ClientePage({
   params,
@@ -22,8 +23,15 @@ export default async function ClientePage({
   const { id } = await params;
   const supabase = await createClient();
 
-  const [{ data: cliente }, { data: prescrizioni }, { data: lac }, { data: buste }, fermiAttivi] =
-    await Promise.all([
+  const [
+    { data: cliente },
+    { data: prescrizioni },
+    { data: lac },
+    { data: buste },
+    fermiAttivi,
+    { data: richiamiCli },
+    { data: prossimoApp },
+  ] = await Promise.all([
       supabase.from("clienti").select("*").eq("id", id).maybeSingle(),
       supabase
         .from("prescrizioni")
@@ -48,6 +56,20 @@ export default async function ClientePage({
         .select("*", { count: "exact", head: true })
         .eq("cliente_id", id)
         .eq("stato", "attivo"),
+      supabase
+        .from("richiami")
+        .select("id, tipo, da_fare_il, esito, fatto_il")
+        .eq("cliente_id", id)
+        .order("created_at", { ascending: false })
+        .limit(3),
+      supabase
+        .from("appuntamenti")
+        .select("tipo, inizio")
+        .eq("cliente_id", id)
+        .eq("stato", "prenotato")
+        .gt("inizio", new Date().toISOString())
+        .order("inizio")
+        .limit(1),
     ]);
 
   if (!cliente) notFound();
@@ -215,6 +237,30 @@ export default async function ClientePage({
         <p className="text-sm text-faint">
           Ancora nessun ordine per questo cliente.
         </p>
+      )}
+
+      {((richiamiCli && richiamiCli.length > 0) || (prossimoApp && prossimoApp.length > 0)) && (
+        <>
+          <h2 className="f-serif mb-3 mt-8 text-lg font-semibold text-inchiostro">Richiami</h2>
+          <Card className="space-y-2">
+            {prossimoApp && prossimoApp.length > 0 && (
+              <p className="rounded-lg bg-carta px-3 py-2 text-sm text-inchiostro">
+                In agenda: {etichettaTipoApp(prossimoApp[0].tipo).toLowerCase()} il{" "}
+                {fmtData(prossimoApp[0].inizio)} alle {oraDi(prossimoApp[0].inizio)}
+              </p>
+            )}
+            {(richiamiCli ?? []).map((r) => (
+              <div key={r.id} className="flex items-center justify-between gap-2 text-sm">
+                <span className="text-inchiostro">{etichettaTipoRichiamo(r.tipo)}</span>
+                <span className="text-xs text-faint">
+                  {r.esito
+                    ? `${ESITI_RICHIAMO[r.esito] ?? r.esito}${r.fatto_il ? ` · ${fmtData(r.fatto_il)}` : ""}`
+                    : `da fare il ${fmtData(r.da_fare_il)}`}
+                </span>
+              </div>
+            ))}
+          </Card>
+        </>
       )}
     </>
   );

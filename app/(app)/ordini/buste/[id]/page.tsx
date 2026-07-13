@@ -200,6 +200,11 @@ export default async function BustaPage({
           saldo={b.saldo}
           accontoSuggerito={accontoSuggerito}
           waHref={waHref}
+          fissaRitiroHref={
+            b.cliente_id
+              ? `/agenda/nuovo?cliente=${b.cliente_id}&tipo=consegna&riferimento=${encodeURIComponent(b.numero)}`
+              : null
+          }
         />
       </Card>
 

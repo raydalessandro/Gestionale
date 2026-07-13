@@ -160,7 +160,16 @@ export default async function OrdineLacPage({
       {/* Azioni */}
       <Card className="mb-4 space-y-3">
         <p className="text-xs font-semibold uppercase tracking-wide text-faint">Azioni</p>
-        <AzioniLac id={ordine.id} stato={ordine.stato} waHref={waHref} />
+        <AzioniLac
+          id={ordine.id}
+          stato={ordine.stato}
+          waHref={waHref}
+          fissaRitiroHref={
+            ordine.cliente_id
+              ? `/agenda/nuovo?cliente=${ordine.cliente_id}&tipo=ritiro_lac&riferimento=${encodeURIComponent(ordine.numero)}`
+              : null
+          }
+        />
       </Card>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

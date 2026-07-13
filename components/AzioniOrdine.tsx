@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { MessageCircle } from "lucide-react";
+import { MessageCircle, CalendarPlus } from "lucide-react";
 import {
   eventoOrdineLac,
   eventoBusta,
@@ -112,10 +112,12 @@ export function AzioniLac({
   id,
   stato,
   waHref,
+  fissaRitiroHref,
 }: {
   id: string;
   stato: string;
   waHref: string | null;
+  fissaRitiroHref?: string | null;
 }) {
   const ev = (e: EventoLac) => eventoOrdineLac.bind(null, id, e);
 
@@ -132,6 +134,7 @@ export function AzioniLac({
           <BottoneEvento azione={ev("consegna")} label="Consegna" variante="accent" />
           <BottoneEvento azione={ev("avvisa")} label="Segna avvisato" variante="ghost" />
           {waHref && <BottoneWhatsApp href={waHref} />}
+          {fissaRitiroHref && <LinkFissaRitiro href={fissaRitiroHref} />}
         </>
       )}
       {["da_ordinare", "ordinato", "arrivato"].includes(stato) && (
@@ -156,12 +159,14 @@ export function AzioniBusta({
   saldo,
   accontoSuggerito,
   waHref,
+  fissaRitiroHref,
 }: {
   id: string;
   stato: string;
   saldo: number;
   accontoSuggerito: number;
   waHref: string | null;
+  fissaRitiroHref?: string | null;
 }) {
   const ev = (e: EventoBusta) => eventoBusta.bind(null, id, e);
 
@@ -185,6 +190,7 @@ export function AzioniBusta({
           <BottoneConsegna azione={ev("consegna")} saldo={saldo} />
           <BottoneEvento azione={ev("avvisa")} label="Segna avvisata" variante="ghost" />
           {waHref && <BottoneWhatsApp href={waHref} />}
+          {fissaRitiroHref && <LinkFissaRitiro href={fissaRitiroHref} />}
         </>
       )}
       {["arrivata", "pronta"].includes(stato) && (
@@ -314,6 +320,14 @@ function BottoneWhatsApp({ href }: { href: string }) {
       className={`${btn} ${stili.ghost}`}
     >
       <MessageCircle size={16} /> Apri WhatsApp
+    </a>
+  );
+}
+
+function LinkFissaRitiro({ href }: { href: string }) {
+  return (
+    <a href={href} className={`${btn} ${stili.ghost}`}>
+      <CalendarPlus size={16} /> Fissa ritiro
     </a>
   );
 }
