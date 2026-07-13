@@ -193,3 +193,35 @@ export function scadenzaRx(p: { data_visita: string; validita_mesi: number }): D
   d.setMonth(d.getMonth() + p.validita_mesi);
   return d;
 }
+
+/* ── Cassa & Vendite (fase 4) ──────────────────────────────────────── */
+
+export const ETICHETTE_ALIQUOTA: Record<string, string> = {
+  "4": "IVA 4%",
+  "22": "IVA 22%",
+  esente: "Esente / fuori campo",
+};
+
+export const ETICHETTE_CAUSALI_RESO: Record<string, string> = {
+  soddisfatti_rimborsati: "Soddisfatti o rimborsati",
+  errore_checkup: "Errore di check-up",
+  errore_ricetta: "Errore ricetta esterna",
+  mancato_adattamento_progressive: "Mancato adattamento progressive",
+  modifica_wo: "Modifica dell'ordine",
+  insoddisfazione_estetica: "Insoddisfazione estetica",
+  insoddisfazione_funzionalita: "Insoddisfazione funzionalità",
+  difetto_fabbricazione: "Difetto di fabbricazione",
+};
+
+export const TIPI_MOVIMENTO_CASSA: Record<string, string> = {
+  prelievo: "Prelievo dal cassetto",
+  spesa: "Spesa di negozio",
+  versamento_cassaforte: "Versamento in cassaforte",
+  versamento_banca: "Versamento in banca",
+  incamero_caparra: "Caparra incamerata",
+};
+
+export const STATI_VENDITA: StatoPipeline[] = [
+  { id: "emessa", label: "Emessa", bg: "#E2F0EE", fg: "#127E7A" },
+  { id: "annullata", label: "Annullata", bg: "#F6E4E2", fg: "#B0483F" },
+];

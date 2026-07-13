@@ -14,15 +14,18 @@ Regola d'oro per chi coda: **il vocabolario del contratto non si cambia mai**
 |---|---|---|---|---|
 | **1 ✅** | v0.2 | **Ordini & Buste** — FATTA (in collaudo con gli ottici) | `002` applicata | La giornata tipo al banco: dalla Rx alla consegna |
 | **2 ✅** | v0.3 | **Catalogo & Magazzino** — FATTA (in collaudo) | `003` applicata | Ricevimento merce, giacenze, i "fermi" |
-| **3 ▶** | v0.4 | **Agenda & Richiami** — spec pronta: `fase-3-agenda-richiami.md` | `004` pronta da applicare | Il "livello ricavi": la settimana di richiami |
-| 4 | v0.5 | **Cassa & Vendite** — vendita veloce e da busta, doppia aliquota 4/22, caparra confirmatoria (scontrino unico alla consegna), resi con causali, incamera caparra | `005` — vendite, resi | Consegna con saldo, un reso, una chiusura |
+| **3 ✅** | v0.4 | **Agenda & Richiami** — FATTA (in collaudo) | `004` applicata | Il "livello ricavi": la settimana di richiami |
+| **4 ▶** | v0.5 | **Cassa & Vendite** — spec pronta: `fase-4-cassa.md` (fonte: documenti fiscali reali in `dominio-cassa-documenti.md`) | `005` pronta da applicare | La giornata di cassa: vendite, resi, chiusura |
 | 5 | v0.6 | **Convenzioni** — pratiche assicurative (attivata→PIC→fatturata→liquidata), gara voucher, coupon aziendali | `006` — voucher_convenzioni | La corsa al voucher, esito pratica |
 | 6 | v0.7 | **Integrazione sito & app** — endpoint service-role, catalogo pubblico, ordini reali `fonte='sito'\|'app'` che atterrano in pipeline | `007` — grant/viste pubbliche | Ordino dal sito, lo vedo comparire in Ordini |
 | 7 | v0.8 | **Collaudo MIDO** — ruoli fini, export CSV, PDF definitivi, hardening, procedure di emergenza | eventuali ritocchi | Giro completo con più utenti |
 
 Il dominio che alimenta tutte le fasi è distillato in
-[`docs/dominio-ottica.md`](../dominio-ottica.md) — lettura obbligatoria prima
-di codare qualunque fase.
+[`docs/dominio-ottica.md`](../dominio-ottica.md) (flussi operativi, dai
+manuali di catena) e [`docs/dominio-fiscale.md`](../dominio-fiscale.md)
+(norme verificate: Sistema TS, IVA, RT, fondi) — lettura obbligatoria prima
+di codare qualunque fase; il layer normativo si ri-verifica all'apertura
+della fase che lo usa.
 
 ## Binari paralleli (da Fase 3 in poi)
 
