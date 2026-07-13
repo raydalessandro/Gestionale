@@ -290,6 +290,116 @@ export type OrdineOcchialiRow = {
 /* ── Helper generici Insert/Update ─────────────────────────────────── */
 
 type Auto = "id" | "created_at" | "updated_at";
+/** Riga di vendita (shape documentata di vendite.righe — vedi 005). */
+export type RigaVendita = {
+  prodotto_id?: string | null;
+  descrizione: string;
+  quantita: number;
+  prezzo_unitario: number;
+  sconto: number;
+  aliquota: "4" | "22" | "esente";
+  dm: boolean;
+};
+
+/** Pagamento di vendita (shape documentata di vendite.pagamenti). */
+export type PagamentoVendita = {
+  metodo_id?: string | null;
+  nome: string;
+  importo: number;
+};
+
+export type MetodoPagamentoRow = {
+  id: string;
+  azienda_id: string;
+  nome: string;
+  tipo: "contanti" | "elettronico" | "buono" | "bonifico" | "assicurazione" | "caparra" | "altro";
+  tracciabile: boolean;
+  attivo: boolean;
+  ordine: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export type VenditaRow = {
+  id: string;
+  azienda_id: string;
+  numero: string;
+  cliente_id: string | null;
+  utente_id: string | null;
+  busta_id: string | null;
+  ordine_lac_id: string | null;
+  righe: Json;
+  pagamenti: Json;
+  totale: number;
+  iva_totale: number;
+  doc_numero: string | null;
+  doc_data: string | null;
+  fattura_numero: string | null;
+  cf_cliente: string | null;
+  opposizione_ts: boolean;
+  origine: "cassa" | "riallineamento";
+  data_vendita: string;
+  stato: "emessa" | "annullata";
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ResoRow = {
+  id: string;
+  azienda_id: string;
+  vendita_id: string | null;
+  cliente_id: string | null;
+  utente_id: string | null;
+  numero: string;
+  tipo: "denaro" | "gestionale";
+  causale:
+    | "soddisfatti_rimborsati"
+    | "errore_checkup"
+    | "errore_ricetta"
+    | "mancato_adattamento_progressive"
+    | "modifica_wo"
+    | "insoddisfazione_estetica"
+    | "insoddisfazione_funzionalita"
+    | "difetto_fabbricazione";
+  importo: number;
+  metodo_rimborso: string | null;
+  righe: Json;
+  doc_numero: string | null;
+  doc_data: string | null;
+  doc_origine_numero: string | null;
+  doc_origine_data: string | null;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ChiusuraCassaRow = {
+  id: string;
+  azienda_id: string;
+  data: string;
+  fondo_apertura: number;
+  contanti_contati: number;
+  fondo_chiusura: number;
+  versamento: number;
+  z_numero: string | null;
+  riepilogo: Json;
+  note: string | null;
+  chiusa_da: string | null;
+  created_at: string;
+}
+
+export type MovimentoCassaRow = {
+  id: string;
+  azienda_id: string;
+  utente_id: string | null;
+  tipo: "prelievo" | "spesa" | "versamento_cassaforte" | "versamento_banca" | "incamero_caparra";
+  importo: number;
+  motivo: string;
+  riferimento: string | null;
+  created_at: string;
+}
+
 type Ins<R> = Omit<Partial<R>, Auto> & { id?: string };
 type Upd<R> = Omit<Partial<R>, Auto>;
 
@@ -311,6 +421,11 @@ export type Database = {
       fermi: { Row: FermoRow; Insert: Ins<FermoRow>; Update: Upd<FermoRow>; Relationships: [] };
       appuntamenti: { Row: AppuntamentoRow; Insert: Ins<AppuntamentoRow>; Update: Upd<AppuntamentoRow>; Relationships: [] };
       richiami: { Row: RichiamoRow; Insert: Ins<RichiamoRow>; Update: Upd<RichiamoRow>; Relationships: [] };
+      metodi_pagamento: { Row: MetodoPagamentoRow; Insert: Ins<MetodoPagamentoRow>; Update: Upd<MetodoPagamentoRow>; Relationships: [] };
+      vendite: { Row: VenditaRow; Insert: Ins<VenditaRow>; Update: Upd<VenditaRow>; Relationships: [] };
+      resi: { Row: ResoRow; Insert: Ins<ResoRow>; Update: Upd<ResoRow>; Relationships: [] };
+      chiusure_cassa: { Row: ChiusuraCassaRow; Insert: Omit<Ins<ChiusuraCassaRow>, "versamento">; Update: never; Relationships: [] };
+      movimenti_cassa: { Row: MovimentoCassaRow; Insert: Omit<Partial<MovimentoCassaRow>, "id" | "created_at"> & { id?: string }; Update: never; Relationships: [] };
       ordini_lac: { Row: OrdineLacRow; Insert: Ins<OrdineLacRow>; Update: Upd<OrdineLacRow>; Relationships: [] };
       ordini_occhiali: { Row: OrdineOcchialiRow; Insert: Ins<OrdineOcchialiRow>; Update: Upd<OrdineOcchialiRow>; Relationships: [] };
     };

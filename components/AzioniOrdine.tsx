@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { MessageCircle, CalendarPlus } from "lucide-react";
+import { MessageCircle, CalendarPlus, Banknote } from "lucide-react";
 import {
   eventoOrdineLac,
   eventoBusta,
@@ -113,11 +113,13 @@ export function AzioniLac({
   stato,
   waHref,
   fissaRitiroHref,
+  incassaHref,
 }: {
   id: string;
   stato: string;
   waHref: string | null;
   fissaRitiroHref?: string | null;
+  incassaHref?: string | null;
 }) {
   const ev = (e: EventoLac) => eventoOrdineLac.bind(null, id, e);
 
@@ -131,7 +133,11 @@ export function AzioniLac({
       )}
       {stato === "arrivato" && (
         <>
-          <BottoneEvento azione={ev("consegna")} label="Consegna" variante="accent" />
+          {incassaHref ? (
+            <LinkConsegnaIncassa href={incassaHref} />
+          ) : (
+            <BottoneEvento azione={ev("consegna")} label="Consegna" variante="accent" />
+          )}
           <BottoneEvento azione={ev("avvisa")} label="Segna avvisato" variante="ghost" />
           {waHref && <BottoneWhatsApp href={waHref} />}
           {fissaRitiroHref && <LinkFissaRitiro href={fissaRitiroHref} />}
@@ -160,6 +166,7 @@ export function AzioniBusta({
   accontoSuggerito,
   waHref,
   fissaRitiroHref,
+  incassaHref,
 }: {
   id: string;
   stato: string;
@@ -167,6 +174,7 @@ export function AzioniBusta({
   accontoSuggerito: number;
   waHref: string | null;
   fissaRitiroHref?: string | null;
+  incassaHref?: string | null;
 }) {
   const ev = (e: EventoBusta) => eventoBusta.bind(null, id, e);
 
@@ -187,7 +195,11 @@ export function AzioniBusta({
       )}
       {stato === "pronta" && (
         <>
-          <BottoneConsegna azione={ev("consegna")} saldo={saldo} />
+          {incassaHref ? (
+            <LinkConsegnaIncassa href={incassaHref} />
+          ) : (
+            <BottoneConsegna azione={ev("consegna")} saldo={saldo} />
+          )}
           <BottoneEvento azione={ev("avvisa")} label="Segna avvisata" variante="ghost" />
           {waHref && <BottoneWhatsApp href={waHref} />}
           {fissaRitiroHref && <LinkFissaRitiro href={fissaRitiroHref} />}
@@ -328,6 +340,14 @@ function LinkFissaRitiro({ href }: { href: string }) {
   return (
     <a href={href} className={`${btn} ${stili.ghost}`}>
       <CalendarPlus size={16} /> Fissa ritiro
+    </a>
+  );
+}
+
+function LinkConsegnaIncassa({ href }: { href: string }) {
+  return (
+    <a href={href} className={`${btn} ${stili.accent}`}>
+      <Banknote size={16} /> Consegna e incassa
     </a>
   );
 }

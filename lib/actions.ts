@@ -10,7 +10,10 @@ import type {
   OrdineLacUpdate,
   OrdineOcchialiUpdate,
   MovimentoMagazzinoRow,
+  RigaVendita,
+  PagamentoVendita,
 } from "@/lib/database.types";
+import { ivaScorporo } from "@/components/CassaUI";
 
 /* ── Helper ────────────────────────────────────────────────────────── */
 
@@ -1217,4 +1220,679 @@ export async function registraEsitoProposta(_prev: Esito, formData: FormData): P
     redirect(urlAgendaPrefill(clienteId, tipo, riferimento));
   }
   return null;
+}
+
+/* ── Cassa: helper ─────────────────────────────────────────────────── */
+
+const ALIQUOTE = ["4", "22", "esente"] as const;
+
+function parseRigheVendita(fd: FormData): RigaVendita[] | { errore: string } {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(str(fd, "righe") ?? "[]");
+  } catch {
+    return { errore: "Righe non valide." };
+  }
+  if (!Array.isArray(raw) || raw.length === 0) return { errore: "Aggiungi almeno una riga." };
+  const righe: RigaVendita[] = [];
+  for (const r of raw as Record<string, unknown>[]) {
+    const descrizione = typeof r.descrizione === "string" ? r.descrizione.trim() : "";
+    if (!descrizione) return { errore: "Ogni riga deve avere una descrizione." };
+    const quantita = Math.round(Number(r.quantita));
+    if (!Number.isFinite(quantita) || quantita < 1) return { errore: "Quantità non valida." };
+    const prezzo_unitario = Number(r.prezzo_unitario);
+    if (!Number.isFinite(prezzo_unitario) || prezzo_unitario < 0) return { errore: "Prezzo non valido." };
+    let sconto = Number(r.sconto);
+    if (!Number.isFinite(sconto) || sconto < 0) sconto = 0;
+    const aliquota = (ALIQUOTE as readonly string[]).includes(String(r.aliquota))
+      ? (String(r.aliquota) as "4" | "22" | "esente")
+      : "22";
+    righe.push({
+      prodotto_id: typeof r.prodotto_id === "string" ? r.prodotto_id : null,
+      descrizione,
+      quantita,
+      prezzo_unitario: euro2(prezzo_unitario),
+      sconto: euro2(sconto),
+      aliquota,
+      dm: !!r.dm,
+    });
+  }
+  return righe;
+}
+
+function parsePagamenti(fd: FormData): PagamentoVendita[] {
+  let raw: unknown;
+  try {
+    raw = JSON.parse(str(fd, "pagamenti") ?? "[]");
+  } catch {
+    return [];
+  }
+  if (!Array.isArray(raw)) return [];
+  const pag: PagamentoVendita[] = [];
+  for (const p of raw as Record<string, unknown>[]) {
+    const importo = Number(p.importo);
+    if (!Number.isFinite(importo) || importo <= 0) continue;
+    pag.push({
+      metodo_id: typeof p.metodo_id === "string" ? p.metodo_id : null,
+      nome: typeof p.nome === "string" ? p.nome : "Pagamento",
+      importo: euro2(importo),
+    });
+  }
+  return pag;
+}
+
+function totaleEIva(righe: RigaVendita[]): { totale: number; iva: number } {
+  let totale = 0;
+  let iva = 0;
+  for (const r of righe) {
+    const imp = Math.max(0, r.quantita * r.prezzo_unitario - r.sconto);
+    totale += imp;
+    iva += ivaScorporo(imp, r.aliquota);
+  }
+  return { totale: euro2(totale), iva: euro2(iva) };
+}
+
+/** Movimenti di magazzino per le righe con prodotto_id (scarico/carico). */
+async function movimentiDaRighe(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  aziendaId: string,
+  utenteId: string,
+  righe: RigaVendita[],
+  verso: "scarico" | "carico",
+  riferimento: string
+) {
+  for (const r of righe) {
+    if (!r.prodotto_id) continue;
+    const q = Math.round(r.quantita);
+    if (q < 1) continue;
+    await supabase.from("movimenti_magazzino").insert({
+      azienda_id: aziendaId,
+      prodotto_id: r.prodotto_id,
+      utente_id: utenteId,
+      tipo: verso,
+      quantita: verso === "scarico" ? -q : q,
+      riferimento,
+    });
+  }
+}
+
+/* ── Cassa: metodi di pagamento ────────────────────────────────────── */
+
+const METODI_BASE: { nome: string; tipo: string; tracciabile: boolean; ordine: number }[] = [
+  { nome: "Contanti", tipo: "contanti", tracciabile: false, ordine: 1 },
+  { nome: "Bancomat", tipo: "elettronico", tracciabile: true, ordine: 2 },
+  { nome: "Mastercard", tipo: "elettronico", tracciabile: true, ordine: 3 },
+  { nome: "Visa", tipo: "elettronico", tracciabile: true, ordine: 4 },
+  { nome: "Bonifico", tipo: "bonifico", tracciabile: true, ordine: 5 },
+  { nome: "Gift Card", tipo: "buono", tracciabile: true, ordine: 6 },
+  { nome: "Assicurazione", tipo: "assicurazione", tracciabile: true, ordine: 7 },
+  { nome: "Caparra", tipo: "caparra", tracciabile: true, ordine: 8 },
+];
+
+async function assicuraMetodi(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  aziendaId: string
+) {
+  const { data: esistenti } = await supabase.from("metodi_pagamento").select("nome");
+  const nomi = new Set((esistenti ?? []).map((m) => m.nome));
+  const daInserire = METODI_BASE.filter((m) => !nomi.has(m.nome)).map((m) => ({
+    ...m,
+    tipo: m.tipo as "contanti" | "elettronico" | "buono" | "bonifico" | "assicurazione" | "caparra" | "altro",
+    azienda_id: aziendaId,
+  }));
+  if (daInserire.length) await supabase.from("metodi_pagamento").insert(daInserire);
+}
+
+export async function seedMetodiPagamento(_prev: Esito, _formData: FormData): Promise<Esito> {
+  const supabase = await createClient();
+  const prof = await profiloCorrente(supabase);
+  if ("errore" in prof) return prof;
+  await assicuraMetodi(supabase, prof.azienda_id);
+  revalidatePath("/cassa/impostazioni");
+  return null;
+}
+
+const TIPI_METODO = ["contanti", "elettronico", "buono", "bonifico", "assicurazione", "caparra", "altro"] as const;
+
+export async function creaMetodoPagamento(_prev: Esito, formData: FormData): Promise<Esito> {
+  const supabase = await createClient();
+  const nome = str(formData, "nome");
+  if (!nome) return { errore: "Serve il nome del metodo." };
+  const tipoRaw = str(formData, "tipo") ?? "altro";
+  const tipo = (TIPI_METODO as readonly string[]).includes(tipoRaw)
+    ? (tipoRaw as (typeof TIPI_METODO)[number])
+    : "altro";
+  const prof = await profiloCorrente(supabase);
+  if ("errore" in prof) return prof;
+  const { error } = await supabase.from("metodi_pagamento").insert({
+    azienda_id: prof.azienda_id,
+    nome,
+    tipo,
+    tracciabile: formData.get("tracciabile") === "on",
+    ordine: Math.round(num(formData, "ordine") ?? 0),
+  });
+  if (error) {
+    if (error.code === "23505") return { errore: "Esiste già un metodo con questo nome." };
+    return { errore: `Non salvato: ${error.message}` };
+  }
+  revalidatePath("/cassa/impostazioni");
+  return null;
+}
+
+export async function aggiornaMetodoPagamento(
+  id: string,
+  _prev: Esito,
+  formData: FormData
+): Promise<Esito> {
+  const supabase = await createClient();
+  const { data: m } = await supabase.from("metodi_pagamento").select("tipo").eq("id", id).maybeSingle();
+  if (!m) return { errore: "Metodo non trovato." };
+  const attivo = m.tipo === "caparra" ? true : formData.get("attivo") === "on";
+  const { error } = await supabase
+    .from("metodi_pagamento")
+    .update({ attivo, tracciabile: formData.get("tracciabile") === "on", ordine: Math.round(num(formData, "ordine") ?? 0) })
+    .eq("id", id);
+  if (error) return { errore: `Non salvato: ${error.message}` };
+  revalidatePath("/cassa/impostazioni");
+  return null;
+}
+
+/* ── Cassa: vendite ────────────────────────────────────────────────── */
+
+export async function creaVendita(_prev: Esito, formData: FormData): Promise<Esito> {
+  const supabase = await createClient();
+  const righe = parseRigheVendita(formData);
+  if ("errore" in righe) return righe;
+  const pagamenti = parsePagamenti(formData);
+  const { totale, iva } = totaleEIva(righe);
+  const sommaPag = euro2(pagamenti.reduce((s, p) => s + p.importo, 0));
+  if (Math.abs(sommaPag - totale) > 0.01) {
+    return { errore: `I pagamenti (${sommaPag.toFixed(2)}) non coprono il totale (${totale.toFixed(2)}).` };
+  }
+
+  const prof = await profiloCorrente(supabase);
+  if ("errore" in prof) return prof;
+
+  const riallineamento = formData.get("riallineamento") === "on";
+  const docNumero = str(formData, "doc_numero");
+  const docData = str(formData, "doc_data");
+  let dataVendita = new Date().toISOString();
+  if (riallineamento) {
+    if (!docNumero || !docData) return { errore: "Il riallineamento richiede numero e data del documento." };
+    const dv = str(formData, "data_vendita");
+    if (dv) dataVendita = new Date(`${dv}T12:00:00`).toISOString();
+  }
+
+  const { data: numero, error: eN } = await supabase.rpc("prossimo_numero", { p_prefisso: "VE" });
+  if (eN || !numero) return { errore: `Numerazione non riuscita: ${eN?.message ?? "riprova"}` };
+
+  const { data: vend, error } = await supabase
+    .from("vendite")
+    .insert({
+      azienda_id: prof.azienda_id,
+      cliente_id: str(formData, "cliente_id"),
+      utente_id: prof.id,
+      numero,
+      righe: righe as unknown as Json,
+      pagamenti: pagamenti as unknown as Json,
+      totale,
+      iva_totale: iva,
+      doc_numero: docNumero,
+      doc_data: docData,
+      fattura_numero: str(formData, "fattura_numero"),
+      cf_cliente: str(formData, "cf_cliente")?.toUpperCase() ?? null,
+      opposizione_ts: formData.get("opposizione_ts") === "on",
+      origine: riallineamento ? "riallineamento" : "cassa",
+      data_vendita: dataVendita,
+      stato: "emessa",
+      note: str(formData, "note"),
+    })
+    .select("id")
+    .single();
+  if (error) return { errore: `Vendita non riuscita: ${error.message}` };
+
+  await movimentiDaRighe(supabase, prof.azienda_id, prof.id, righe, "scarico", numero);
+
+  revalidatePath("/cassa");
+  revalidatePath("/magazzino");
+  redirect(`/cassa/vendite/${vend.id}`);
+}
+
+export async function annullaVendita(id: string, _prev: Esito, formData: FormData): Promise<Esito> {
+  const supabase = await createClient();
+  const { data: v } = await supabase
+    .from("vendite")
+    .select("stato, righe, numero, note, azienda_id")
+    .eq("id", id)
+    .maybeSingle();
+  if (!v) return { errore: "Vendita non trovata." };
+  if (v.stato !== "emessa") return { errore: "La vendita è già annullata." };
+  const motivo = str(formData, "motivo");
+  if (!motivo) return { errore: "Indica un motivo per l'annullo." };
+
+  const prof = await profiloCorrente(supabase);
+  if ("errore" in prof) return prof;
+
+  const { error } = await supabase
+    .from("vendite")
+    .update({ stato: "annullata", note: appendiNota(v.note, `— Annullata ${dataIt()}: ${motivo}`) })
+    .eq("id", id);
+  if (error) return { errore: `Annullo non riuscito: ${error.message}` };
+
+  const righe = (Array.isArray(v.righe) ? v.righe : []) as RigaVendita[];
+  await movimentiDaRighe(supabase, v.azienda_id, prof.id, righe, "carico", `Annullo ${v.numero}`);
+
+  revalidatePath("/cassa");
+  revalidatePath(`/cassa/vendite/${id}`);
+  revalidatePath("/magazzino");
+  return null;
+}
+
+/* ── Cassa: resi ───────────────────────────────────────────────────── */
+
+const CAUSALI_RESO = [
+  "soddisfatti_rimborsati", "errore_checkup", "errore_ricetta",
+  "mancato_adattamento_progressive", "modifica_wo", "insoddisfazione_estetica",
+  "insoddisfazione_funzionalita", "difetto_fabbricazione",
+] as const;
+
+export async function creaReso(_prev: Esito, formData: FormData): Promise<Esito> {
+  const supabase = await createClient();
+  const venditaId = str(formData, "vendita_id");
+  const tipo = str(formData, "tipo") === "gestionale" ? "gestionale" : "denaro";
+  const causaleRaw = str(formData, "causale") ?? "";
+  if (!(CAUSALI_RESO as readonly string[]).includes(causaleRaw)) return { errore: "Scegli una causale." };
+  const importo = num(formData, "importo");
+  if (importo === null || importo <= 0) return { errore: "L'importo del reso dev'essere positivo." };
+  const metodoRimborso = str(formData, "metodo_rimborso");
+  if (tipo === "denaro" && !metodoRimborso) return { errore: "Indica il metodo con cui rimborsi." };
+
+  const docOrigineNum = str(formData, "doc_origine_numero");
+  const docOrigineData = str(formData, "doc_origine_data");
+  if (!venditaId && (!docOrigineNum || !docOrigineData)) {
+    return { errore: "Per un reso di vendita esterna servono numero e data del documento d'origine." };
+  }
+
+  let righe: RigaVendita[] = [];
+  const rr = parseRigheVendita(formData);
+  if (!("errore" in rr)) righe = rr;
+
+  const prof = await profiloCorrente(supabase);
+  if ("errore" in prof) return prof;
+
+  const { data: numero, error: eN } = await supabase.rpc("prossimo_numero", { p_prefisso: "RE" });
+  if (eN || !numero) return { errore: `Numerazione non riuscita: ${eN?.message ?? "riprova"}` };
+
+  const { data: reso, error } = await supabase
+    .from("resi")
+    .insert({
+      azienda_id: prof.azienda_id,
+      vendita_id: venditaId,
+      cliente_id: str(formData, "cliente_id"),
+      utente_id: prof.id,
+      numero,
+      tipo,
+      causale: causaleRaw as (typeof CAUSALI_RESO)[number],
+      importo: euro2(importo),
+      metodo_rimborso: tipo === "denaro" ? metodoRimborso : null,
+      righe: righe as unknown as Json,
+      doc_numero: str(formData, "doc_numero"),
+      doc_data: str(formData, "doc_data"),
+      doc_origine_numero: docOrigineNum,
+      doc_origine_data: docOrigineData,
+      note: str(formData, "note"),
+    })
+    .select("id")
+    .single();
+  if (error) return { errore: `Reso non riuscito: ${error.message}` };
+
+  await movimentiDaRighe(supabase, prof.azienda_id, prof.id, righe, "carico", numero);
+
+  revalidatePath("/cassa/resi");
+  if (venditaId) revalidatePath(`/cassa/vendite/${venditaId}`);
+  revalidatePath("/magazzino");
+  redirect(`/cassa/resi`);
+}
+
+/* ── Cassa: incasso alla consegna ordine (§3.6) ────────────────────── */
+
+export async function incassaConsegna(
+  tipoOrdine: "busta" | "lac",
+  ordineId: string,
+  _prev: Esito,
+  formData: FormData
+): Promise<Esito> {
+  const supabase = await createClient();
+  const righe = parseRigheVendita(formData);
+  if ("errore" in righe) return righe;
+  const pagamenti = parsePagamenti(formData);
+  const { totale, iva } = totaleEIva(righe);
+  const sommaPag = euro2(pagamenti.reduce((s, p) => s + p.importo, 0));
+  if (Math.abs(sommaPag - totale) > 0.01) {
+    return { errore: `I pagamenti (${sommaPag.toFixed(2)}) non coprono il totale (${totale.toFixed(2)}).` };
+  }
+
+  const prof = await profiloCorrente(supabase);
+  if ("errore" in prof) return prof;
+
+  // Pre-check: ordine gia' incassato?
+  const colonna = tipoOrdine === "busta" ? "busta_id" : "ordine_lac_id";
+  const { data: esistente } = await supabase
+    .from("vendite")
+    .select("id")
+    .eq(colonna, ordineId)
+    .eq("stato", "emessa")
+    .maybeSingle();
+  if (esistente) return { errore: "Questo ordine ha già una vendita." };
+
+  // Stato ordine + transizione (guardata)
+  if (tipoOrdine === "busta") {
+    const { data: b } = await supabase.from("ordini_occhiali").select("stato").eq("id", ordineId).maybeSingle();
+    if (!b) return { errore: "Busta non trovata." };
+    if (b.stato !== "pronta") return { errore: `La busta non è pronta (stato ${b.stato}).` };
+  } else {
+    const { data: o } = await supabase.from("ordini_lac").select("stato").eq("id", ordineId).maybeSingle();
+    if (!o) return { errore: "Ordine non trovato." };
+    if (o.stato !== "arrivato") return { errore: `L'ordine non è arrivato (stato ${o.stato}).` };
+  }
+
+  const { data: numero, error: eN } = await supabase.rpc("prossimo_numero", { p_prefisso: "VE" });
+  if (eN || !numero) return { errore: `Numerazione non riuscita: ${eN?.message ?? "riprova"}` };
+
+  const { data: vend, error } = await supabase
+    .from("vendite")
+    .insert({
+      azienda_id: prof.azienda_id,
+      cliente_id: str(formData, "cliente_id"),
+      utente_id: prof.id,
+      numero,
+      busta_id: tipoOrdine === "busta" ? ordineId : null,
+      ordine_lac_id: tipoOrdine === "lac" ? ordineId : null,
+      righe: righe as unknown as Json,
+      pagamenti: pagamenti as unknown as Json,
+      totale,
+      iva_totale: iva,
+      doc_numero: str(formData, "doc_numero"),
+      doc_data: str(formData, "doc_data"),
+      fattura_numero: str(formData, "fattura_numero"),
+      cf_cliente: str(formData, "cf_cliente")?.toUpperCase() ?? null,
+      opposizione_ts: formData.get("opposizione_ts") === "on",
+      origine: "cassa",
+      stato: "emessa",
+      note: str(formData, "note"),
+    })
+    .select("id")
+    .single();
+  if (error) {
+    if (error.code === "23505") return { errore: "Questo ordine ha già una vendita." };
+    return { errore: `Vendita non riuscita: ${error.message}` };
+  }
+
+  // Transizione ordine → consegnato (guardata sullo stato). Rollback vendita se fallisce.
+  const now = new Date().toISOString();
+  const trans =
+    tipoOrdine === "busta"
+      ? await supabase.from("ordini_occhiali").update({ stato: "consegnata", data_consegna: now }).eq("id", ordineId).eq("stato", "pronta").select("id")
+      : await supabase.from("ordini_lac").update({ stato: "consegnato", data_consegna: now }).eq("id", ordineId).eq("stato", "arrivato").select("id");
+  if (trans.error || !trans.data || trans.data.length === 0) {
+    await supabase.from("vendite").update({ stato: "annullata", note: "Rollback: consegna non riuscita" }).eq("id", vend.id);
+    return { errore: "Consegna non riuscita: l'ordine è cambiato di stato, riprova." };
+  }
+
+  await movimentiDaRighe(supabase, prof.azienda_id, prof.id, righe, "scarico", numero);
+
+  revalidatePath("/cassa");
+  revalidatePath("/ordini");
+  revalidatePath(tipoOrdine === "busta" ? `/ordini/buste/${ordineId}` : `/ordini/lac/${ordineId}`);
+  revalidatePath("/magazzino");
+  redirect(`/cassa/vendite/${vend.id}`);
+}
+
+/* ── Cassa: caparra (incamero / restituzione) ──────────────────────── */
+
+export async function incameraCaparra(bustaId: string, _prev: Esito, _formData: FormData): Promise<Esito> {
+  const supabase = await createClient();
+  const { data: b } = await supabase
+    .from("ordini_occhiali")
+    .select("stato, acconto, numero, note, caparra_incamerata_il, azienda_id")
+    .eq("id", bustaId)
+    .maybeSingle();
+  if (!b) return { errore: "Busta non trovata." };
+  if (b.stato === "consegnata") return { errore: "Busta già consegnata: non si incamera." };
+  if (b.caparra_incamerata_il) return { errore: "Caparra già incamerata." };
+  if (b.acconto <= 0) return { errore: "Non c'è caparra da incamerare." };
+
+  const prof = await profiloCorrente(supabase);
+  if ("errore" in prof) return prof;
+
+  const { error } = await supabase
+    .from("ordini_occhiali")
+    .update({
+      caparra_incamerata_il: new Date().toISOString(),
+      stato: "annullata",
+      note: appendiNota(b.note, `— Caparra incamerata ${dataIt()} (mancato ritiro)`),
+    })
+    .eq("id", bustaId);
+  if (error) return { errore: `Operazione non riuscita: ${error.message}` };
+
+  await supabase.from("movimenti_cassa").insert({
+    azienda_id: b.azienda_id,
+    utente_id: prof.id,
+    tipo: "incamero_caparra",
+    importo: b.acconto,
+    motivo: "Caparra incamerata per mancato ritiro",
+    riferimento: b.numero,
+  });
+
+  revalidatePath("/cassa");
+  revalidatePath(`/ordini/buste/${bustaId}`);
+  revalidatePath("/ordini");
+  return null;
+}
+
+export async function annullaBustaConRestituzione(
+  bustaId: string,
+  _prev: Esito,
+  formData: FormData
+): Promise<Esito> {
+  const supabase = await createClient();
+  const { data: b } = await supabase
+    .from("ordini_occhiali")
+    .select("stato, acconto, numero, note, caparra_incamerata_il, cliente_id")
+    .eq("id", bustaId)
+    .maybeSingle();
+  if (!b) return { errore: "Busta non trovata." };
+  if (b.stato === "consegnata") return { errore: "Busta già consegnata." };
+  if (b.caparra_incamerata_il) return { errore: "Caparra già incamerata: non si restituisce." };
+  if (b.acconto <= 0) return { errore: "Non c'è caparra da restituire." };
+
+  const causaleRaw = str(formData, "causale") ?? "modifica_wo";
+  const causale = (CAUSALI_RESO as readonly string[]).includes(causaleRaw) ? causaleRaw : "modifica_wo";
+  const metodoRimborso = str(formData, "metodo_rimborso") ?? "Contanti";
+
+  const prof = await profiloCorrente(supabase);
+  if ("errore" in prof) return prof;
+
+  const { data: numero, error: eN } = await supabase.rpc("prossimo_numero", { p_prefisso: "RE" });
+  if (eN || !numero) return { errore: `Numerazione non riuscita: ${eN?.message ?? "riprova"}` };
+
+  const { data: reso, error } = await supabase
+    .from("resi")
+    .insert({
+      azienda_id: prof.azienda_id,
+      cliente_id: b.cliente_id,
+      utente_id: prof.id,
+      numero,
+      tipo: "denaro",
+      causale: causale as (typeof CAUSALI_RESO)[number],
+      importo: b.acconto,
+      metodo_rimborso: metodoRimborso,
+      doc_origine_numero: b.numero,
+      note: `Restituzione caparra busta ${b.numero}`,
+    })
+    .select("id")
+    .single();
+  if (error) return { errore: `Reso non riuscito: ${error.message}` };
+
+  await supabase
+    .from("ordini_occhiali")
+    .update({ stato: "annullata", note: appendiNota(b.note, `— Annullata ${dataIt()}, caparra restituita (reso ${numero})`) })
+    .eq("id", bustaId);
+
+  revalidatePath("/cassa");
+  revalidatePath(`/ordini/buste/${bustaId}`);
+  revalidatePath("/ordini");
+  redirect(`/cassa/resi/${reso.id}`);
+}
+
+/* ── Cassa: movimenti ──────────────────────────────────────────────── */
+
+const TIPI_MOV_CASSA_MANUALI = ["prelievo", "spesa", "versamento_cassaforte", "versamento_banca"] as const;
+
+export async function registraMovimentoCassa(_prev: Esito, formData: FormData): Promise<Esito> {
+  const supabase = await createClient();
+  const tipoRaw = str(formData, "tipo") ?? "";
+  if (!(TIPI_MOV_CASSA_MANUALI as readonly string[]).includes(tipoRaw)) {
+    return { errore: "Tipo di movimento non ammesso." };
+  }
+  const importo = num(formData, "importo");
+  if (importo === null || importo <= 0) return { errore: "L'importo dev'essere positivo." };
+  const motivo = str(formData, "motivo");
+  if (!motivo) return { errore: "Il motivo è obbligatorio." };
+
+  const prof = await profiloCorrente(supabase);
+  if ("errore" in prof) return prof;
+
+  const { error } = await supabase.from("movimenti_cassa").insert({
+    azienda_id: prof.azienda_id,
+    utente_id: prof.id,
+    tipo: tipoRaw as (typeof TIPI_MOV_CASSA_MANUALI)[number],
+    importo: euro2(importo),
+    motivo,
+    riferimento: str(formData, "riferimento"),
+  });
+  if (error) return { errore: `Movimento non riuscito: ${error.message}` };
+
+  revalidatePath("/cassa");
+  return null;
+}
+
+/* ── Cassa: chiusura di giornata ───────────────────────────────────── */
+
+export async function chiudiCassa(_prev: Esito, formData: FormData): Promise<Esito> {
+  const supabase = await createClient();
+  const prof = await profiloCorrente(supabase);
+  if ("errore" in prof) return prof;
+
+  const oggi = new Date().toISOString().slice(0, 10);
+  const inizio = `${oggi}T00:00:00`;
+  const fine = `${oggi}T23:59:59`;
+
+  const [{ data: vendite }, { data: resi }] = await Promise.all([
+    supabase.from("vendite").select("pagamenti, righe, totale").eq("stato", "emessa").gte("data_vendita", inizio).lte("data_vendita", fine),
+    supabase.from("resi").select("tipo, metodo_rimborso, importo").eq("tipo", "denaro").gte("created_at", inizio).lte("created_at", fine),
+  ]);
+
+  // Sistema per metodo
+  const sistemaMetodo = new Map<string, number>();
+  for (const v of vendite ?? []) {
+    for (const p of (Array.isArray(v.pagamenti) ? v.pagamenti : []) as PagamentoVendita[]) {
+      sistemaMetodo.set(p.nome, euro2((sistemaMetodo.get(p.nome) ?? 0) + p.importo));
+    }
+  }
+  for (const r of resi ?? []) {
+    const m = r.metodo_rimborso ?? "Contanti";
+    sistemaMetodo.set(m, euro2((sistemaMetodo.get(m) ?? 0) - r.importo));
+  }
+
+  // Sistema per aliquota (imponibile+iva = importo lordo per aliquota)
+  const sistemaAliquota = new Map<string, number>();
+  for (const v of vendite ?? []) {
+    for (const r of (Array.isArray(v.righe) ? v.righe : []) as RigaVendita[]) {
+      const imp = Math.max(0, r.quantita * r.prezzo_unitario - r.sconto);
+      sistemaAliquota.set(r.aliquota, euro2((sistemaAliquota.get(r.aliquota) ?? 0) + imp));
+    }
+  }
+
+  const fondoApertura = num(formData, "fondo_apertura") ?? 0;
+  const contantiContati = num(formData, "contanti_contati") ?? 0;
+  const fondoChiusura = num(formData, "fondo_chiusura") ?? 0;
+
+  // Quadratura dichiarata (JSON [{ metodo, dichiarato, causale }])
+  let quadRaw: { metodo: string; dichiarato: number; causale?: string }[] = [];
+  try {
+    const p = JSON.parse(str(formData, "quadratura") ?? "[]");
+    if (Array.isArray(p)) quadRaw = p;
+  } catch {
+    quadRaw = [];
+  }
+
+  const quadratura: { metodo: string; sistema: number; dichiarato: number; differenza: number; causale: string | null }[] = [];
+  for (const q of quadRaw) {
+    const metodo = String(q.metodo);
+    const isContanti = metodo.toLowerCase() === "contanti";
+    const sistema = euro2(sistemaMetodo.get(metodo) ?? 0);
+    const dichiarato = euro2(Number(q.dichiarato) || 0);
+    const dichiaratoNetto = isContanti ? euro2(dichiarato - fondoApertura) : dichiarato;
+    const differenza = euro2(dichiaratoNetto - sistema);
+    const causale = q.causale ? String(q.causale).trim() : "";
+    if (Math.abs(differenza) > 0.05 && !causale) {
+      return { errore: `Serve una causale per lo scarto su "${metodo}" (${differenza.toFixed(2)} €).` };
+    }
+    quadratura.push({ metodo, sistema, dichiarato, differenza, causale: causale || null });
+  }
+
+  // Confronto RT (JSON [{ aliquota, stampante }])
+  let confRaw: { aliquota: string; stampante: number }[] = [];
+  try {
+    const p = JSON.parse(str(formData, "confronto") ?? "[]");
+    if (Array.isArray(p)) confRaw = p;
+  } catch {
+    confRaw = [];
+  }
+  const confronto_rt = (["4", "22", "esente"] as const).map((a) => {
+    const stampante = euro2(Number(confRaw.find((c) => c.aliquota === a)?.stampante) || 0);
+    const sistema = euro2(sistemaAliquota.get(a) ?? 0);
+    return { aliquota: a, stampante, sistema, differenza: euro2(stampante - sistema) };
+  });
+
+  // Caparre del giorno
+  const [{ data: ordiniOggi }, { data: movIncamero }] = await Promise.all([
+    supabase.from("ordini_occhiali").select("acconto").gte("created_at", inizio).lte("created_at", fine),
+    supabase.from("movimenti_cassa").select("importo").eq("tipo", "incamero_caparra").gte("created_at", inizio).lte("created_at", fine),
+  ]);
+  const caparreEmesse = euro2((ordiniOggi ?? []).reduce((s, o) => s + (o.acconto ?? 0), 0));
+  let caparreScontate = 0;
+  for (const v of vendite ?? []) {
+    for (const p of (Array.isArray(v.pagamenti) ? v.pagamenti : []) as PagamentoVendita[]) {
+      if (p.nome.toLowerCase() === "caparra") caparreScontate = euro2(caparreScontate + p.importo);
+    }
+  }
+  const caparreIncamerate = euro2((movIncamero ?? []).reduce((s, m) => s + m.importo, 0));
+
+  const riepilogo = {
+    quadratura,
+    confronto_rt,
+    caparre: { emesse: caparreEmesse, scontate: caparreScontate, incamerate: caparreIncamerate },
+  };
+
+  const { error } = await supabase.from("chiusure_cassa").insert({
+    azienda_id: prof.azienda_id,
+    data: oggi,
+    fondo_apertura: euro2(fondoApertura),
+    contanti_contati: euro2(contantiContati),
+    fondo_chiusura: euro2(fondoChiusura),
+    z_numero: str(formData, "z_numero"),
+    riepilogo: riepilogo as unknown as Json,
+    note: str(formData, "note"),
+    chiusa_da: prof.id,
+  });
+  if (error) {
+    if (error.code === "23505") return { errore: "La giornata di oggi è già stata chiusa." };
+    return { errore: `Chiusura non riuscita: ${error.message}` };
+  }
+
+  revalidatePath("/cassa");
+  revalidatePath("/cassa/chiusure");
+  redirect("/cassa/chiusure");
 }
