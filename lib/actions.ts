@@ -984,3 +984,237 @@ export async function eventoFermo(
   revalidatePath(`/clienti/${fermo.cliente_id}`);
   return null;
 }
+
+/* ── Agenda ────────────────────────────────────────────────────────── */
+
+const TIPI_APPUNTAMENTO = [
+  "controllo_vista",
+  "consegna",
+  "ritiro_lac",
+  "prima_applicazione_lac",
+  "altro",
+] as const;
+
+export async function creaAppuntamento(_prev: Esito, formData: FormData): Promise<Esito> {
+  const supabase = await createClient();
+
+  const data = str(formData, "data");
+  const ora = str(formData, "ora");
+  if (!data || !ora) return { errore: "Servono data e ora." };
+
+  const inizio = new Date(`${data}T${ora}`);
+  if (Number.isNaN(inizio.getTime())) return { errore: "Data o ora non valide." };
+
+  const durata = Math.round(num(formData, "durata_minuti") ?? 20);
+  if (durata < 5 || durata > 240) return { errore: "La durata dev'essere tra 5 e 240 minuti." };
+
+  const tipoRaw = str(formData, "tipo") ?? "controllo_vista";
+  const tipo = (TIPI_APPUNTAMENTO as readonly string[]).includes(tipoRaw)
+    ? (tipoRaw as (typeof TIPI_APPUNTAMENTO)[number])
+    : "controllo_vista";
+
+  const prof = await profiloCorrente(supabase);
+  if ("errore" in prof) return prof;
+
+  const { error } = await supabase.from("appuntamenti").insert({
+    azienda_id: prof.azienda_id,
+    cliente_id: str(formData, "cliente_id"),
+    utente_id: str(formData, "utente_id") ?? prof.id,
+    tipo,
+    inizio: inizio.toISOString(),
+    durata_minuti: durata,
+    stato: "prenotato",
+    riferimento: str(formData, "riferimento"),
+    note: str(formData, "note"),
+  });
+  if (error) return { errore: `Appuntamento non salvato: ${error.message}` };
+
+  revalidatePath("/agenda");
+  redirect(`/agenda?data=${data}`);
+}
+
+export async function eventoAppuntamento(
+  id: string,
+  evento: "completa" | "mancato" | "annulla",
+  _prev: Esito,
+  formData: FormData
+): Promise<Esito> {
+  const supabase = await createClient();
+
+  const { data: app } = await supabase
+    .from("appuntamenti")
+    .select("stato, note, inizio")
+    .eq("id", id)
+    .maybeSingle();
+  if (!app) return { errore: "Appuntamento non trovato." };
+  if (app.stato !== "prenotato") return { errore: `Nessuna azione: appuntamento ${app.stato}.` };
+
+  const nuovoStato =
+    evento === "completa" ? "completato" : evento === "mancato" ? "mancato" : "annullato";
+  const patch: { stato: "completato" | "mancato" | "annullato"; note?: string | null } = {
+    stato: nuovoStato,
+  };
+  if (evento === "annulla") {
+    const motivo = str(formData, "motivo");
+    if (motivo) patch.note = appendiNota(app.note, `— Annullato ${dataIt()}: ${motivo}`);
+  }
+
+  const { error } = await supabase.from("appuntamenti").update(patch).eq("id", id);
+  if (error) return { errore: `Operazione non riuscita: ${error.message}` };
+
+  revalidatePath("/agenda");
+  return null;
+}
+
+/* ── Richiami ──────────────────────────────────────────────────────── */
+
+const TIPI_RICHIAMO = [
+  "controllo_vista",
+  "lac_esaurimento",
+  "ritiro_sollecito",
+  "fermo_scadenza",
+  "promessa_ritardo",
+  "generico",
+] as const;
+const CANALI = ["telefono", "whatsapp", "sms", "email", "di_persona"] as const;
+const ESITI = ["appuntamento_fissato", "richiamare", "non_risponde", "non_interessato", "gestito"] as const;
+
+function tipoAppuntamentoDaRichiamo(tipoRichiamo: string, riferimento: string | null): string {
+  if (tipoRichiamo === "controllo_vista") return "controllo_vista";
+  const rif = (riferimento ?? "").toUpperCase();
+  if (rif.startsWith("BL")) return "consegna";
+  if (rif.startsWith("OL")) return "ritiro_lac";
+  return "altro";
+}
+
+function urlAgendaPrefill(clienteId: string, tipoRichiamo: string, riferimento: string | null): string {
+  const p = new URLSearchParams();
+  p.set("cliente", clienteId);
+  p.set("tipo", tipoAppuntamentoDaRichiamo(tipoRichiamo, riferimento));
+  if (riferimento) p.set("riferimento", riferimento);
+  return `/agenda/nuovo?${p.toString()}`;
+}
+
+export async function creaRichiamo(_prev: Esito, formData: FormData): Promise<Esito> {
+  const supabase = await createClient();
+  const clienteId = str(formData, "cliente_id");
+  if (!clienteId) return { errore: "Seleziona un cliente." };
+
+  const tipoRaw = str(formData, "tipo") ?? "generico";
+  const tipo = (TIPI_RICHIAMO as readonly string[]).includes(tipoRaw)
+    ? (tipoRaw as (typeof TIPI_RICHIAMO)[number])
+    : "generico";
+
+  const prof = await profiloCorrente(supabase);
+  if ("errore" in prof) return prof;
+
+  const { error } = await supabase.from("richiami").insert({
+    azienda_id: prof.azienda_id,
+    cliente_id: clienteId,
+    tipo,
+    da_fare_il: str(formData, "da_fare_il") ?? new Date().toISOString().slice(0, 10),
+    riferimento: str(formData, "riferimento"),
+    valore: num(formData, "valore"),
+    note: str(formData, "note"),
+  });
+  if (error) return { errore: `Richiamo non salvato: ${error.message}` };
+
+  revalidatePath("/richiami");
+  redirect("/richiami");
+}
+
+/** Valida e compone canale/esito/valore/note comuni ai due flussi di esito. */
+function leggiEsito(formData: FormData):
+  | { errore: string }
+  | { canale: (typeof CANALI)[number]; esito: (typeof ESITI)[number]; valore: number | null; note: string | null } {
+  const canale = str(formData, "canale");
+  const esito = str(formData, "esito");
+  if (!canale || !(CANALI as readonly string[]).includes(canale)) return { errore: "Scegli il canale del contatto." };
+  if (!esito || !(ESITI as readonly string[]).includes(esito)) return { errore: "Scegli l'esito." };
+  return {
+    canale: canale as (typeof CANALI)[number],
+    esito: esito as (typeof ESITI)[number],
+    valore: num(formData, "valore"),
+    note: str(formData, "note"),
+  };
+}
+
+export async function registraEsitoRichiamo(
+  id: string,
+  _prev: Esito,
+  formData: FormData
+): Promise<Esito> {
+  const supabase = await createClient();
+
+  const { data: r } = await supabase
+    .from("richiami")
+    .select("esito, cliente_id, tipo, riferimento")
+    .eq("id", id)
+    .maybeSingle();
+  if (!r) return { errore: "Richiamo non trovato." };
+  if (r.esito) return { errore: "Questo richiamo è già stato lavorato." };
+
+  const e = leggiEsito(formData);
+  if ("errore" in e) return e;
+
+  const prof = await profiloCorrente(supabase);
+  if ("errore" in prof) return prof;
+
+  const { error } = await supabase
+    .from("richiami")
+    .update({
+      canale: e.canale,
+      esito: e.esito,
+      fatto_il: new Date().toISOString(),
+      utente_id: prof.id,
+      valore: e.valore,
+      note: e.note,
+    })
+    .eq("id", id);
+  if (error) return { errore: `Esito non salvato: ${error.message}` };
+
+  revalidatePath("/richiami");
+  if (e.esito === "appuntamento_fissato" && r.cliente_id) {
+    redirect(urlAgendaPrefill(r.cliente_id, r.tipo, r.riferimento));
+  }
+  return null;
+}
+
+export async function registraEsitoProposta(_prev: Esito, formData: FormData): Promise<Esito> {
+  const supabase = await createClient();
+
+  const clienteId = str(formData, "cliente_id");
+  if (!clienteId) return { errore: "Cliente mancante." };
+  const tipoRaw = str(formData, "tipo") ?? "generico";
+  const tipo = (TIPI_RICHIAMO as readonly string[]).includes(tipoRaw)
+    ? (tipoRaw as (typeof TIPI_RICHIAMO)[number])
+    : "generico";
+  const riferimento = str(formData, "riferimento");
+
+  const e = leggiEsito(formData);
+  if ("errore" in e) return e;
+
+  const prof = await profiloCorrente(supabase);
+  if ("errore" in prof) return prof;
+
+  const { error } = await supabase.from("richiami").insert({
+    azienda_id: prof.azienda_id,
+    cliente_id: clienteId,
+    tipo,
+    da_fare_il: new Date().toISOString().slice(0, 10),
+    canale: e.canale,
+    esito: e.esito,
+    fatto_il: new Date().toISOString(),
+    utente_id: prof.id,
+    riferimento,
+    valore: e.valore,
+    note: e.note,
+  });
+  if (error) return { errore: `Esito non salvato: ${error.message}` };
+
+  revalidatePath("/richiami");
+  if (e.esito === "appuntamento_fissato") {
+    redirect(urlAgendaPrefill(clienteId, tipo, riferimento));
+  }
+  return null;
+}

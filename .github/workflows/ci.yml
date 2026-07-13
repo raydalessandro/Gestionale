@@ -1,0 +1,101 @@
+name: CI
+
+# Cancello di merge (non di deploy: a quello pensa Vercel).
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    - cron: "0 2 * * *" # controllo notturno del contratto
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── build: sempre, anche sui fork (nessun segreto richiesto) ────────────────
+  build:
+    name: Build · typecheck · L1+L4
+    runs-on: ubuntu-latest
+    env:
+      # Env fittizie: bastano a compilare, non toccano alcun DB reale.
+      NEXT_PUBLIC_SUPABASE_URL: https://fake.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: fake-anon-key-for-build
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Build (Next)
+        run: npm run build
+      - name: L1 unit + L4 guardie
+        run: npm test
+
+  # ── guardia: i job contratto/e2e girano solo se ci sono i segreti ───────────
+  guard:
+    name: Segreti di test presenti?
+    runs-on: ubuntu-latest
+    outputs:
+      secrets: ${{ steps.check.outputs.secrets }}
+    steps:
+      - id: check
+        env:
+          URL: ${{ secrets.TEST_SUPABASE_URL }}
+        run: |
+          if [ -n "$URL" ]; then
+            echo "secrets=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "secrets=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # ── contratto (L2) poi E2E (L3): solo con segreti, e non su ogni push ───────
+  contratto-e2e:
+    name: L2 contratto · L3 e2e
+    needs: [build, guard]
+    if: >-
+      needs.guard.outputs.secrets == 'true' &&
+      (github.event_name == 'pull_request' ||
+       github.event_name == 'workflow_dispatch' ||
+       github.event_name == 'schedule')
+    runs-on: ubuntu-latest
+    env:
+      TEST_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
+      TEST_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
+      TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TEST_SUPABASE_SERVICE_ROLE_KEY }}
+      # L'app E2E parla col progetto di TEST (mai produzione).
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+
+      # L2 · Contratto: parla col DB di test via service/anon. Prima dell'E2E.
+      - name: L2 · contratto
+        run: npm run test:contratto
+
+      # L3 · E2E: build dell'app col target di test, poi Playwright (chromium).
+      - name: Installa Chromium per Playwright
+        run: npx playwright install --with-deps chromium
+      - name: Build app (target di test)
+        run: npm run build
+      - name: L3 · e2e
+        run: npm run test:e2e
+        env:
+          E2E_WEB_COMMAND: npm run start
+      - name: Report Playwright (se fallisce)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

@@ -3,6 +3,7 @@ import { Plus, UserPlus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { Card, PageHeader, ButtonLink, Badge, tintaFonte, Vuoto } from "@/components/ui";
 import { sottoScorta } from "@/components/MagazzinoUI";
+import { calcolaProposte } from "@/lib/richiami-proposte";
 import { fmtData, ETICHETTE_FONTE } from "@/lib/utils";
 
 export default async function DashboardPage() {
@@ -11,8 +12,9 @@ export default async function DashboardPage() {
   const trentaGiorniFa = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
     .toISOString()
     .slice(0, 10);
+  const oggi = new Date().toISOString().slice(0, 10);
 
-  const [clienti, prescrizioni, lac, buste, ultimi, perScorta] = await Promise.all([
+  const [clienti, prescrizioni, lac, buste, ultimi, perScorta, appOggi, richDaFare, proposte] = await Promise.all([
     supabase.from("clienti").select("*", { count: "exact", head: true }),
     supabase
       .from("prescrizioni")
@@ -36,9 +38,23 @@ export default async function DashboardPage() {
       .select("giacenza, scorta_minima, attivo")
       .eq("attivo", true)
       .gt("scorta_minima", 0),
+    supabase
+      .from("appuntamenti")
+      .select("*", { count: "exact", head: true })
+      .gte("inizio", `${oggi}T00:00:00`)
+      .lte("inizio", `${oggi}T23:59:59`)
+      .eq("stato", "prenotato"),
+    supabase
+      .from("richiami")
+      .select("*", { count: "exact", head: true })
+      .is("esito", null)
+      .lte("da_fare_il", oggi),
+    calcolaProposte(supabase),
   ]);
 
   const nSottoScorta = (perScorta.data ?? []).filter((p) => sottoScorta(p)).length;
+  const nAppOggi = appOggi.count ?? 0;
+  const nRichiami = (richDaFare.count ?? 0) + proposte.proposte.length;
 
   const kpi = [
     { label: "Clienti in anagrafica", value: clienti.count ?? 0 },
@@ -95,6 +111,23 @@ export default async function DashboardPage() {
           </span>
           <span aria-hidden>→</span>
         </Link>
+      )}
+
+      {(nAppOggi > 0 || nRichiami > 0) && (
+        <div className="mb-6 space-y-2">
+          {nAppOggi > 0 && (
+            <Link href="/agenda" className="flex items-center justify-between gap-2 rounded-xl border border-linea bg-white px-4 py-3 text-sm font-medium text-inchiostro transition-colors hover:bg-carta">
+              <span>Oggi in agenda: {nAppOggi} appuntament{nAppOggi === 1 ? "o" : "i"}</span>
+              <span aria-hidden>→</span>
+            </Link>
+          )}
+          {nRichiami > 0 && (
+            <Link href="/richiami" className="flex items-center justify-between gap-2 rounded-xl border border-ambra/40 bg-ambra-soft px-4 py-3 text-sm font-medium text-ambra transition-colors hover:border-ambra">
+              <span>Richiami da fare: {nRichiami}</span>
+              <span aria-hidden>→</span>
+            </Link>
+          )}
+        </div>
       )}
 
       <h2 className="f-serif mb-3 text-lg font-semibold text-inchiostro">
