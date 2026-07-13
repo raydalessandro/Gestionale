@@ -9,6 +9,7 @@ import type {
   Json,
   OrdineLacUpdate,
   OrdineOcchialiUpdate,
+  MovimentoMagazzinoRow,
 } from "@/lib/database.types";
 
 /* ── Helper ────────────────────────────────────────────────────────── */
@@ -488,7 +489,7 @@ export async function eventoOrdineLac(
 
   const { data: ordine } = await supabase
     .from("ordini_lac")
-    .select("stato, note")
+    .select("stato, note, righe, numero, azienda_id")
     .eq("id", id)
     .maybeSingle();
   if (!ordine) return { errore: "Ordine non trovato." };
@@ -528,6 +529,30 @@ export async function eventoOrdineLac(
 
   const { error } = await supabase.from("ordini_lac").update(patch).eq("id", id);
   if (error) return { errore: `Operazione non riuscita: ${error.message}` };
+
+  // Scarico automatico alla consegna (§2.8): una riga con prodotto_id → un
+  // movimento ordine_cliente. Prodotto rimosso: si salta, non blocca.
+  if (evento === "consegna") {
+    let utenteId: string | null = null;
+    const prof = await profiloCorrente(supabase);
+    if (!("errore" in prof)) utenteId = prof.id;
+
+    const righe = (Array.isArray(ordine.righe) ? ordine.righe : []) as RigaOrdineLac[];
+    for (const r of righe) {
+      if (!r.prodotto_id) continue;
+      const q = Math.round(Number(r.quantita) || 0);
+      if (q < 1) continue;
+      await supabase.from("movimenti_magazzino").insert({
+        azienda_id: ordine.azienda_id,
+        prodotto_id: r.prodotto_id,
+        utente_id: utenteId,
+        tipo: "ordine_cliente",
+        quantita: -q,
+        riferimento: ordine.numero,
+      });
+    }
+    revalidatePath("/magazzino");
+  }
 
   revalidatePath("/ordini");
   revalidatePath(`/ordini/lac/${id}`);
@@ -660,5 +685,301 @@ export async function aggiungiNotaOrdine(
   }
 
   revalidatePath(`/ordini/${tipo}/${id}`);
+  return null;
+}
+
+/* ── Magazzino: prodotti ───────────────────────────────────────────── */
+
+const TIPI_PRODOTTO = [
+  "lac",
+  "soluzione",
+  "montatura",
+  "lente",
+  "accessorio",
+  "servizio",
+] as const;
+
+function prodottoDaForm(fd: FormData) {
+  const tipoRaw = str(fd, "tipo") ?? "accessorio";
+  const tipo = (TIPI_PRODOTTO as readonly string[]).includes(tipoRaw)
+    ? (tipoRaw as (typeof TIPI_PRODOTTO)[number])
+    : "accessorio";
+
+  // parametri LAC (§2.10); per gli altri tipi resta {}.
+  const parametri: Record<string, unknown> =
+    tipo === "lac"
+      ? {
+          raggio: num(fd, "par_raggio"),
+          diametro: num(fd, "par_diametro"),
+          confezione: str(fd, "par_confezione"),
+        }
+      : {};
+
+  return {
+    tipo,
+    marca: str(fd, "marca"),
+    nome: str(fd, "nome") ?? "",
+    descrizione: str(fd, "descrizione"),
+    sku: str(fd, "sku"),
+    fornitore: str(fd, "fornitore"),
+    prezzo: Math.max(0, num(fd, "prezzo") ?? 0),
+    costo: num(fd, "costo"),
+    scorta_minima: Math.max(0, Math.round(num(fd, "scorta_minima") ?? 0)),
+    visibile_sito: fd.get("visibile_sito") === "on",
+    parametri: parametri as Json,
+  };
+}
+
+export async function creaProdotto(_prev: Esito, formData: FormData): Promise<Esito> {
+  const supabase = await createClient();
+  const dati = prodottoDaForm(formData);
+  if (!dati.nome) return { errore: "Il nome del prodotto è obbligatorio." };
+
+  const prof = await profiloCorrente(supabase);
+  if ("errore" in prof) return prof;
+
+  const { data, error } = await supabase
+    .from("prodotti")
+    .insert({ ...dati, azienda_id: prof.azienda_id })
+    .select("id")
+    .single();
+
+  if (error) {
+    if (error.code === "23505") return { errore: "SKU già in uso su un altro prodotto." };
+    return { errore: `Creazione non riuscita: ${error.message}` };
+  }
+
+  revalidatePath("/magazzino");
+  redirect(`/magazzino/prodotti/${data.id}`);
+}
+
+export async function aggiornaProdotto(
+  id: string,
+  _prev: Esito,
+  formData: FormData
+): Promise<Esito> {
+  const supabase = await createClient();
+  const dati = prodottoDaForm(formData);
+  if (!dati.nome) return { errore: "Il nome del prodotto è obbligatorio." };
+  const attivo = formData.get("attivo") === "on";
+
+  const { error } = await supabase
+    .from("prodotti")
+    .update({ ...dati, attivo })
+    .eq("id", id);
+
+  if (error) {
+    if (error.code === "23505") return { errore: "SKU già in uso su un altro prodotto." };
+    return { errore: `Salvataggio non riuscito: ${error.message}` };
+  }
+
+  revalidatePath("/magazzino");
+  revalidatePath(`/magazzino/prodotti/${id}`);
+  redirect(`/magazzino/prodotti/${id}`);
+}
+
+/* ── Magazzino: movimenti (la giacenza la muove il trigger) ─────────── */
+
+type TipoMovimento = MovimentoMagazzinoRow["tipo"];
+
+const MOVIMENTI_MANUALI = ["scarico", "reso_fornitore", "danno", "uso_interno"] as const;
+
+/** Disponibile = giacenza − Σ fermi attivi (§2.6). */
+async function disponibileProdotto(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  prodottoId: string
+): Promise<number> {
+  const [{ data: prod }, { data: fermi }] = await Promise.all([
+    supabase.from("prodotti").select("giacenza").eq("id", prodottoId).maybeSingle(),
+    supabase
+      .from("fermi")
+      .select("quantita")
+      .eq("prodotto_id", prodottoId)
+      .eq("stato", "attivo"),
+  ]);
+  const giacenza = prod?.giacenza ?? 0;
+  const impegnata = (fermi ?? []).reduce((s, f) => s + f.quantita, 0);
+  return giacenza - impegnata;
+}
+
+export async function caricoDaBolla(
+  prodottoId: string,
+  _prev: Esito,
+  formData: FormData
+): Promise<Esito> {
+  const supabase = await createClient();
+  const bolla = str(formData, "bolla");
+  const qBolla = Math.round(num(formData, "qta_bolla") ?? 0);
+  const qContataRaw = num(formData, "qta_contata");
+  const qContata = qContataRaw === null ? qBolla : Math.round(qContataRaw);
+
+  if (qBolla < 1) return { errore: "La quantità in bolla dev'essere almeno 1." };
+  if (qContata < 0) return { errore: "La quantità contata non può essere negativa." };
+
+  const prof = await profiloCorrente(supabase);
+  if ("errore" in prof) return prof;
+
+  // 1) carico = quantità IN BOLLA (riferimento = n° bolla)
+  const { error: e1 } = await supabase.from("movimenti_magazzino").insert({
+    azienda_id: prof.azienda_id,
+    prodotto_id: prodottoId,
+    utente_id: prof.id,
+    tipo: "carico",
+    quantita: qBolla,
+    riferimento: bolla ? `Bolla ${bolla}` : "Carico",
+  });
+  if (e1) return { errore: `Carico non riuscito: ${e1.message}` };
+
+  // 2) rettifica se il contato differisce dalla bolla
+  const diff = qContata - qBolla;
+  if (diff !== 0) {
+    const { error: e2 } = await supabase.from("movimenti_magazzino").insert({
+      azienda_id: prof.azienda_id,
+      prodotto_id: prodottoId,
+      utente_id: prof.id,
+      tipo: "rettifica",
+      quantita: diff,
+      note: `Differenza da bolla ${bolla ?? "—"}`,
+    });
+    if (e2) return { errore: `Rettifica non riuscita: ${e2.message}` };
+  }
+
+  revalidatePath("/magazzino");
+  revalidatePath(`/magazzino/prodotti/${prodottoId}`);
+  return null;
+}
+
+export async function registraMovimento(
+  prodottoId: string,
+  _prev: Esito,
+  formData: FormData
+): Promise<Esito> {
+  const supabase = await createClient();
+  const tipo = str(formData, "tipo");
+  const q = Math.round(num(formData, "quantita") ?? 0);
+  if (q < 1) return { errore: "La quantità dev'essere almeno 1." };
+
+  const prof = await profiloCorrente(supabase);
+  if ("errore" in prof) return prof;
+
+  let quantita: number;
+  let note: string | null;
+  let riferimento: string | null = str(formData, "riferimento");
+  let tipoFinale: TipoMovimento;
+
+  if (tipo === "rettifica") {
+    const motivo = str(formData, "motivo");
+    if (!motivo) return { errore: "La rettifica richiede un motivo." };
+    quantita = str(formData, "direzione") === "-" ? -q : q;
+    note = motivo;
+    riferimento = null;
+    tipoFinale = "rettifica";
+  } else if ((MOVIMENTI_MANUALI as readonly string[]).includes(tipo ?? "")) {
+    quantita = -q;
+    note = str(formData, "motivo");
+    tipoFinale = tipo as TipoMovimento;
+  } else {
+    return { errore: "Tipo di movimento non ammesso." };
+  }
+
+  const { error } = await supabase.from("movimenti_magazzino").insert({
+    azienda_id: prof.azienda_id,
+    prodotto_id: prodottoId,
+    utente_id: prof.id,
+    tipo: tipoFinale,
+    quantita,
+    riferimento,
+    note,
+  });
+  if (error) return { errore: `Movimento non riuscito: ${error.message}` };
+
+  revalidatePath("/magazzino");
+  revalidatePath(`/magazzino/prodotti/${prodottoId}`);
+  return null;
+}
+
+/* ── Magazzino: fermi ──────────────────────────────────────────────── */
+
+export async function creaFermo(
+  prodottoId: string,
+  _prev: Esito,
+  formData: FormData
+): Promise<Esito> {
+  const supabase = await createClient();
+  const clienteId = str(formData, "cliente_id");
+  if (!clienteId) return { errore: "Seleziona un cliente per il fermo." };
+  const q = Math.round(num(formData, "quantita") ?? 0);
+  if (q < 1) return { errore: "La quantità dev'essere almeno 1." };
+
+  const prof = await profiloCorrente(supabase);
+  if ("errore" in prof) return prof;
+
+  const disp = await disponibileProdotto(supabase, prodottoId);
+  if (q > disp) return { errore: `Disponibili solo ${disp} pezzi da fermare.` };
+
+  const { error } = await supabase.from("fermi").insert({
+    azienda_id: prof.azienda_id,
+    prodotto_id: prodottoId,
+    cliente_id: clienteId,
+    utente_id: prof.id,
+    quantita: q,
+    stato: "attivo",
+    scade_il: str(formData, "scade_il"),
+    note: str(formData, "note"),
+  });
+  if (error) return { errore: `Fermo non riuscito: ${error.message}` };
+
+  revalidatePath("/magazzino");
+  revalidatePath(`/magazzino/prodotti/${prodottoId}`);
+  revalidatePath(`/clienti/${clienteId}`);
+  return null;
+}
+
+export async function eventoFermo(
+  id: string,
+  evento: "ritira" | "annulla",
+  _prev: Esito,
+  formData: FormData
+): Promise<Esito> {
+  const supabase = await createClient();
+  void formData;
+
+  const { data: fermo } = await supabase
+    .from("fermi")
+    .select("stato, prodotto_id, cliente_id, quantita, azienda_id")
+    .eq("id", id)
+    .maybeSingle();
+  if (!fermo) return { errore: "Fermo non trovato." };
+  if (fermo.stato !== "attivo") return { errore: `Fermo già ${fermo.stato}.` };
+
+  const prof = await profiloCorrente(supabase);
+  if ("errore" in prof) return prof;
+
+  if (evento === "ritira") {
+    const { data: cli } = await supabase
+      .from("clienti")
+      .select("nome, cognome")
+      .eq("id", fermo.cliente_id)
+      .maybeSingle();
+    const rif = cli ? `Fermo ${cli.cognome} ${cli.nome}` : "Fermo ritirato";
+    const { error: em } = await supabase.from("movimenti_magazzino").insert({
+      azienda_id: fermo.azienda_id,
+      prodotto_id: fermo.prodotto_id,
+      utente_id: prof.id,
+      tipo: "scarico",
+      quantita: -fermo.quantita,
+      riferimento: rif,
+    });
+    if (em) return { errore: `Scarico non riuscito: ${em.message}` };
+    const { error } = await supabase.from("fermi").update({ stato: "ritirato" }).eq("id", id);
+    if (error) return { errore: `Aggiornamento non riuscito: ${error.message}` };
+  } else {
+    const { error } = await supabase.from("fermi").update({ stato: "annullato" }).eq("id", id);
+    if (error) return { errore: `Aggiornamento non riuscito: ${error.message}` };
+  }
+
+  revalidatePath("/magazzino");
+  revalidatePath(`/magazzino/prodotti/${fermo.prodotto_id}`);
+  revalidatePath(`/clienti/${fermo.cliente_id}`);
   return null;
 }
