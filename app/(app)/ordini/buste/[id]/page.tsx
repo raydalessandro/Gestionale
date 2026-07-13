@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Card, PageHeader, ButtonLink, Badge, tintaFonte } from "@/components/ui";
 import { PillStato, RxMono, waLink, ETICHETTE_TIPO_LAVORO } from "@/components/OrdiniUI";
 import { AzioniBusta, NotaRapida } from "@/components/AzioniOrdine";
+import { AzioniCaparra } from "@/components/AzioniCaparra";
 import { fmtEuro, fmtData, ETICHETTE_FONTE } from "@/lib/utils";
 
 export default async function BustaPage({
@@ -39,6 +40,11 @@ export default async function BustaPage({
         ? supabase.from("utenti").select("nome").eq("id", b.ispezionata_da).maybeSingle()
         : Promise.resolve({ data: null }),
     ]);
+
+  const { data: metodiCassa } =
+    b.acconto > 0 && !["consegnata", "annullata"].includes(b.stato)
+      ? await supabase.from("metodi_pagamento").select("id, nome").eq("attivo", true).order("ordine")
+      : { data: [] };
 
   const accontoSuggerito = Math.round((b.totale * 0.3) / 5) * 5;
 
@@ -87,9 +93,16 @@ export default async function BustaPage({
             Busta lavoro · {ETICHETTE_TIPO_LAVORO[b.tipo_lavoro]}
           </p>
         </div>
-        <ButtonLink href={`/ordini/buste/${b.id}/stampa`} variante="ghost">
-          <Printer size={16} /> Stampa busta
-        </ButtonLink>
+        <div className="flex gap-2">
+          <ButtonLink href={`/ordini/buste/${b.id}/stampa`} variante="ghost">
+            <Printer size={16} /> Stampa busta
+          </ButtonLink>
+          {b.acconto > 0 && (
+            <ButtonLink href={`/ordini/buste/${b.id}/caparra`} variante="ghost">
+              <Printer size={16} /> Ricevuta caparra
+            </ButtonLink>
+          )}
+        </div>
       </div>
 
       <div className="mb-4 grid grid-cols-1 gap-4 md:grid-cols-3">
@@ -205,7 +218,14 @@ export default async function BustaPage({
               ? `/agenda/nuovo?cliente=${b.cliente_id}&tipo=consegna&riferimento=${encodeURIComponent(b.numero)}`
               : null
           }
+          incassaHref={`/cassa/vendita/nuova?busta=${b.id}`}
         />
+        {b.acconto > 0 && !["consegnata", "annullata"].includes(b.stato) && (
+          <div className="mt-3 border-t border-linea pt-3">
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-faint">Caparra</p>
+            <AzioniCaparra bustaId={b.id} acconto={b.acconto} metodi={metodiCassa ?? []} />
+          </div>
+        )}
       </Card>
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">

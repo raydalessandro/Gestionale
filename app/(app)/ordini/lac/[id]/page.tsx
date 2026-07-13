@@ -169,6 +169,7 @@ export default async function OrdineLacPage({
               ? `/agenda/nuovo?cliente=${ordine.cliente_id}&tipo=ritiro_lac&riferimento=${encodeURIComponent(ordine.numero)}`
               : null
           }
+          incassaHref={`/cassa/vendita/nuova?lac=${ordine.id}`}
         />
       </Card>
 

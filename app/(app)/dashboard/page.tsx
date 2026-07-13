@@ -4,7 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Card, PageHeader, ButtonLink, Badge, tintaFonte, Vuoto } from "@/components/ui";
 import { sottoScorta } from "@/components/MagazzinoUI";
 import { calcolaProposte } from "@/lib/richiami-proposte";
-import { fmtData, ETICHETTE_FONTE } from "@/lib/utils";
+import { fmtData, fmtEuro, ETICHETTE_FONTE } from "@/lib/utils";
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -14,7 +14,7 @@ export default async function DashboardPage() {
     .slice(0, 10);
   const oggi = new Date().toISOString().slice(0, 10);
 
-  const [clienti, prescrizioni, lac, buste, ultimi, perScorta, appOggi, richDaFare, proposte] = await Promise.all([
+  const [clienti, prescrizioni, lac, buste, ultimi, perScorta, appOggi, richDaFare, proposte, venditeOggi] = await Promise.all([
     supabase.from("clienti").select("*", { count: "exact", head: true }),
     supabase
       .from("prescrizioni")
@@ -50,11 +50,19 @@ export default async function DashboardPage() {
       .is("esito", null)
       .lte("da_fare_il", oggi),
     calcolaProposte(supabase),
+    supabase
+      .from("vendite")
+      .select("totale")
+      .eq("stato", "emessa")
+      .gte("data_vendita", `${oggi}T00:00:00`)
+      .lte("data_vendita", `${oggi}T23:59:59`),
   ]);
 
   const nSottoScorta = (perScorta.data ?? []).filter((p) => sottoScorta(p)).length;
   const nAppOggi = appOggi.count ?? 0;
   const nRichiami = (richDaFare.count ?? 0) + proposte.proposte.length;
+  const nVendite = (venditeOggi.data ?? []).length;
+  const incassoOggi = (venditeOggi.data ?? []).reduce((s, v) => s + v.totale, 0);
 
   const kpi = [
     { label: "Clienti in anagrafica", value: clienti.count ?? 0 },
@@ -113,7 +121,7 @@ export default async function DashboardPage() {
         </Link>
       )}
 
-      {(nAppOggi > 0 || nRichiami > 0) && (
+      {(nAppOggi > 0 || nRichiami > 0 || nVendite > 0) && (
         <div className="mb-6 space-y-2">
           {nAppOggi > 0 && (
             <Link href="/agenda" className="flex items-center justify-between gap-2 rounded-xl border border-linea bg-white px-4 py-3 text-sm font-medium text-inchiostro transition-colors hover:bg-carta">
@@ -124,6 +132,12 @@ export default async function DashboardPage() {
           {nRichiami > 0 && (
             <Link href="/richiami" className="flex items-center justify-between gap-2 rounded-xl border border-ambra/40 bg-ambra-soft px-4 py-3 text-sm font-medium text-ambra transition-colors hover:border-ambra">
               <span>Richiami da fare: {nRichiami}</span>
+              <span aria-hidden>→</span>
+            </Link>
+          )}
+          {nVendite > 0 && (
+            <Link href="/cassa" className="flex items-center justify-between gap-2 rounded-xl border border-linea bg-white px-4 py-3 text-sm font-medium text-inchiostro transition-colors hover:bg-carta">
+              <span>Incasso di oggi: {fmtEuro(incassoOggi)} — {nVendite} vendit{nVendite === 1 ? "a" : "e"}</span>
               <span aria-hidden>→</span>
             </Link>
           )}

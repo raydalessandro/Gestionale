@@ -105,7 +105,7 @@ Il piano completo fase per fase è in [`docs/fasi/piano.md`](docs/fasi/piano.md)
 - **v0.3 — Catalogo & Magazzino**: ✅ **fatto** (DB: migrazione 003 ·
   spec: `docs/fasi/fase-2-catalogo-magazzino.md`).
 - **v0.4 — Agenda & Richiami**: ✅ fatta — in collaudo con gli ottici.
-- **v0.5 — Cassa & Vendite**: **in codifica** (DB: migrazione 005 · spec:
+- **v0.5 — Cassa & Vendite**: ✅ **fatto** (DB: migrazione 005 · spec:
   `docs/fasi/fase-4-cassa.md`, costruita sui documenti fiscali reali).
 - **Poi**: richiami (Recall legge da qui), voucher convenzioni, punti
   vendita, fase fiscale (Tessera Sanitaria, fattura elettronica).
