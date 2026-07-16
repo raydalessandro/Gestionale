@@ -1,4 +1,4 @@
-*Aggiornato a: v0.3 (Fase 2)*
+*Aggiornato a: v0.5.1 (Fase 4c)*
 
 # Buste di lavorazione
 
@@ -26,14 +26,16 @@ indietro senza perdere quello che hai scritto.
    (antiriflesso, indurente, filtro luce blu, fotocromatico, idrorepellente) e
    il **Prezzo lenti**.
 4. **Extra** — la **Garanzia** (testo libero, es. "Garanzia 24 mesi
-   inclusa"), un eventuale **Prezzo extra** e lo **Sconto**.
+   inclusa"), il **Tipo di garanzia** (vedi sotto), un eventuale **Prezzo
+   extra** e lo **Sconto**.
 5. **Centratura** — per OD e OS il **DNP** (20–40 mm) e l'**Altezza**
    (10–35 mm). Se scrivi un valore fuori misura il bordo diventa rosso e non
    ti fa proseguire.
 6. **Riepilogo** — vedi il **Totale** in grande, l'**Acconto** già proposto al
    30% (lo puoi cambiare) e il **Saldo alla consegna** che si aggiorna da solo.
    Metti la data in **"Da promettere per il"** (di default +7 giorni),
-   eventuali note, e concludi con **"Crea busta"**.
+   eventuali note, e concludi con **"Crea busta"**. Se metti un acconto, prima
+   scegli il **Metodo della caparra** (vedi sotto).
 
 La busta creata così parte in **lavorazione**.
 
@@ -50,6 +52,28 @@ Al passo 2 scegli come lavori la busta:
 Con **Solo lenti** e **Montatura del cliente** i campi montatura sono
 facoltativi; con **Solo montatura** sono facoltative le lenti e la centratura.
 
+### Il metodo della caparra
+
+Se prendi un acconto, VISTA ti chiede **con cosa lo incassi**: è il campo
+**"Metodo della caparra"** (Contanti, Bancomat, Mastercard…). È obbligatorio,
+perché serve alla quadratura di sera: l'acconto che prendi oggi entra nella
+cassa di oggi, con il suo metodo, e a fine giornata i conti tornano senza che
+tu debba spiegare niente a mano. Lo scegli sia quando crei la busta (al passo
+Riepilogo), sia quando confermi un preventivo con **"Conferma ordine"**. Il
+metodo scelto compare poi anche sulla **ricevuta di caparra** stampata.
+
+### Il tipo di garanzia
+
+Al passo Extra, sotto la garanzia, scegli tra due tipi:
+
+- **Servizio del negozio** (proposto di default) — la garanzia è un servizio
+  tuo: alla consegna la sua riga nasce al 22%.
+- **Polizza di compagnia** — la garanzia è una polizza di un'assicurazione:
+  alla consegna la sua riga nasce esente (fuori campo IVA).
+
+Serve a non versare IVA per sbaglio su una polizza. L'aliquota resta comunque
+modificabile a mano in cassa.
+
 ### Far avanzare la busta
 
 Dalla scheda, un bottone alla volta:
@@ -60,8 +84,10 @@ Dalla scheda, un bottone alla volta:
 3. **"Segna avvisata"** — quando avverti il cliente. Compare anche **"Apri
    WhatsApp"** con il messaggio già scritto: *"Ciao Laura! Il tuo occhiale è
    pronto. Ti aspettiamo per la consegna."*.
-4. **"Consegna"** — al ritiro. Prima di confermare, VISTA ti mostra in
-   evidenza il **saldo da incassare**; premi **"Conferma consegna"**.
+4. **Consegna** — al ritiro. Se il modulo Cassa è attivo, il bottone è
+   **"Consegna e incassa"** e ti porta direttamente alla vendita (vedi il
+   capitolo Cassa); se la Cassa non è attiva, il bottone resta **"Consegna"** e
+   ti mostra il **saldo da incassare** prima di **"Conferma consegna"**.
 
 ### Arrivata non vuol dire pronta: l'ispezione
 
@@ -76,28 +102,35 @@ occhiale sbagliato.
 
 Dalla scheda premi **"Stampa busta"**: si apre un foglio pulito, pensato per la
 stampa in bianco e nero, da appendere alla montatura per il laboratorio.
-Riporta numero, cliente, prescrizione, tipo di lavoro, montatura, lenti,
-centratura, totale/acconto/saldo, laboratorio e le righe per la firma. In alto
-nel foglio c'è il bottone **"Stampa"**; sparisce quando stampi davvero.
+Riporta numero, cliente, prescrizione (con la DNP, se l'hai messa nella
+misura), tipo di lavoro, montatura, lenti, centratura, totale/acconto/saldo,
+laboratorio e le righe per la firma. In alto nel foglio c'è il bottone
+**"Stampa"**; sparisce quando stampi davvero.
 
 ## Casi particolari
 
 - **Acconto e saldo.** L'acconto è la caparra che prendi all'apertura della
   busta (VISTA suggerisce il 30%, arrotondato). Il saldo è quello che
-  incasserai alla consegna: totale meno acconto. La caparra non fa scontrino:
-  lo scontrino, per l'intero valore, si emette alla consegna (arriverà con il
-  modulo Cassa).
+  incasserai alla consegna: totale meno acconto. La caparra non fa scontrino di
+  suo; lo scontrino, per l'intero valore, lo batti alla consegna con **"Consegna
+  e incassa"** e la caparra vi rientra come un pagamento già coperto. Da quando
+  c'è la Cassa, quell'incasso della caparra entra subito nella tua giornata con
+  il metodo che hai scelto: niente più "scontrino futuro" da ricordare.
 - **Salvare come preventivo.** Al riepilogo, invece di "Crea busta", puoi
   premere **"Salva come preventivo"**: la busta resta in stato **preventivo**,
   senza impegno. Quando il cliente conferma, dalla scheda premi **"Conferma
-  ordine"**: ti chiede l'acconto e la porta in lavorazione.
+  ordine"**: ti chiede l'acconto e, se lo metti, il metodo della caparra, poi
+  la porta in lavorazione.
 - **Remake (il laboratorio ha sbagliato).** Se all'ispezione l'occhiale non va
   (un graffio sull'antiriflesso, una centratura fuori), premi **"Remake"** con
   il motivo. La busta torna in **lavorazione**, il numero resta lo stesso,
   l'ispezione si azzera e il motivo finisce nelle note con la data. Il remake
   si può fare anche su una busta già pronta.
 - **Annullare una busta.** Con **"Annulla busta"** e un motivo obbligatorio.
-  Resta in lista con "Tutti", senza più bottoni di avanzamento.
+  Resta in lista con "Tutti", senza più bottoni di avanzamento. Se avevi preso
+  una caparra e il cliente rinuncia o non ritira, dalla scheda usi
+  **"Incamera caparra"** o **"Annulla e restituisci caparra"** (vedi il
+  capitolo Cassa).
 
 ## Se qualcosa non torna
 
