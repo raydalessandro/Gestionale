@@ -167,6 +167,7 @@ export function AzioniBusta({
   waHref,
   fissaRitiroHref,
   incassaHref,
+  metodiCaparra = [],
 }: {
   id: string;
   stato: string;
@@ -175,13 +176,14 @@ export function AzioniBusta({
   waHref: string | null;
   fissaRitiroHref?: string | null;
   incassaHref?: string | null;
+  metodiCaparra?: string[];
 }) {
   const ev = (e: EventoBusta) => eventoBusta.bind(null, id, e);
 
   return (
     <div className="flex flex-wrap items-start gap-2">
       {stato === "preventivo" && (
-        <BottoneConferma azione={ev("conferma")} accontoSuggerito={accontoSuggerito} />
+        <BottoneConferma azione={ev("conferma")} accontoSuggerito={accontoSuggerito} metodiCaparra={metodiCaparra} />
       )}
       {stato === "lavorazione" && (
         <BottoneEvento azione={ev("arriva")} label="Segna arrivata" />
@@ -230,12 +232,17 @@ export function AzioniBusta({
 function BottoneConferma({
   azione,
   accontoSuggerito,
+  metodiCaparra,
 }: {
   azione: (prev: { errore: string } | null, fd: FormData) => Promise<{ errore: string } | null>;
   accontoSuggerito: number;
+  metodiCaparra: string[];
 }) {
   const [aperto, setAperto] = useState(false);
+  const [acconto, setAcconto] = useState(String(accontoSuggerito));
   const [stato, run, inCorso] = useActionState(azione, null);
+  const metodi = metodiCaparra.length ? metodiCaparra : ["Contanti", "Bancomat", "Mastercard"];
+  const accontoNum = Number(acconto.replace(",", ".")) || 0;
 
   if (!aperto) {
     return (
@@ -258,9 +265,22 @@ function BottoneConferma({
         type="number"
         step="0.01"
         min={0}
-        defaultValue={accontoSuggerito}
+        value={acconto}
+        onChange={(e) => setAcconto(e.target.value)}
         className={`${inputCls} diottria`}
       />
+      {accontoNum > 0 && (
+        <>
+          <label className="block text-xs font-semibold uppercase tracking-wide text-soft">
+            Metodo della caparra
+          </label>
+          <select name="acconto_metodo" defaultValue={metodi[0]} className={inputCls} aria-label="metodo della caparra">
+            {metodi.map((m) => (
+              <option key={m} value={m}>{m}</option>
+            ))}
+          </select>
+        </>
+      )}
       <Errore msg={stato?.errore} />
       <div className="flex gap-2">
         <button type="submit" disabled={inCorso} className={`${btn} ${stili.primary}`}>

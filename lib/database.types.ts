@@ -75,6 +75,7 @@ export type ClienteRow = {
   canale_preferito: "telefono" | "whatsapp" | "sms" | "email" | "cartaceo" | null;
   non_contattare: boolean;
   consenso_marketing: boolean;
+  consenso_sanitario_il: string | null;
   data_consenso: string | null;
   consenso_dati_sanitari: string | null;
   note: string | null;
@@ -283,10 +284,13 @@ export type OrdineOcchialiRow = {
   od_altezza: number | null;
   os_altezza: number | null;
   garanzia: string | null;
+  garanzia_tipo: "servizio" | "polizza" | null;
   prezzo_extra: number;
   sconto: number;
   totale: number;
   acconto: number;
+  acconto_metodo: string | null;
+  acconto_incassato_il: string | null;
   saldo: number;
   laboratorio: string | null;
   data_promessa: string | null;
@@ -362,6 +366,7 @@ export type ResoRow = {
   id: string;
   azienda_id: string;
   vendita_id: string | null;
+  busta_id: string | null;
   cliente_id: string | null;
   utente_id: string | null;
   numero: string;

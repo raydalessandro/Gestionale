@@ -15,14 +15,20 @@ export default async function VenditaPage({ params }: { params: Promise<{ id: st
   const { data: v } = await supabase.from("vendite").select("*").eq("id", id).maybeSingle();
   if (!v) notFound();
 
-  const [{ data: cliente }, { data: resi }, { data: metodi }] = await Promise.all([
+  const giornoVendita = (v.data_vendita ?? "").slice(0, 10);
+  const [{ data: cliente }, { data: resi }, { data: metodi }, { data: chiusuraGiorno }] = await Promise.all([
     v.cliente_id ? supabase.from("clienti").select("id, nome, cognome").eq("id", v.cliente_id).maybeSingle() : Promise.resolve({ data: null }),
     supabase.from("resi").select("id, numero, tipo, causale, importo, created_at").eq("vendita_id", id).order("created_at", { ascending: false }),
     supabase.from("metodi_pagamento").select("id, nome").eq("attivo", true).order("ordine"),
+    giornoVendita ? supabase.from("chiusure_cassa").select("id").eq("data", giornoVendita).maybeSingle() : Promise.resolve({ data: null }),
   ]);
 
   const righe = (Array.isArray(v.righe) ? v.righe : []) as RigaVendita[];
   const pagamenti = (Array.isArray(v.pagamenti) ? v.pagamenti : []) as PagamentoVendita[];
+  const oggi = new Date().toISOString().slice(0, 10);
+  const daOrdine = !!(v.busta_id || v.ordine_lac_id);
+  // Vendita fuori dalle quadrature: giorno già chiuso (A5) o retrodatata a giornata chiusa.
+  const fuoriQuadratura = !!chiusuraGiorno && giornoVendita !== oggi;
 
   return (
     <>
@@ -36,6 +42,11 @@ export default async function VenditaPage({ params }: { params: Promise<{ id: st
           {fmtQuando(v.data_vendita)} · {cliente ? <Link href={`/clienti/${cliente.id}`} className="hover:underline">{cliente.cognome} {cliente.nome}</Link> : "Non associato"}
           {v.origine === "riallineamento" && <Badge tinta="ambra">Riallineamento</Badge>}
         </p>
+        {fuoriQuadratura && (
+          <p className="mt-2 rounded-lg border border-ambra/40 bg-ambra-soft px-3 py-2 text-xs text-ambra">
+            La giornata di questa vendita è già chiusa: la vendita è nella lista ma resta fuori dalle quadrature.
+          </p>
+        )}
       </div>
 
       <Card className="mb-4 overflow-x-auto">
@@ -93,7 +104,7 @@ export default async function VenditaPage({ params }: { params: Promise<{ id: st
           <p className="text-xs font-semibold uppercase tracking-wide text-faint">Azioni</p>
           <div className="flex flex-wrap items-start gap-2">
             <RegistraReso venditaId={v.id} clienteId={v.cliente_id} righe={righe} totale={v.totale} metodi={metodi ?? []} />
-            <AnnullaVendita id={v.id} />
+            <AnnullaVendita id={v.id} daOrdine={daOrdine} />
           </div>
         </Card>
       )}

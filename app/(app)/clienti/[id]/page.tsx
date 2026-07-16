@@ -11,6 +11,7 @@ import {
   Vuoto,
 } from "@/components/ui";
 import PrescrizioneCard from "@/components/PrescrizioneCard";
+import { BannerConsensi } from "@/components/ConsensiCliente";
 import { PillStato } from "@/components/OrdiniUI";
 import { etichettaTipoRichiamo, etichettaTipoApp, oraDi } from "@/components/AgendaUI";
 import { fmtData, ETICHETTE_FONTE, ESITI_RICHIAMO, ETICHETTE_CANALE_PREFERITO } from "@/lib/utils";
@@ -133,6 +134,12 @@ export default async function ClientePage({
         }
       />
 
+      <BannerConsensi
+        clienteId={cliente.id}
+        mancaMarketing={!cliente.consenso_marketing}
+        mancaSanitario={!cliente.consenso_dati_sanitari}
+      />
+
       <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
         <Card className="md:col-span-2">
           <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -187,13 +194,32 @@ export default async function ClientePage({
           )}
         </Card>
 
-        <Card>
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-faint">
-            Note
-          </p>
-          <p className="whitespace-pre-wrap text-sm text-soft">
-            {cliente.note || "—"}
-          </p>
+        <Card className="space-y-3">
+          <div>
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-faint">
+              Privacy
+            </p>
+            <p className="text-sm text-soft">
+              Marketing:{" "}
+              {cliente.consenso_marketing
+                ? `sì${cliente.data_consenso ? `, dal ${fmtData(cliente.data_consenso)}` : ""}`
+                : "non raccolto"}
+            </p>
+            <p className="text-sm text-soft">
+              Dati sanitari:{" "}
+              {cliente.consenso_dati_sanitari
+                ? `sì, dal ${fmtData(cliente.consenso_sanitario_il ?? cliente.consenso_dati_sanitari)}`
+                : "non raccolto"}
+            </p>
+          </div>
+          <div>
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-faint">
+              Note
+            </p>
+            <p className="whitespace-pre-wrap text-sm text-soft">
+              {cliente.note || "—"}
+            </p>
+          </div>
         </Card>
       </div>
 

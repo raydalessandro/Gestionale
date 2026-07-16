@@ -8,7 +8,7 @@ import type { RigaVendita } from "@/lib/database.types";
 
 const btn = "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors disabled:opacity-50";
 
-export function AnnullaVendita({ id }: { id: string }) {
+export function AnnullaVendita({ id, daOrdine = false }: { id: string; daOrdine?: boolean }) {
   const [aperto, setAperto] = useState(false);
   const [stato, run, inCorso] = useActionState(annullaVendita.bind(null, id), null);
   if (!aperto) {
@@ -17,7 +17,11 @@ export function AnnullaVendita({ id }: { id: string }) {
   return (
     <form action={run} className="w-full space-y-2 rounded-xl border border-linea p-3">
       <textarea name="motivo" rows={2} required placeholder="Motivo dell'annullo…" className={inputCls} />
-      <p className="text-[11px] text-faint">Se legata a un ordine: l&apos;ordine resta consegnato, gestisci l&apos;eventuale reso a parte.</p>
+      {daOrdine ? (
+        <p className="text-[11px] text-ambra">Vendita da un ordine: la merce è dal cliente, quindi il magazzino non rientra. Per riprendere la merce registra un reso con le righe che tornano.</p>
+      ) : (
+        <p className="text-[11px] text-faint">Annullo consentito solo in giornata e prima della chiusura; la merce libera rientra a magazzino.</p>
+      )}
       <Errore msg={stato?.errore} />
       <div className="flex gap-2">
         <button type="submit" disabled={inCorso} className={`${btn} border border-rosso/40 bg-white text-rosso hover:bg-rosso-soft`}>{inCorso ? "…" : "Conferma annullo"}</button>

@@ -6,7 +6,7 @@ import { PillStatoVendita } from "@/components/CassaUI";
 import { TIPI_MOVIMENTO_CASSA } from "@/lib/utils";
 import FormMovimentoCassa from "@/components/FormMovimentoCassa";
 import { fmtEuro, fmtQuando } from "@/lib/utils";
-import type { PagamentoVendita } from "@/lib/database.types";
+import { sistemaPerMetodo, contantiAttesi as calcContantiAttesi, contatoriCaparre, caparreSenzaMetodo, NOME_CAPARRA } from "@/lib/cassa-calcoli";
 
 export default async function CassaPage() {
   const supabase = await createClient();
@@ -14,35 +14,42 @@ export default async function CassaPage() {
   const inizio = `${oggi}T00:00:00`;
   const fine = `${oggi}T23:59:59`;
 
-  const [{ data: vendite }, { data: movimenti }, { data: chiusuraOggi }, { data: ultimaChiusura }, { data: ordiniOggi }, { data: incameri }] =
+  const [{ data: vendite }, { data: movimenti }, { data: chiusuraOggi }, { data: ultimaChiusura }, { data: accontiOggi }, { data: incameri }, { data: resiOggi }] =
     await Promise.all([
       supabase.from("vendite").select("id, numero, cliente_id, totale, stato, data_vendita, pagamenti").gte("data_vendita", inizio).lte("data_vendita", fine).order("data_vendita", { ascending: false }),
       supabase.from("movimenti_cassa").select("id, tipo, importo, motivo, riferimento, created_at").gte("created_at", inizio).lte("created_at", fine).order("created_at", { ascending: false }),
       supabase.from("chiusure_cassa").select("id").eq("data", oggi).maybeSingle(),
       supabase.from("chiusure_cassa").select("fondo_chiusura").order("data", { ascending: false }).limit(1).maybeSingle(),
-      supabase.from("ordini_occhiali").select("acconto").gte("created_at", inizio).lte("created_at", fine),
+      supabase.from("ordini_occhiali").select("acconto, acconto_metodo").gte("acconto_incassato_il", inizio).lte("acconto_incassato_il", fine),
       supabase.from("movimenti_cassa").select("importo").eq("tipo", "incamero_caparra").gte("created_at", inizio).lte("created_at", fine),
+      supabase.from("resi").select("metodo_rimborso, importo, busta_id").eq("tipo", "denaro").gte("created_at", inizio).lte("created_at", fine),
     ]);
 
   const venditeEmesse = (vendite ?? []).filter((v) => v.stato === "emessa");
   const incassoOggi = venditeEmesse.reduce((s, v) => s + v.totale, 0);
+  const acconti = accontiOggi ?? [];
+  const resiDenaro = resiOggi ?? [];
 
-  // Totali per metodo + caparre scalate
-  const perMetodo = new Map<string, number>();
-  let caparreScalate = 0;
-  for (const v of venditeEmesse) {
-    for (const p of (Array.isArray(v.pagamenti) ? v.pagamenti : []) as PagamentoVendita[]) {
-      perMetodo.set(p.nome, (perMetodo.get(p.nome) ?? 0) + p.importo);
-      if (p.nome.toLowerCase() === "caparra") caparreScalate += p.importo;
-    }
-  }
-  const contantiVendite = perMetodo.get("Contanti") ?? 0;
+  // Formula condivisa con la chiusura (§2.2): stesso numero, mai due conti diversi.
+  const sistema = sistemaPerMetodo(venditeEmesse, resiDenaro, acconti);
   const prelieviSpese = (movimenti ?? []).filter((m) => m.tipo === "prelievo" || m.tipo === "spesa").reduce((s, m) => s + m.importo, 0);
   const fondoApertura = ultimaChiusura?.fondo_chiusura ?? 300;
-  const contantiAttesi = fondoApertura + contantiVendite - prelieviSpese;
+  const contantiAttesi = calcContantiAttesi(fondoApertura, sistema, prelieviSpese);
 
-  const caparreEmesse = (ordiniOggi ?? []).reduce((s, o) => s + (o.acconto ?? 0), 0);
-  const caparreIncamerate = (incameri ?? []).reduce((s, m) => s + m.importo, 0);
+  // Totali per metodo mostrati (la voce 'Caparra' esce dal conteggio).
+  const perMetodo = new Map([...sistema.entries()].filter(([nome]) => nome.toLowerCase() !== NOME_CAPARRA && sistema.get(nome) !== 0));
+
+  const cont = contatoriCaparre({
+    accontiEmessiOggi: acconti,
+    venditeOggi: venditeEmesse,
+    resiCaparraOggi: resiDenaro.filter((r) => r.busta_id),
+    incameriOggi: incameri ?? [],
+  });
+  const caparreEmesse = cont.emesse;
+  const caparreScalate = cont.scontate;
+  const caparreRese = cont.rese;
+  const caparreIncamerate = cont.incamerate;
+  const caparreSenza = caparreSenzaMetodo(acconti);
 
   const clienteIds = [...new Set(venditeEmesse.map((v) => v.cliente_id).filter(Boolean))] as string[];
   const { data: clienti } = clienteIds.length ? await supabase.from("clienti").select("id, nome, cognome").in("id", clienteIds) : { data: [] };
@@ -134,9 +141,10 @@ export default async function CassaPage() {
         </Card>
       </div>
 
-      {(caparreEmesse > 0 || caparreScalate > 0 || caparreIncamerate > 0) && (
+      {(caparreEmesse > 0 || caparreScalate > 0 || caparreRese > 0 || caparreIncamerate > 0) && (
         <p className="text-xs text-faint">
-          Caparre di oggi — emesse {fmtEuro(caparreEmesse)} · scalate {fmtEuro(caparreScalate)} · incamerate {fmtEuro(caparreIncamerate)}
+          Caparre di oggi — emesse {fmtEuro(caparreEmesse)} · scontate {fmtEuro(caparreScalate)} · rese {fmtEuro(caparreRese)} · incamerate {fmtEuro(caparreIncamerate)}
+          {caparreSenza > 0 ? ` · senza metodo ${fmtEuro(caparreSenza)}` : ""}
         </p>
       )}
     </>

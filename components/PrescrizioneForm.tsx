@@ -29,7 +29,13 @@ function n(s: string): number | null {
   return Number.isFinite(v) ? v : null;
 }
 
-export default function PrescrizioneForm({ clienteId }: { clienteId: string }) {
+export default function PrescrizioneForm({
+  clienteId,
+  consensoSanitario = true,
+}: {
+  clienteId: string;
+  consensoSanitario?: boolean;
+}) {
   const azioneBound = creaPrescrizione.bind(null, clienteId);
   const [stato, azione, inCorso] = useActionState(azioneBound, null);
 
@@ -105,6 +111,24 @@ export default function PrescrizioneForm({ clienteId }: { clienteId: string }) {
   return (
     <form action={azione} className="space-y-4">
       <Errore msg={stato?.errore} />
+
+      {/* Gate consenso dati sanitari (A6): obbligatorio se il cliente non l'ha ancora dato */}
+      {!consensoSanitario && (
+        <Card className="space-y-2 border-ottone/40 bg-ottone-soft">
+          <p className="text-xs font-semibold uppercase tracking-wide text-ottone-scuro">
+            Consenso dati sanitari
+          </p>
+          <label className="flex items-start gap-3 text-sm text-inchiostro">
+            <input type="checkbox" name="consenso_dati_sanitari" required className="mt-0.5 h-4 w-4 accent-[#A67C42]" />
+            <span>
+              Il cliente ha firmato l&apos;informativa e acconsente al trattamento dei dati sanitari.
+              <span className="block text-xs text-soft">
+                Obbligatorio: la prescrizione contiene dati sulla salute (art. 9 GDPR). La data resta registrata in scheda.
+              </span>
+            </span>
+          </label>
+        </Card>
+      )}
 
       {/* Tipo di prescrizione + dati visita */}
       <Card className="space-y-4">

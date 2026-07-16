@@ -25,5 +25,9 @@ colonna `valore_unitario` snapshot sui movimenti (danno, rottamazione,
 reso fornitore) — al costo o al prezzo di vendita? Da decidere in
 sessione. Additiva, come sempre.
 
-## 4 · Punti dall'analisi dell'agente
-(in attesa del documento)
+## 4 · Punti dall'analisi dell'agente — ARRIVATA (16/07)
+Documento integrale: `docs/revisione-procedure-vista.md`. I punti 1–2 di
+questa lista coincidono con A1/A3/A4 e sono assorbiti nella spec
+`fase-4c-caparra-quadratura.md` (+ migrazione 007). Restano QUI per la
+sessione dedicata: il punto 3 (valore sugli smaltimenti), A6 → **DECISA il 16/07** (spec `fase-4d-consensi.md`; resta a roadmap l'anonimizzazione), A7 (montatura da catalogo),
+C2/C3/C5 (roadmap richiami/TS/fermi).

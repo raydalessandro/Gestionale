@@ -32,6 +32,16 @@ della fase che lo usa.
 Prima delle prossime fasi: fatto il 16/07: schermate lette, `006` pronta da applicare, spec form in `fase-4b-anagrafiche.md`. Poi revisione di questa roadmap (candidati: Preventivi, Inventario,
 Fase 5 "portale unico", fase fiscale TS).
 
+## Correzione pre-collaudo — Fase 4c (dall'audit `revisione-procedure-vista.md`)
+
+La caparra entra in cassa: `007_caparra_incasso.sql` pronta, spec
+`fase-4c-caparra-quadratura.md` (parte DOPO il merge della 4b). L'ossatura
+multi-negozio slitta da 007 a **008** (invariata nei contenuti). Dopo 4c:
+**Fase 4d consensi** (`fase-4d-consensi.md`, decisione A6 del 16/07 — il
+sistema chiede finché manca; sanitario alla prescrizione). A roadmap:
+firma digitale dei consensi + archivio documenti privacy + invio
+informativa via email.
+
 ## Binari paralleli (da Fase 3 in poi)
 
 Oltre alla codifica delle fasi (la spina dorsale), corrono **due binari

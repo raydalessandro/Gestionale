@@ -80,3 +80,24 @@ Niente promesse di roadmap dentro i capitoli operativi. Niente istruzioni di
 setup tecnico (Supabase, Vercel: quello è il README, pubblico diverso).
 Niente riscritture di massa a ogni checkpoint: si tocca solo ciò che la fase
 ha cambiato. Niente inglese dove esiste l'italiano del mestiere.
+
+
+## Giro v0.5.1 — dall'audit (docs/revisione-procedure-vista.md, sez. D+B)
+
+- [ ] D1 · Cap. 04: "Consegna e incassa" quando la Cassa è attiva; sezione
+      *Acconto e saldo* aggiornata (lo scontrino non è più futuro).
+- [ ] D2 · Cap. 05: citare anche il percorso "Consegna e incassa".
+- [ ] D3 · Cap. 00: "il tuo nome resta scritto su tutto quello che registri".
+- [ ] D4 · Glossario: "l'avviso al cliente è un'annotazione, non uno stato".
+- [ ] B2 · Cap. 07 Impostazioni: riscrivere la frase sulla tracciabilità —
+      per i dispositivi medici la detrazione vale anche in contanti; il
+      tracciato serve solo alle spese AA.
+- [ ] B3 · Cap. Magazzino: le LAC puramente estetiche si creano come
+      accessorio (22%, niente AD), non come LAC.
+- [ ] A6 · Cap. Clienti + Cap. Prescrizioni (quando la 4d è live): come si
+      registrano i consensi — marketing alla scheda, sanitario alla prima
+      prescrizione; il banner che ricorda; le date sempre visibili.
+- [ ] C6 · Cap. 07 Chiusura: nota transitoria "se oggi hai incassato
+      caparre in contanti, lo scarto positivo è normale: causale 'caparre
+      di oggi'" — DA RIMUOVERE quando la Fase 4c è live, sostituendola col
+      nuovo blocco caparre a quattro contatori e il metodo sull'acconto.

@@ -11,15 +11,17 @@ export function AzioniCaparra({
   bustaId,
   acconto,
   metodi,
+  metodoIncasso,
 }: {
   bustaId: string;
   acconto: number;
   metodi: { id: string; nome: string }[];
+  metodoIncasso?: string | null;
 }) {
   return (
     <div className="flex flex-wrap items-start gap-2">
       <IncameraCaparra bustaId={bustaId} acconto={acconto} />
-      <AnnullaRestituisci bustaId={bustaId} acconto={acconto} metodi={metodi} />
+      <AnnullaRestituisci bustaId={bustaId} acconto={acconto} metodi={metodi} metodoIncasso={metodoIncasso} />
     </div>
   );
 }
@@ -47,9 +49,13 @@ function IncameraCaparra({ bustaId, acconto }: { bustaId: string; acconto: numbe
   );
 }
 
-function AnnullaRestituisci({ bustaId, acconto, metodi }: { bustaId: string; acconto: number; metodi: { id: string; nome: string }[] }) {
+function AnnullaRestituisci({ bustaId, acconto, metodi, metodoIncasso }: { bustaId: string; acconto: number; metodi: { id: string; nome: string }[]; metodoIncasso?: string | null }) {
   const [aperto, setAperto] = useState(false);
   const [stato, run, inCorso] = useActionState(annullaBustaConRestituzione.bind(null, bustaId), null);
+  // Precompila il metodo di rimborso con quello dell'incasso (§2.4), modificabile.
+  const metodoDefault = metodoIncasso && metodi.some((m) => m.nome === metodoIncasso)
+    ? metodoIncasso
+    : metodi[0]?.nome ?? "Contanti";
   if (!aperto) {
     return <button type="button" onClick={() => setAperto(true)} className={`${btn} border border-rosso/40 bg-white text-rosso hover:bg-rosso-soft`}>Annulla e restituisci caparra</button>;
   }
@@ -60,7 +66,7 @@ function AnnullaRestituisci({ bustaId, acconto, metodi }: { bustaId: string; acc
         <select name="causale" defaultValue="modifica_wo" className={inputCls} aria-label="causale">
           {Object.entries(ETICHETTE_CAUSALI_RESO).map(([id, l]) => (<option key={id} value={id}>{l}</option>))}
         </select>
-        <select name="metodo_rimborso" defaultValue={metodi[0]?.nome ?? "Contanti"} className={inputCls} aria-label="metodo rimborso">
+        <select name="metodo_rimborso" defaultValue={metodoDefault} className={inputCls} aria-label="metodo rimborso">
           {metodi.map((m) => (<option key={m.id} value={m.nome}>{m.nome}</option>))}
         </select>
       </div>
