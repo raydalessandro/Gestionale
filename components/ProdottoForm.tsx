@@ -4,15 +4,24 @@ import { useActionState, useState } from "react";
 import { creaProdotto, aggiornaProdotto } from "@/lib/actions";
 import type { ProdottoRow } from "@/lib/database.types";
 import { Card, Field, inputCls, Errore } from "@/components/ui";
-import { parametriLac } from "@/components/MagazzinoUI";
+import { parametriLac, parametriMontatura } from "@/components/MagazzinoUI";
 
 const TIPI: { id: ProdottoRow["tipo"]; label: string }[] = [
   { id: "lac", label: "Lente a contatto" },
   { id: "soluzione", label: "Soluzione" },
   { id: "montatura", label: "Montatura" },
+  { id: "sole", label: "Occhiale da sole" },
   { id: "lente", label: "Lente oftalmica" },
   { id: "accessorio", label: "Accessorio" },
   { id: "servizio", label: "Servizio" },
+];
+
+/** Ricambio LAC: giorni tra una lente e la successiva. */
+const RICAMBIO: { valore: string; label: string }[] = [
+  { valore: "1", label: "Giornaliere (1)" },
+  { valore: "14", label: "Quindicinali (14)" },
+  { valore: "30", label: "Mensili (30)" },
+  { valore: "90", label: "Trimestrali (90)" },
 ];
 
 export default function ProdottoForm({ prodotto }: { prodotto?: ProdottoRow }) {
@@ -22,6 +31,7 @@ export default function ProdottoForm({ prodotto }: { prodotto?: ProdottoRow }) {
   const [stato, run, inCorso] = useActionState(azione, null);
   const [tipo, setTipo] = useState<ProdottoRow["tipo"]>(prodotto?.tipo ?? "lac");
   const lac = parametriLac(prodotto?.parametri);
+  const mont = parametriMontatura(prodotto?.parametri);
 
   return (
     <form action={run} className="space-y-4">
@@ -69,7 +79,7 @@ export default function ProdottoForm({ prodotto }: { prodotto?: ProdottoRow }) {
           <p className="text-xs font-semibold uppercase tracking-wide text-faint">
             Parametri lente a contatto
           </p>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Raggio (BC)">
               <input name="par_raggio" type="number" step="0.1" inputMode="decimal" className={`${inputCls} diottria`} defaultValue={lac.raggio ?? ""} placeholder="8.6" />
             </Field>
@@ -78,6 +88,42 @@ export default function ProdottoForm({ prodotto }: { prodotto?: ProdottoRow }) {
             </Field>
             <Field label="Confezione">
               <input name="par_confezione" className={inputCls} defaultValue={lac.confezione ?? ""} placeholder="×6" />
+            </Field>
+            <Field label="Ricambio" hint="Guida la stima di esaurimento nei richiami.">
+              <select name="ricambio_giorni" className={inputCls} defaultValue={prodotto?.ricambio_giorni != null ? String(prodotto.ricambio_giorni) : ""} aria-label="ricambio">
+                <option value="">—</option>
+                {RICAMBIO.map((r) => (
+                  <option key={r.valore} value={r.valore}>{r.label}</option>
+                ))}
+              </select>
+            </Field>
+          </div>
+        </Card>
+      )}
+
+      {(tipo === "montatura" || tipo === "sole") && (
+        <Card className="space-y-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-faint">
+            {tipo === "sole" ? "Parametri occhiale da sole" : "Parametri montatura"}
+          </p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <Field label="Calibro (mm)">
+              <input name="par_calibro" type="number" step="1" min={0} inputMode="numeric" className={`${inputCls} diottria`} defaultValue={mont.calibro ?? ""} placeholder="54" />
+            </Field>
+            <Field label="Ponte (mm)">
+              <input name="par_ponte" type="number" step="1" min={0} inputMode="numeric" className={`${inputCls} diottria`} defaultValue={mont.ponte ?? ""} placeholder="18" />
+            </Field>
+            <Field label="Asta (mm)">
+              <input name="par_asta" type="number" step="1" min={0} inputMode="numeric" className={`${inputCls} diottria`} defaultValue={mont.asta ?? ""} placeholder="140" />
+            </Field>
+            <Field label="Colore — codice">
+              <input name="par_colore_codice" className={`${inputCls} f-mono`} defaultValue={mont.colore_codice ?? ""} placeholder="VS01" />
+            </Field>
+            <Field label="Colore — nome">
+              <input name="par_colore_nome" className={inputCls} defaultValue={mont.colore_nome ?? ""} placeholder="Havana" />
+            </Field>
+            <Field label="Materiale">
+              <input name="par_materiale" className={inputCls} defaultValue={mont.materiale ?? ""} placeholder="Acetato" />
             </Field>
           </div>
         </Card>

@@ -42,7 +42,7 @@ export type UtenteRow = {
   azienda_id: string;
   email: string;
   nome: string;
-  ruolo: "titolare" | "optometrista" | "staff";
+  ruolo: "titolare" | "responsabile" | "ottico" | "addetto";
   attivo: boolean;
   created_at: string;
   updated_at: string;
@@ -64,6 +64,16 @@ export type ClienteRow = {
   cap: string | null;
   provincia: string | null;
   fonte: Fonte;
+  secondo_nome: string | null;
+  sesso: "M" | "F" | null;
+  indirizzo2: string | null;
+  nazione: string | null;
+  telefono_casa: string | null;
+  telefono_lavoro: string | null;
+  lingua: string | null;
+  tutore_legale: string | null;
+  canale_preferito: "telefono" | "whatsapp" | "sms" | "email" | "cartaceo" | null;
+  non_contattare: boolean;
   consenso_marketing: boolean;
   data_consenso: string | null;
   consenso_dati_sanitari: string | null;
@@ -100,6 +110,8 @@ export type PrescrizioneRow = {
   od_diametro: number | null;
   os_raggio: number | null;
   os_diametro: number | null;
+  od_dnp: number | null;
+  os_dnp: number | null;
   validita_mesi: number;
   attiva: boolean;
   note: string | null;
@@ -110,7 +122,7 @@ export type PrescrizioneRow = {
 export type ProdottoRow = {
   id: string;
   azienda_id: string;
-  tipo: "lac" | "soluzione" | "montatura" | "lente" | "accessorio" | "servizio";
+  tipo: "lac" | "soluzione" | "montatura" | "sole" | "lente" | "accessorio" | "servizio";
   marca: string | null;
   nome: string;
   descrizione: string | null;
@@ -121,6 +133,7 @@ export type ProdottoRow = {
   parametri: Json;
   giacenza: number;
   scorta_minima: number;
+  ricambio_giorni: number | null;
   costo: number | null;
   fornitore: string | null;
   created_at: string;

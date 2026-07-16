@@ -11,9 +11,10 @@ import {
   sottoScorta,
   fermoScaduto,
   parametriLac,
+  parametriMontatura,
 } from "@/components/MagazzinoUI";
 import { AzioniProdotto, AzioniFermo } from "@/components/AzioniMagazzino";
-import { fmtEuro, fmtQuando, fmtData } from "@/lib/utils";
+import { fmtEuro, fmtQuando, fmtData, ETICHETTE_RICAMBIO } from "@/lib/utils";
 
 export default async function ProdottoPage({
   params,
@@ -44,6 +45,10 @@ export default async function ProdottoPage({
   const impegnata = (fermi ?? []).reduce((s, f) => s + f.quantita, 0);
   const disponibile = p.giacenza - impegnata;
   const lac = parametriLac(p.parametri);
+  const mont =
+    p.tipo === "montatura" || p.tipo === "sole"
+      ? parametriMontatura(p.parametri)
+      : null;
 
   // Nomi utenti dei movimenti + clienti dei fermi
   const utenteIds = [...new Set((movimenti ?? []).map((m) => m.utente_id).filter(Boolean))] as string[];
@@ -95,6 +100,23 @@ export default async function ProdottoPage({
             <Dato
               label="Parametri LAC"
               valore={[lac.raggio && `BC ${lac.raggio}`, lac.diametro && `DIA ${lac.diametro}`, lac.confezione].filter(Boolean).join(" · ") || "—"}
+              mono
+              full
+            />
+          )}
+          {p.tipo === "lac" && (
+            <Dato label="Ricambio" valore={p.ricambio_giorni != null ? (ETICHETTE_RICAMBIO[String(p.ricambio_giorni)] ?? `${p.ricambio_giorni} gg`) : "—"} />
+          )}
+          {mont && (
+            <Dato
+              label="Parametri montatura"
+              valore={[
+                mont.calibro && `calibro ${mont.calibro}`,
+                mont.ponte && `ponte ${mont.ponte}`,
+                mont.asta && `asta ${mont.asta}`,
+                [mont.colore_nome, mont.colore_codice && `(${mont.colore_codice})`].filter(Boolean).join(" "),
+                mont.materiale,
+              ].filter(Boolean).join(" · ") || "—"}
               mono
               full
             />

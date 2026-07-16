@@ -20,11 +20,11 @@ const stili = {
 } as const;
 
 /** Campi comuni canale/esito/valore/note (§2.6). */
-function CampiEsito({ valore }: { valore: number | null }) {
+function CampiEsito({ valore, canale }: { valore: number | null; canale?: string }) {
   return (
     <>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-        <select name="canale" defaultValue="" required className={inputCls} aria-label="canale del richiamo">
+        <select name="canale" defaultValue={canale ?? ""} required className={inputCls} aria-label="canale del richiamo">
           <option value="" disabled>Canale…</option>
           {Object.entries(CANALI_RICHIAMO).map(([id, l]) => (
             <option key={id} value={id}>{l}</option>
@@ -46,7 +46,7 @@ function CampiEsito({ valore }: { valore: number | null }) {
   );
 }
 
-export function RegistraEsito({ id, valore }: { id: string; valore: number | null }) {
+export function RegistraEsito({ id, valore, canale }: { id: string; valore: number | null; canale?: string }) {
   const [aperto, setAperto] = useState(false);
   const [stato, run, inCorso] = useActionState(registraEsitoRichiamo.bind(null, id), null);
   if (!aperto) {
@@ -58,7 +58,7 @@ export function RegistraEsito({ id, valore }: { id: string; valore: number | nul
   }
   return (
     <form action={run} className="w-full space-y-2 rounded-xl border border-linea bg-carta p-3">
-      <CampiEsito valore={valore} />
+      <CampiEsito valore={valore} canale={canale} />
       <Errore msg={stato?.errore} />
       <div className="flex gap-2">
         <button type="submit" disabled={inCorso} className={`${btn} ${stili.primary}`}>{inCorso ? "…" : "Salva esito"}</button>
@@ -75,7 +75,7 @@ type PropostaMini = {
   valore: number | null;
 };
 
-export function EsitoProposta({ proposta }: { proposta: PropostaMini }) {
+export function EsitoProposta({ proposta, canale }: { proposta: PropostaMini; canale?: string }) {
   const [aperto, setAperto] = useState(false);
   const [stato, run, inCorso] = useActionState(registraEsitoProposta, null);
   if (!aperto) {
@@ -90,7 +90,7 @@ export function EsitoProposta({ proposta }: { proposta: PropostaMini }) {
       <input type="hidden" name="tipo" value={proposta.tipo} />
       <input type="hidden" name="cliente_id" value={proposta.cliente_id} />
       <input type="hidden" name="riferimento" value={proposta.riferimento ?? ""} />
-      <CampiEsito valore={proposta.valore} />
+      <CampiEsito valore={proposta.valore} canale={canale} />
       <Errore msg={stato?.errore} />
       <div className="flex gap-2">
         <button type="submit" disabled={inCorso} className={`${btn} ${stili.primary}`}>{inCorso ? "…" : "Salva esito"}</button>

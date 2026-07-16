@@ -12,7 +12,7 @@ import {
   Ripianifica,
 } from "@/components/AzioniRichiami";
 import { calcolaProposte } from "@/lib/richiami-proposte";
-import { fmtEuro, fmtQuando, fmtData, ESITI_RICHIAMO, CANALI_RICHIAMO } from "@/lib/utils";
+import { fmtEuro, fmtQuando, fmtData, ESITI_RICHIAMO, CANALI_RICHIAMO, canaleEsitoDaPreferito } from "@/lib/utils";
 
 const GG = 24 * 60 * 60 * 1000;
 
@@ -80,7 +80,7 @@ export default async function RichiamiPage() {
   ] as string[];
   const utenteIds = [...new Set(storicoRows.map((r) => r.utente_id).filter(Boolean))] as string[];
   const [{ data: clienti }, { data: utenti }] = await Promise.all([
-    cliIds.length ? supabase.from("clienti").select("id, nome, cognome, telefono").in("id", cliIds) : Promise.resolve({ data: [] }),
+    cliIds.length ? supabase.from("clienti").select("id, nome, cognome, telefono, canale_preferito, non_contattare").in("id", cliIds) : Promise.resolve({ data: [] }),
     utenteIds.length ? supabase.from("utenti").select("id, nome").in("id", utenteIds) : Promise.resolve({ data: [] }),
   ]);
   const info = new Map((clienti ?? []).map((c) => [c.id, c]));
@@ -128,7 +128,7 @@ export default async function RichiamiPage() {
                   <Contatti telefono={c?.telefono ?? null} messaggio={messaggioRichiamo(r.tipo, nome, aziendaNome)} />
                 </div>
                 <div className="mt-2">
-                  <RegistraEsito id={r.id} valore={r.valore} />
+                  <RegistraEsito id={r.id} valore={r.valore} canale={canaleEsitoDaPreferito(c?.canale_preferito)} />
                 </div>
               </div>
             );
@@ -151,7 +151,7 @@ export default async function RichiamiPage() {
                   </div>
                   <p className="mt-0.5 text-xs text-faint">da fare il {fmtData(r.da_fare_il)}{r.valore != null ? ` · ${fmtEuro(r.valore)}` : ""}</p>
                 </div>
-                <RegistraEsito id={r.id} valore={r.valore} />
+                <RegistraEsito id={r.id} valore={r.valore} canale={canaleEsitoDaPreferito(c?.canale_preferito)} />
               </div>
             );
           })}
@@ -176,6 +176,7 @@ export default async function RichiamiPage() {
                   <div className="flex flex-wrap items-center gap-1.5">
                     <Badge tinta="ottone">{etichettaTipoRichiamo(p.tipo)}</Badge>
                     <Link href={`/clienti/${p.cliente_id}`} className="text-sm font-semibold text-inchiostro hover:underline">{p.clienteNome}</Link>
+                    {p.nonContattare && <Badge tinta="neutro">Non contattare</Badge>}
                   </div>
                   <p className="mt-0.5 text-xs text-soft">{p.motivo}</p>
                   <p className="text-[11px] text-faint">
@@ -187,7 +188,7 @@ export default async function RichiamiPage() {
                 <Contatti telefono={p.telefono} messaggio={messaggioRichiamo(p.tipo, p.clienteNome.split(" ").slice(-1)[0], aziendaNome)} />
               </div>
               <div className="mt-2 flex flex-wrap gap-2">
-                <EsitoProposta proposta={{ tipo: p.tipo, cliente_id: p.cliente_id, riferimento: p.riferimento, valore: p.valore }} />
+                <EsitoProposta proposta={{ tipo: p.tipo, cliente_id: p.cliente_id, riferimento: p.riferimento, valore: p.valore }} canale={canaleEsitoDaPreferito(p.canalePreferito)} />
                 <PianificaProposta proposta={{ tipo: p.tipo, cliente_id: p.cliente_id, riferimento: p.riferimento, valore: p.valore }} />
               </div>
             </div>

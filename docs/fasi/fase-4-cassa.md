@@ -120,7 +120,8 @@ multi-postazione/multi-cassa, corrispettivi XML.
 ### 3.2 `/cassa` — la giornata (server)
 - **Tre numeri grandi** in mono: incasso di oggi (vendite `emesse`) ·
   n° vendite · contanti attesi in cassetto (fondo apertura + contanti del
-  giorno − prelievi/spese di oggi).
+  giorno − prelievi/spese di oggi −
+  rimborsi in contanti dei resi di oggi).
 - **Totali per metodo** del giorno (dai `pagamenti` delle vendite emesse,
   raggruppati per nome): riga per metodo con importo mono.
 - **Vendite di oggi**: ora · numero VE · cliente (o "Non associato") ·

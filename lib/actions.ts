@@ -76,14 +76,25 @@ function clienteDaForm(fd: FormData) {
   return {
     nome: str(fd, "nome") ?? "",
     cognome: str(fd, "cognome") ?? "",
+    secondo_nome: str(fd, "secondo_nome"),
     data_nascita: str(fd, "data_nascita"),
+    sesso: (str(fd, "sesso") as "M" | "F" | null) ?? null,
     codice_fiscale: str(fd, "codice_fiscale")?.toUpperCase() ?? null,
+    tutore_legale: str(fd, "tutore_legale"),
     email: str(fd, "email"),
     telefono: str(fd, "telefono"),
+    telefono_casa: str(fd, "telefono_casa"),
+    telefono_lavoro: str(fd, "telefono_lavoro"),
+    canale_preferito: (str(fd, "canale_preferito") as
+      | "telefono" | "whatsapp" | "sms" | "email" | "cartaceo" | null) ?? null,
+    non_contattare: fd.get("non_contattare") === "on",
     indirizzo: str(fd, "indirizzo"),
+    indirizzo2: str(fd, "indirizzo2"),
     citta: str(fd, "citta"),
     cap: str(fd, "cap"),
     provincia: str(fd, "provincia")?.toUpperCase() ?? null,
+    nazione: str(fd, "nazione"),
+    lingua: str(fd, "lingua"),
     fonte: (str(fd, "fonte") ?? "banco") as
       | "banco" | "sito" | "app" | "convenzione" | "import",
     consenso_marketing: consenso,
@@ -213,6 +224,8 @@ export async function creaPrescrizione(
     od_diametro: tipo === "lac" ? num(formData, "od_diametro") : null,
     os_raggio: tipo === "lac" ? num(formData, "os_raggio") : null,
     os_diametro: tipo === "lac" ? num(formData, "os_diametro") : null,
+    od_dnp: tipo === "occhiali" ? num(formData, "od_dnp") : null,
+    os_dnp: tipo === "occhiali" ? num(formData, "os_dnp") : null,
     validita_mesi: num(formData, "validita_mesi") ?? 12,
     note: str(formData, "note"),
   });
@@ -698,6 +711,7 @@ const TIPI_PRODOTTO = [
   "lac",
   "soluzione",
   "montatura",
+  "sole",
   "lente",
   "accessorio",
   "servizio",
@@ -709,7 +723,7 @@ function prodottoDaForm(fd: FormData) {
     ? (tipoRaw as (typeof TIPI_PRODOTTO)[number])
     : "accessorio";
 
-  // parametri LAC (§2.10); per gli altri tipi resta {}.
+  // Parametri per-tipo nel jsonb (§2.5 Fase 4b); per gli altri tipi resta {}.
   const parametri: Record<string, unknown> =
     tipo === "lac"
       ? {
@@ -717,7 +731,19 @@ function prodottoDaForm(fd: FormData) {
           diametro: num(fd, "par_diametro"),
           confezione: str(fd, "par_confezione"),
         }
-      : {};
+      : tipo === "montatura" || tipo === "sole"
+        ? {
+            calibro: num(fd, "par_calibro"),
+            ponte: num(fd, "par_ponte"),
+            asta: num(fd, "par_asta"),
+            colore_codice: str(fd, "par_colore_codice"),
+            colore_nome: str(fd, "par_colore_nome"),
+            materiale: str(fd, "par_materiale"),
+          }
+        : {};
+
+  // Ricambio LAC → colonna dedicata (raffina l'esaurimento richiami).
+  const ricambio_giorni = tipo === "lac" ? num(fd, "ricambio_giorni") : null;
 
   return {
     tipo,
@@ -730,6 +756,7 @@ function prodottoDaForm(fd: FormData) {
     costo: num(fd, "costo"),
     scorta_minima: Math.max(0, Math.round(num(fd, "scorta_minima") ?? 0)),
     visibile_sito: fd.get("visibile_sito") === "on",
+    ricambio_giorni: ricambio_giorni != null && ricambio_giorni > 0 ? Math.round(ricambio_giorni) : null,
     parametri: parametri as Json,
   };
 }

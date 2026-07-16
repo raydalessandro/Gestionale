@@ -225,3 +225,33 @@ export const STATI_VENDITA: StatoPipeline[] = [
   { id: "emessa", label: "Emessa", bg: "#E2F0EE", fg: "#127E7A" },
   { id: "annullata", label: "Annullata", bg: "#F6E4E2", fg: "#B0483F" },
 ];
+
+/* ── Anagrafiche (006) ─────────────────────────────────────────────── */
+
+export const ETICHETTE_CANALE_PREFERITO: Record<string, string> = {
+  telefono: "Telefono",
+  whatsapp: "WhatsApp",
+  sms: "SMS",
+  email: "Email",
+  cartaceo: "Cartaceo",
+};
+
+export const ETICHETTE_RICAMBIO: Record<string, string> = {
+  "1": "Giornaliere",
+  "14": "Quindicinali",
+  "30": "Mensili",
+  "90": "Trimestrali",
+};
+
+/** Canale preferito del cliente → canale precompilato nell'esito richiamo
+ *  (solo se è un canale di contatto valido; "cartaceo" non lo è → ""). */
+export function canaleEsitoDaPreferito(pref: string | null | undefined): string {
+  return pref && pref in CANALI_RICHIAMO ? pref : "";
+}
+
+export const ETICHETTE_RUOLO: Record<string, string> = {
+  titolare: "Titolare",
+  responsabile: "Responsabile",
+  ottico: "Ottico",
+  addetto: "Addetto vendita",
+};

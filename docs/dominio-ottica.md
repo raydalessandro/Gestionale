@@ -279,3 +279,48 @@ prodotto **entro 24h dall'arrivo**; avviso "pronto per il ritiro" con
 raccomandata); scuse proattive per ritardi critici (>10gg). Ognuna di queste,
 per un indipendente, oggi vive nella testa del titolare: metterle in VISTA è
 esattamente "il livello ricavi sopra qualunque gestionale".
+
+
+## 14 · Anatomia dei dati di catena (schermate CIAO!/MIM del 16/07)
+
+**Cinque department, non uno**: sole · montature da vista · lenti oftalmiche
+· LAC · accessori — ognuno con IVA, processi e flussi propri. Conferma la
+nostra tassonomia `prodotti.tipo` e ci ha fatto aggiungere il tipo `sole`
+(l'occhiale finito è un mondo a sé: 22%, logiche da pronto-moda).
+
+**Anagrafica cliente CIAO!** (campo per campo): nome, secondo nome,
+cognome · indirizzo + scala/appartamento, CAP, città, provincia, nazione ·
+email, cellulare, tel. di casa, tel. di lavoro · canali di contatto
+preferiti a flag multipli (email / cellulare / cartaceo) · data di nascita,
+sesso, **tutore legale** (minori) · lingua · consenso marketing · blocco
+convenzioni: assicurazione (tendina), azienda convenzionata (tendina) + CF
+azienda, ragione sociale, doppio indirizzo, **codice SDI aziendale**, note.
+Nostre scelte: il canale preferito è UNO (guida i richiami); il blocco
+assicurazione/azienda arriva con la Fase 5 come registro con FK, non testo
+libero.
+
+**Catalogo LAC di catena = una riga per potere**: la descrizione codifica
+tutto — `GIOENT 30S 8.6 145 VS01 N032,012 020` = linea Giornaliere Eye
+Next, confezione 30, BC 8.6, DIA 14.5, sfero −3,25 / cil −1,25 / asse 20°;
+le sferiche chiudono con il solo potere (`30P, −3.25`); colonna
+Toric/Spheric; confezione (30/3) e gruppo merci per linea. Per VISTA: il
+prodotto resta **linea + confezione** (il potere vive sulla riga d'ordine);
+la granularità per-potere con EAN arriverà solo con gli ordini elettronici
+al fornitore.
+
+**Report inventariali On-Hand**: due livelli — per marchio dentro il
+department (quantità totale / non confermata / in store, con conte a mano
+a fianco) e dettaglio per SKU (EAN, descrizione con colore, size dimension
+`modello_calibro_colore`, **PLM status**, prezzo, colonne di conta). È il
+telaio della futura funzione Inventario: liste per department → marchio →
+SKU, con la colonna "contato" accanto al contabile.
+
+**Rottamazione (movimento 551)**: documento con reason strutturata (es.
+`1400 - Mistagged`), righe a quantità negativa, valore totale, **doppia
+firma** (chi consegna / chi riceve). Si usa per furto, rottura,
+smaltimento, reso di conformità, errore negozio. Le rotture vivono in un
+**magazzino separato dal vendibile** ("Quality Inspection"): da lì o si
+confermano (scarico definitivo) o si "riportano a magazzino". Regola ERGO:
+il prodotto sostituito in garanzia assicurativa **resta al cliente** e non
+si movimenta. Il modulo cartaceo LOF per le lenti rotte lega vecchio e
+nuovo ordine con le causali standard (le stesse dei nostri resi).

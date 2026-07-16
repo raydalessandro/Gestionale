@@ -201,6 +201,37 @@ export default function PrescrizioneForm({ clienteId }: { clienteId: string }) {
         {grigliaOcchio("od", od, setOd)}
         {grigliaOcchio("os", os, setOs)}
 
+        {/* DNP (distanza naso-pupillare) — solo occhiali, serve alla busta */}
+        {tipo === "occhiali" && (
+          <div className="grid grid-cols-[2.4rem_1fr_1fr] items-center gap-2">
+            <span className="f-mono text-[10px] font-semibold uppercase tracking-wide text-faint">
+              DNP
+            </span>
+            <input
+              name="od_dnp"
+              type="number"
+              step="0.5"
+              min={20}
+              max={45}
+              inputMode="decimal"
+              placeholder="OD 31.5"
+              className={`${inputCls} diottria`}
+              aria-label="DNP occhio destro"
+            />
+            <input
+              name="os_dnp"
+              type="number"
+              step="0.5"
+              min={20}
+              max={45}
+              inputMode="decimal"
+              placeholder="OS 31.5"
+              className={`${inputCls} diottria`}
+              aria-label="DNP occhio sinistro"
+            />
+          </div>
+        )}
+
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <Field label="Addizione" hint="Progressive, bifocali, LAC multifocali.">
             <input
