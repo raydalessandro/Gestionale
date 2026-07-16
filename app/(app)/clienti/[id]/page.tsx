@@ -11,9 +11,10 @@ import {
   Vuoto,
 } from "@/components/ui";
 import PrescrizioneCard from "@/components/PrescrizioneCard";
+import { BannerConsensi } from "@/components/ConsensiCliente";
 import { PillStato } from "@/components/OrdiniUI";
 import { etichettaTipoRichiamo, etichettaTipoApp, oraDi } from "@/components/AgendaUI";
-import { fmtData, ETICHETTE_FONTE, ESITI_RICHIAMO } from "@/lib/utils";
+import { fmtData, ETICHETTE_FONTE, ESITI_RICHIAMO, ETICHETTE_CANALE_PREFERITO } from "@/lib/utils";
 
 export default async function ClientePage({
   params,
@@ -74,6 +75,24 @@ export default async function ClientePage({
 
   if (!cliente) notFound();
 
+  // Vitali della testata
+  const eta = cliente.data_nascita
+    ? Math.floor(
+        (Date.now() - new Date(cliente.data_nascita).getTime()) /
+          (365.25 * 24 * 60 * 60 * 1000)
+      )
+    : null;
+  // Quale recapito è quello preferito (guida l'evidenza in scheda).
+  const canalePreferito = cliente.canale_preferito;
+  const recapitoPreferito =
+    canalePreferito === "email"
+      ? "email"
+      : canalePreferito === "cartaceo"
+        ? "indirizzo"
+        : canalePreferito // telefono / whatsapp / sms
+          ? "telefono"
+          : null;
+
   const ordini = [
     ...(lac ?? []).map((o) => ({ ...o, tipo: "lac" as const })),
     ...(buste ?? []).map((o) => ({ ...o, tipo: "buste" as const })),
@@ -82,15 +101,18 @@ export default async function ClientePage({
     .slice(0, 5);
 
   const contatti = [
-    cliente.telefono && { icona: Phone, testo: cliente.telefono },
-    cliente.email && { icona: Mail, testo: cliente.email },
+    cliente.telefono && { chiave: "telefono", icona: Phone, testo: cliente.telefono },
+    cliente.telefono_casa && { chiave: "telefono_casa", icona: Phone, testo: `${cliente.telefono_casa} (casa)` },
+    cliente.telefono_lavoro && { chiave: "telefono_lavoro", icona: Phone, testo: `${cliente.telefono_lavoro} (lavoro)` },
+    cliente.email && { chiave: "email", icona: Mail, testo: cliente.email },
     (cliente.citta || cliente.indirizzo) && {
+      chiave: "indirizzo",
       icona: MapPin,
-      testo: [cliente.indirizzo, cliente.cap, cliente.citta, cliente.provincia]
+      testo: [cliente.indirizzo, cliente.indirizzo2, cliente.cap, cliente.citta, cliente.provincia, cliente.nazione]
         .filter(Boolean)
         .join(", "),
     },
-  ].filter(Boolean) as { icona: typeof Phone; testo: string }[];
+  ].filter(Boolean) as { chiave: string; icona: typeof Phone; testo: string }[];
 
   return (
     <>
@@ -112,12 +134,23 @@ export default async function ClientePage({
         }
       />
 
+      <BannerConsensi
+        clienteId={cliente.id}
+        mancaMarketing={!cliente.consenso_marketing}
+        mancaSanitario={!cliente.consenso_dati_sanitari}
+      />
+
       <div className="mb-6 grid grid-cols-1 gap-4 md:grid-cols-3">
         <Card className="md:col-span-2">
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <Badge tinta={tintaFonte(cliente.fonte)}>
               {ETICHETTE_FONTE[cliente.fonte] ?? cliente.fonte}
             </Badge>
+            {eta !== null && <Badge tinta="neutro">{eta} anni</Badge>}
+            {cliente.tutore_legale && (
+              <Badge tinta="ottone">Tutore: {cliente.tutore_legale}</Badge>
+            )}
+            {cliente.non_contattare && <Badge tinta="neutro">Non contattare</Badge>}
             {cliente.consenso_marketing ? (
               <Badge tinta="verde">Consenso marketing ✓</Badge>
             ) : (
@@ -130,12 +163,23 @@ export default async function ClientePage({
 
           {contatti.length > 0 ? (
             <ul className="space-y-2">
-              {contatti.map((c, i) => (
-                <li key={i} className="flex items-center gap-2.5 text-sm text-inchiostro">
-                  <c.icona size={15} className="shrink-0 text-ottone" />
-                  {c.testo}
-                </li>
-              ))}
+              {contatti.map((c, i) => {
+                const preferito = recapitoPreferito === c.chiave;
+                return (
+                  <li
+                    key={i}
+                    className={`flex items-center gap-2.5 text-sm ${preferito ? "font-semibold text-inchiostro" : "text-inchiostro"}`}
+                  >
+                    <c.icona size={15} className="shrink-0 text-ottone" />
+                    {c.testo}
+                    {preferito && (
+                      <span className="rounded-md bg-ottone/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ottone-scuro">
+                        {ETICHETTE_CANALE_PREFERITO[canalePreferito!] ?? "preferito"}
+                      </span>
+                    )}
+                  </li>
+                );
+              })}
             </ul>
           ) : (
             <p className="text-sm text-faint">
@@ -150,13 +194,32 @@ export default async function ClientePage({
           )}
         </Card>
 
-        <Card>
-          <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-faint">
-            Note
-          </p>
-          <p className="whitespace-pre-wrap text-sm text-soft">
-            {cliente.note || "—"}
-          </p>
+        <Card className="space-y-3">
+          <div>
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-faint">
+              Privacy
+            </p>
+            <p className="text-sm text-soft">
+              Marketing:{" "}
+              {cliente.consenso_marketing
+                ? `sì${cliente.data_consenso ? `, dal ${fmtData(cliente.data_consenso)}` : ""}`
+                : "non raccolto"}
+            </p>
+            <p className="text-sm text-soft">
+              Dati sanitari:{" "}
+              {cliente.consenso_dati_sanitari
+                ? `sì, dal ${fmtData(cliente.consenso_sanitario_il ?? cliente.consenso_dati_sanitari)}`
+                : "non raccolto"}
+            </p>
+          </div>
+          <div>
+            <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-faint">
+              Note
+            </p>
+            <p className="whitespace-pre-wrap text-sm text-soft">
+              {cliente.note || "—"}
+            </p>
+          </div>
         </Card>
       </div>
 

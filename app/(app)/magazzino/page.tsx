@@ -15,6 +15,7 @@ import {
   etichettaMovimento,
   sottoScorta,
   fermoScaduto,
+  parametriMontatura,
 } from "@/components/MagazzinoUI";
 import { ContatoreCard } from "@/components/OrdiniUI";
 import { AzioniFermo } from "@/components/AzioniMagazzino";
@@ -129,7 +130,7 @@ async function VistaProdotti({
 }) {
   let query = supabase
     .from("prodotti")
-    .select("id, tipo, marca, nome, sku, prezzo, giacenza, scorta_minima, attivo")
+    .select("id, tipo, marca, nome, sku, prezzo, giacenza, scorta_minima, attivo, parametri")
     .order("nome")
     .limit(100);
 
@@ -187,6 +188,10 @@ async function VistaProdotti({
           {prodotti.map((p) => {
             const scorta = sottoScorta(p);
             const imp = impegnato.get(p.id) ?? 0;
+            const calibro =
+              p.tipo === "montatura" || p.tipo === "sole"
+                ? parametriMontatura(p.parametri).calibro
+                : null;
             return (
               <Link key={p.id} href={`/magazzino/prodotti/${p.id}`} className="flex items-center gap-3 px-5 py-3.5 transition-colors hover:bg-carta">
                 <div className="min-w-0 flex-1">
@@ -194,6 +199,9 @@ async function VistaProdotti({
                     <span className="truncate text-sm font-semibold text-inchiostro">
                       {[p.marca, p.nome].filter(Boolean).join(" ")}
                     </span>
+                    {calibro != null && (
+                      <span className="f-mono text-xs text-soft">◻ {calibro}</span>
+                    )}
                     <BadgeTipoProdotto tipo={p.tipo} />
                   </div>
                   <p className="mt-0.5 text-xs text-soft">

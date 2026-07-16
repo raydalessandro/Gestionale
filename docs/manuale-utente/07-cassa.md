@@ -1,4 +1,4 @@
-*Aggiornato a: v0.5 (Fase 4)*
+*Aggiornato a: v0.5.1 (Fase 4c)*
 
 # Cassa e vendite
 
@@ -19,8 +19,17 @@ non manda niente al Sistema TS: salva solo i dati che servono a te.
 Appena entri vedi la giornata a colpo d'occhio: tre numeri grandi
 (**Incasso di oggi**, **Vendite**, **Contanti attesi** nel cassetto), i
 **Totali per metodo**, l'elenco delle **Vendite di oggi** e i **Movimenti di
-cassa**. In alto i bottoni **"Vendita veloce"**, **"Chiudi la giornata"** e
-l'ingranaggio delle impostazioni.
+cassa**. In fondo, se oggi hai mosso delle caparre, una riga le riassume
+("Caparre di oggi — emesse … · scontate … · rese … · incamerate …"). In alto i
+bottoni **"Vendita veloce"**, **"Chiudi la giornata"** e l'ingranaggio delle
+impostazioni.
+
+I **Contanti attesi** sono quello che ti aspetti di trovare nel cassetto: il
+fondo di apertura più i contanti delle vendite e delle caparre incassate oggi,
+meno prelievi e spese in contanti. Questo numero e quello che ti propone la
+chiusura di sera nascono dalla **stessa formula**: le caparre che hai preso in
+contanti oggi sono già dentro tutti e due, quindi non c'è più nessuno scarto da
+spiegare a mano.
 
 ## I gesti di ogni giorno
 
@@ -62,7 +71,8 @@ alla vendita con le righe già composte:
 
 - per una **busta**: montatura, lenti e — se valorizzata — la garanzia, con le
   aliquote giuste (un occhiale completo va tutto al 4%, perché il prodotto
-  finito è l'ausilio);
+  finito è l'ausilio; la garanzia nasce al 22% se è un servizio del negozio,
+  esente se è una polizza di compagnia — secondo il tipo scelto nella busta);
 - per un **ordine LAC**: le righe dell'ordine con i loro prodotti.
 
 Il punto importante: **la vendita è per l'intero valore**, non per il saldo. La
@@ -82,11 +92,20 @@ modificano e non si cancellano: se sbagli, registri un movimento contrario.
 
 ### Annullare una vendita
 
-Dal dettaglio di una vendita ancora **emessa** premi **"Annulla vendita"**,
-scrivi il **motivo** e conferma con **"Conferma annullo"**. Il magazzino torna
-indietro in automatico. Attenzione: se la vendita era legata a un ordine,
-l'ordine **resta consegnato** — l'annullo della vendita non lo riporta
-indietro. Gestisci l'eventuale reso a parte.
+L'annullo serve a cancellare una vendita sbagliata **nella stessa giornata**,
+prima della chiusura. Dal dettaglio di una vendita ancora **emessa** premi
+**"Annulla vendita"**, scrivi il **motivo** e conferma con **"Conferma
+annullo"**.
+
+- Per una **vendita libera** (vendita veloce), la merce **rientra a magazzino**
+  in automatico.
+- Per una **vendita nata da un ordine** (busta o LAC consegnato), la merce è
+  già dal cliente: il magazzino **non** rientra da solo. Se il cliente ti
+  riporta la merce, non usi l'annullo ma registri un **reso** scegliendo le
+  righe che tornano in giacenza.
+
+Oltre la giornata, o dopo che hai chiuso la cassa, l'annullo non è più
+possibile: la strada per rimettere le cose a posto è sempre il **reso**.
 
 ### Registrare un reso
 
@@ -124,17 +143,19 @@ caparra resta ristampabile con la clausola dei due mesi.
 
 Se invece il cliente rinuncia e vuoi rendergli l'acconto, sulla stessa busta
 c'è **"Annulla e restituisci caparra"**: scegli la causale e il metodo con cui
-rimborsi, poi **"Restituisci e annulla"**. VISTA crea un reso in denaro e
-annulla la busta, tutto insieme. Restituisci **solo quanto è stato davvero
-incassato**: se una parte della caparra non era mai stata versata, quella non
-genera nessun movimento.
+rimborsi (te lo propone già col metodo con cui era stata incassata), poi
+**"Restituisci e annulla"**. VISTA crea un reso in denaro e annulla la busta,
+tutto insieme. Restituisci **solo quanto è stato davvero incassato**: se una
+parte della caparra non era mai stata versata, quella non genera nessun
+movimento.
 
 ### I documenti da stampare
 
 - **"Ricevuta caparra"** — dalla scheda della busta con un acconto. È un
   documento gestionale (non fiscale): elenca l'ordine a valore pieno, la
-  caparra versata, quanto resta "in attesa di pagamento" e il testo legale
-  della caparra confirmatoria con la clausola dei due mesi.
+  caparra versata **con il metodo** con cui l'hai incassata, quanto resta "in
+  attesa di pagamento" e il testo legale della caparra confirmatoria con la
+  clausola dei due mesi.
 - **"Quietanza"** — dal dettaglio di un reso di restituzione caparra. Stampa
   due copie: quella per il cliente col testo di quietanza e la firma, e quella
   per il negozio con la doppia firma (cliente e dipendente).
@@ -149,7 +170,9 @@ giorno. Sono quattro blocchi, con i valori di sistema già calcolati:
    la **differenza** colorata: verde se torna, ambra fino a 5 centesimi (sono
    arrotondamenti, si tollerano), rossa oltre. Sui contanti conti tutto il
    cassetto, **fondo compreso**. Se lo scarto supera i 5 centesimi, VISTA ti
-   chiede una **causale**: senza, non chiude.
+   chiede una **causale**: senza, non chiude. Le caparre incassate oggi sono già
+   dentro il totale di sistema di ciascun metodo: non le devi aggiungere né
+   spiegare a parte.
 2. **Confronto col registratore (Z)** — scrivi il **N° azzeramento Z** e, per
    ogni aliquota (4%, 22%, esente), il totale letto dallo scontrino di
    chiusura. A fianco vedi il totale di sistema e la differenza. (Il dato lo
@@ -157,8 +180,16 @@ giorno. Sono quattro blocchi, con i valori di sistema già calcolati:
 3. **Cassaforte** — **Fondo apertura** (già proposto da ieri), **Contanti
    contati** e **Fondo che resta** nel cassetto. VISTA calcola il **Versamento**
    e ti mostra il **saldo della cassaforte** dopo il versamento.
-4. **Caparre del giorno** — i contatori (emesse, scalate, incamerate) e uno
-   spazio per le **Note**.
+4. **Caparre del giorno** — quattro contatori e uno spazio per le **Note**:
+   - **emesse** — le caparre che hai preso oggi;
+   - **scontate** — le caparre scalate oggi in una consegna;
+   - **rese** — le caparre restituite oggi con un reso;
+   - **incamerate** — le caparre trattenute oggi perché il cliente non ha
+     ritirato.
+   Se hai buste vecchie con una caparra presa prima di questo aggiornamento
+   (senza il metodo registrato), compare una riga a parte "caparre senza metodo
+   registrato: € X": è solo informativa, resta fuori dal conteggio per metodo e
+   non blocca la chiusura.
 
 Premi **"Chiudi la giornata"**: VISTA rifà tutti i conti da solo (i valori di
 sistema del blocco 1 e 2 li ricalcola, non si fida di quelli mostrati) e salva.
@@ -172,9 +203,14 @@ Visa, Bonifico, Gift Card, Assicurazione e **Caparra**. Poi con **"Nuovo
 metodo"** ne aggiungi altri.
 
 Ogni metodo si può attivare o disattivare (mai cancellare) e ordinare; la
-spunta **"tracciabile"** distingue i pagamenti tracciati (utile alla
-detraibilità): solo i contanti non lo sono. Il metodo **Caparra** fa eccezione:
-serve al flusso di consegna e non si può disattivare né togliere.
+spunta **"tracciabile"** segna i pagamenti che lasciano una traccia (tutti
+tranne i contanti). Serve per quelle spese che la detrazione riconosce solo se
+pagate in modo tracciato. **Attenzione**: per i **dispositivi medici**
+(occhiali, lenti, lenti a contatto graduate) la detrazione spetta al cliente
+**anche pagando in contanti** — quindi non spaventarti e non spaventare il
+cliente: il contante non gli fa perdere la detrazione sugli occhiali. Il metodo
+**Caparra** fa eccezione: serve al flusso di consegna e non si può disattivare
+né togliere.
 
 ## Casi particolari
 
@@ -187,6 +223,11 @@ serve al flusso di consegna e non si può disattivare né togliere.
   **"Vendita di riallineamento (emergenza)"**: è l'unico modo per datare una
   vendita nel passato, e richiede numero e data del documento emesso a mano. La
   vendita comparirà nella giornata giusta, non in quella di oggi.
+- **Riallineare in una giornata già chiusa.** Se la data che scegli per il
+  riallineamento è di un giorno che avevi già chiuso, VISTA ti avvisa: "questa
+  giornata è già chiusa: la vendita resterà fuori dalle quadrature". La vendita
+  compare nella lista, ma non entra nella chiusura di quel giorno (che è già
+  salvata). Lo stesso promemoria lo ritrovi sul dettaglio di quella vendita.
 - **Doppio incasso.** Non puoi incassare due volte lo stesso ordine: se ci
   provi, VISTA te lo dice.
 - **Consegna senza cassa.** Se il modulo Cassa non è attivo, la consegna di
@@ -207,6 +248,10 @@ serve al flusso di consegna e non si può disattivare né togliere.
 - **"La busta non è pronta (stato …)."** / **"L'ordine non è arrivato
   (stato …)."** / **"Consegna non riuscita: l'ordine è cambiato di stato,
   riprova."** Lo stato dell'ordine è cambiato nel frattempo: ricarica la scheda.
+- **"La vendita è di un giorno passato: registra un reso, non un annullo."** /
+  **"La giornata è già chiusa: per rendere il denaro registra un reso, non un
+  annullo."** L'annullo vale solo in giornata e prima della chiusura: per tutto
+  il resto la strada è il reso.
 - **"La vendita è già annullata."** / **"Indica un motivo per l'annullo."**
   L'annullo vuole un motivo, e non si annulla due volte.
 - **"Scegli una causale."** / **"L'importo del reso dev'essere positivo."** /

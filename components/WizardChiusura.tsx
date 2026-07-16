@@ -26,7 +26,7 @@ export default function WizardChiusura({
 }: {
   metodi: { nome: string; sistema: number }[];
   aliquote: { aliquota: string; sistema: number }[];
-  caparre: { emesse: number; scontate: number; incamerate: number };
+  caparre: { emesse: number; scontate: number; rese: number; incamerate: number; senzaMetodo: number };
   fondoApertura: number;
   saldoCassaforte: number;
 }) {
@@ -125,7 +125,14 @@ export default function WizardChiusura({
       {/* 4 · Caparre e note */}
       <Card className="space-y-2">
         <p className="text-xs font-semibold uppercase tracking-wide text-faint">4 · Caparre del giorno</p>
-        <p className="text-sm text-soft">emesse {fmtEuro(caparre.emesse)} · scalate {fmtEuro(caparre.scontate)} · incamerate {fmtEuro(caparre.incamerate)}</p>
+        <p className="text-sm text-soft">
+          emesse {fmtEuro(caparre.emesse)} · scontate {fmtEuro(caparre.scontate)} · rese {fmtEuro(caparre.rese)} · incamerate {fmtEuro(caparre.incamerate)}
+        </p>
+        {caparre.senzaMetodo > 0 && (
+          <p className="text-[11px] text-ambra">
+            Caparre senza metodo registrato: {fmtEuro(caparre.senzaMetodo)} (fuori dal conteggio per metodo).
+          </p>
+        )}
         <Field label="Note"><textarea name="note" rows={2} className={inputCls} /></Field>
       </Card>
 

@@ -59,7 +59,7 @@ export default async function RicevutaCaparraPage({ params }: { params: Promise<
 
       <div className="mt-3 space-y-1 font-mono text-[13px]">
         <div className="flex justify-between"><span>Totale</span><span>{fmtEuro(b.totale)}</span></div>
-        <div className="flex justify-between font-bold"><span>Caparra versata</span><span>{fmtEuro(b.acconto)}</span></div>
+        <div className="flex justify-between font-bold"><span>Caparra versata{b.acconto_metodo ? ` · ${b.acconto_metodo}` : ""}</span><span>{fmtEuro(b.acconto)}</span></div>
         <div className="flex justify-between"><span>In attesa di pagamento</span><span>{fmtEuro(inAttesa)}</span></div>
       </div>
 

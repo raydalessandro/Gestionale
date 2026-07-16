@@ -41,10 +41,11 @@ export default async function BustaPage({
         : Promise.resolve({ data: null }),
     ]);
 
-  const { data: metodiCassa } =
-    b.acconto > 0 && !["consegnata", "annullata"].includes(b.stato)
-      ? await supabase.from("metodi_pagamento").select("id, nome").eq("attivo", true).order("ordine")
-      : { data: [] };
+  const { data: metodiRow } = await supabase
+    .from("metodi_pagamento").select("id, nome, tipo").eq("attivo", true).order("ordine");
+  const metodiTutti = metodiRow ?? [];
+  const metodiCassa = metodiTutti.map((m) => ({ id: m.id, nome: m.nome }));
+  const metodiCaparra = metodiTutti.filter((m) => m.tipo !== "caparra").map((m) => m.nome);
 
   const accontoSuggerito = Math.round((b.totale * 0.3) / 5) * 5;
 
@@ -219,11 +220,14 @@ export default async function BustaPage({
               : null
           }
           incassaHref={`/cassa/vendita/nuova?busta=${b.id}`}
+          metodiCaparra={metodiCaparra}
         />
         {b.acconto > 0 && !["consegnata", "annullata"].includes(b.stato) && (
           <div className="mt-3 border-t border-linea pt-3">
-            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-faint">Caparra</p>
-            <AzioniCaparra bustaId={b.id} acconto={b.acconto} metodi={metodiCassa ?? []} />
+            <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-faint">
+              Caparra {b.acconto_metodo ? `· incassata: ${b.acconto_metodo}` : ""}
+            </p>
+            <AzioniCaparra bustaId={b.id} acconto={b.acconto} metodi={metodiCassa} metodoIncasso={b.acconto_metodo} />
           </div>
         )}
       </Card>

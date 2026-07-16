@@ -1,4 +1,4 @@
-*Aggiornato a: v0.5 (Fase 4)*
+*Aggiornato a: v0.5.1 (Fasi 4b–4d)*
 
 # Benvenuto in VISTA Gestionale
 
@@ -22,8 +22,9 @@ La prima volta entri con la tua email e crei il negozio:
 2. Scegli un **indirizzo breve** per il negozio: solo lettere minuscole,
    numeri e trattini, almeno tre caratteri (per esempio `ottica-bianchi`).
    Serve per il sito e va bene tenerlo semplice.
-3. Metti il **tuo nome**: è il nome che resta scritto quando ispezioni una
-   busta o registri un movimento di magazzino.
+3. Metti il **tuo nome**: è il nome che resta scritto su tutto quello che
+   registri — quando ispezioni una busta, incassi in cassa o muovi il
+   magazzino. Il lavoro è sempre firmato.
 
 Fatto questo, sei dentro. Il negozio è tuo e i tuoi dati restano solo tuoi.
 
@@ -49,6 +50,17 @@ coupon aziendali. Quando saranno pronte, questo capitolo si aggiornerà.
 
 ## Note di versione del manuale
 
+- **Luglio 2026 — v0.5.1** — Rifiniture prima del collaudo. La **scheda
+  cliente** si completa (secondo nome, tre telefoni, canale preferito,
+  indirizzo, tutore per i minori, "Non contattare"); arrivano i **consensi**
+  (marketing alla scheda, dati sanitari alla prima prescrizione) con il
+  promemoria che li chiede finché mancano. La **DNP** entra nella prescrizione
+  occhiali e sulla busta stampata. In magazzino nasce il tipo **Occhiale da
+  sole** e i parametri di montature e sole (calibro, colore, materiale), più il
+  **ricambio** delle lenti a contatto. In **Cassa** la caparra entra davvero
+  nella giornata: scegli il metodo dell'acconto, i contanti attesi e la
+  chiusura tornano da soli, la chiusura mostra i quattro contatori delle
+  caparre. La **garanzia** della busta si tipizza (servizio o polizza).
 - **Luglio 2026 — v0.5** — Arriva la **Cassa**: vendite e vendita veloce,
   incasso alla consegna con la caparra scalata, resi con causale, incameramento
   e restituzione della caparra, movimenti di cassa e chiusura della giornata.

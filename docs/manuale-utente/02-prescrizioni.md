@@ -1,4 +1,4 @@
-*Aggiornato a: v0.3 (Fase 2)*
+*Aggiornato a: v0.5.1 (Fasi 4b–4d)*
 
 # Prescrizioni
 
@@ -30,12 +30,22 @@ prescrizione.
 4. Compila la **Refrazione**: per OD e OS scrivi **Sfero**, **Cilindro** e
    **Asse**. Per progressive, bifocali e LAC multifocali aggiungi
    l'**Addizione**.
-5. Controlla la **Validità (mesi)**: di default 12. Passato quel tempo la
+5. Solo per gli occhiali, sotto la griglia trovi la riga **DNP** (vedi sotto).
+6. Controlla la **Validità (mesi)**: di default 12. Passato quel tempo la
    prescrizione risulta scaduta.
-6. Premi **"Salva prescrizione"**.
+7. Premi **"Salva prescrizione"**.
 
 Sotto la griglia trovi sempre un'**anteprima** della misura scritta come la
 leggeresti al banco: la usi per un ultimo controllo prima di salvare.
+
+### La DNP (solo occhiali)
+
+Sotto la griglia della refrazione, per le prescrizioni da occhiali, c'è la riga
+**DNP** (la distanza naso-pupilla): un valore in millimetri per **OD** e uno
+per **OS** (per esempio 31.5). Non è obbligatoria, ma se la compili ti torna
+comodo dopo: quando la prescrizione è collegata a una busta, la **busta
+stampata** riporta la DNP accanto alla griglia della misura, pronta per il
+laboratorio.
 
 ### I template rapidi
 
@@ -57,6 +67,20 @@ Quando scegli **Lenti a contatto (LAC)** compare il riquadro della geometria:
 Sono i valori che poi ritrovi in automatico quando fai un ordine di lenti a
 contatto per quel cliente.
 
+## Il consenso ai dati sanitari
+
+La prescrizione contiene dati sulla salute del cliente. La prima volta che ne
+registri una per un cliente che non ha ancora dato il consenso ai dati
+sanitari, in testa al form compare un riquadro con una spunta obbligatoria:
+
+> Il cliente ha firmato l'informativa e acconsente al trattamento dei dati
+> sanitari.
+
+Senza quella spunta non salvi. La metti **una volta sola**: da lì in poi VISTA
+non te la richiede più per quel cliente, e la data del consenso resta scritta
+nella sua scheda (riquadro Privacy). Se modifichi una vecchia prescrizione di
+un cliente che il consenso l'ha già dato, non ti viene chiesto niente.
+
 ## Casi particolari
 
 - **Attiva o scaduta.** Una prescrizione entro la sua validità è **valida**;
@@ -72,6 +96,9 @@ contatto per quel cliente.
 
 - **"L'asse deve essere compreso tra 0 e 180."** Hai scritto un asse fuori
   scala: correggilo e risalva.
+- **La spunta del consenso sanitario è obbligatoria.** Se provi a salvare la
+  prima prescrizione senza spuntarla, il form non prosegue: raccogli
+  l'informativa firmata e metti la spunta.
 - **"Salvataggio non riuscito…"** Riprova; se persiste, controlla la
   connessione.
 - **"Sessione scaduta: rifai il login."** Rientra e riprendi.

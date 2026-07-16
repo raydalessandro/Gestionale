@@ -1,4 +1,4 @@
-*Aggiornato a: v0.5 (Fase 4)*
+*Aggiornato a: v0.5.1 (Fasi 4b–4d)*
 
 # Domande frequenti
 
@@ -22,7 +22,20 @@ scorciatoia: serve a non consegnare un occhiale con un difetto.
 No. L'acconto (la caparra) non genera scontrino: lo scontrino, per l'intero
 valore, si emette alla consegna. Alla consegna con **"Consegna e incassa"** la
 caparra rientra come un pagamento già coperto, e batti alla stampante il totale
-pieno.
+pieno. Quando prendi l'acconto scegli il **metodo della caparra**: così quel
+denaro entra subito nella cassa di oggi.
+
+**Come registro i consensi di un cliente?**
+Il **consenso marketing** lo spunti sulla scheda cliente (subito o dopo). Il
+**consenso ai dati sanitari** te lo chiede il form alla prima prescrizione, con
+una spunta obbligatoria. Se manca qualcosa, aprendo la scheda vedi un riquadro
+con **"Registra consensi"** e puoi metterlo anche con una data del passato (per
+i consensi raccolti su carta).
+
+**Il cliente paga gli occhiali in contanti: perde la detrazione?**
+No. Gli occhiali, le lenti e le lenti a contatto graduate sono dispositivi
+medici: la detrazione spetta al cliente anche pagando in contanti. Il pagamento
+tracciato serve solo per altri tipi di spesa, non per i dispositivi medici.
 
 **Come avviso il cliente che l'ordine è pronto?**
 Dalla scheda dell'ordine premi **"Segna avvisato"** (o "Segna avvisata" per le
@@ -32,6 +45,10 @@ messaggio già pronto da controllare e inviare.
 **Posso fare un ordine senza prescrizione?**
 Sì. Sia per una busta che per un ordine di lenti a contatto puoi procedere
 senza misura collegata: compare un avviso, ma l'ordine si crea lo stesso.
+
+**Le lenti colorate senza gradazione le creo come LAC?**
+No: creale come **Accessorio**. Solo le LAC graduate sono dispositivi medici
+(4%); quelle puramente estetiche vanno al 22% senza dispositivo medico.
 
 **Che differenza c'è tra giacenza, impegnata e disponibile?**
 La **giacenza** è quanta merce hai fisicamente. L'**impegnata** è quella messa
@@ -72,12 +89,22 @@ non blocca) e annulla la busta. **"Annulla e restituisci caparra"** invece gli
 rende i soldi con un reso e annulla la busta. Restituisci solo quanto era stato
 davvero versato.
 
+**Annullo o reso: qual è la differenza?**
+L'**annullo** cancella una vendita sbagliata nella stessa giornata, prima della
+chiusura. Il **reso** è la strada per tutto il resto: giorno passato, giornata
+già chiusa, oppure merce che il cliente ti riporta (le righe scelte rientrano a
+magazzino). Su una vendita nata da un ordine la merce è già dal cliente, quindi
+l'annullo non fa rientrare il magazzino: si passa dal reso.
+
 **A fine giornata i conti non tornano di pochi centesimi: è un problema?**
 No. In chiusura, uno scarto fino a 5 centesimi è considerato arrotondamento: si
 mostra e si tollera. Oltre quella soglia VISTA ti chiede una causale per
-spiegare la differenza, altrimenti non chiude.
+spiegare la differenza, altrimenti non chiude. Le caparre incassate oggi sono
+già dentro i totali: non generano più scarti da spiegare.
 
 **Ho emesso un documento a mano mentre la cassa era guasta: come lo registro?**
 Nella vendita apri **"+ Documento fiscale e opzioni"** e spunti **"Vendita di
 riallineamento (emergenza)"**: è l'unico modo per datare la vendita nel giorno
-giusto, e ti chiede numero e data del documento emesso a mano.
+giusto, e ti chiede numero e data del documento emesso a mano. Se quella
+giornata era già chiusa, VISTA ti avvisa: la vendita resta fuori dalle
+quadrature di quel giorno.

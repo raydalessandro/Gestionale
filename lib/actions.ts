@@ -14,6 +14,12 @@ import type {
   PagamentoVendita,
 } from "@/lib/database.types";
 import { ivaScorporo } from "@/components/CassaUI";
+import {
+  sistemaPerMetodo,
+  caparreSenzaMetodo,
+  contatoriCaparre,
+  NOME_CAPARRA,
+} from "@/lib/cassa-calcoli";
 
 /* ── Helper ────────────────────────────────────────────────────────── */
 
@@ -76,14 +82,25 @@ function clienteDaForm(fd: FormData) {
   return {
     nome: str(fd, "nome") ?? "",
     cognome: str(fd, "cognome") ?? "",
+    secondo_nome: str(fd, "secondo_nome"),
     data_nascita: str(fd, "data_nascita"),
+    sesso: (str(fd, "sesso") as "M" | "F" | null) ?? null,
     codice_fiscale: str(fd, "codice_fiscale")?.toUpperCase() ?? null,
+    tutore_legale: str(fd, "tutore_legale"),
     email: str(fd, "email"),
     telefono: str(fd, "telefono"),
+    telefono_casa: str(fd, "telefono_casa"),
+    telefono_lavoro: str(fd, "telefono_lavoro"),
+    canale_preferito: (str(fd, "canale_preferito") as
+      | "telefono" | "whatsapp" | "sms" | "email" | "cartaceo" | null) ?? null,
+    non_contattare: fd.get("non_contattare") === "on",
     indirizzo: str(fd, "indirizzo"),
+    indirizzo2: str(fd, "indirizzo2"),
     citta: str(fd, "citta"),
     cap: str(fd, "cap"),
     provincia: str(fd, "provincia")?.toUpperCase() ?? null,
+    nazione: str(fd, "nazione"),
+    lingua: str(fd, "lingua"),
     fonte: (str(fd, "fonte") ?? "banco") as
       | "banco" | "sito" | "app" | "convenzione" | "import",
     consenso_marketing: consenso,
@@ -151,6 +168,46 @@ export async function aggiornaCliente(
   redirect(`/clienti/${clienteId}`);
 }
 
+/** Registra i consensi raccolti (anche su carta, con data retrodatabile) — audit A6. */
+export async function registraConsensi(
+  clienteId: string,
+  _prev: { errore: string } | null,
+  formData: FormData
+): Promise<{ errore: string } | null> {
+  const supabase = await createClient();
+  const marketing = formData.get("consenso_marketing") === "on";
+  const sanitario = formData.get("consenso_dati_sanitari") === "on";
+  if (!marketing && !sanitario) {
+    return { errore: "Spunta almeno un consenso da registrare." };
+  }
+  const tsDa = (campo: string): string => {
+    const d = str(formData, campo);
+    return d ? new Date(`${d}T12:00:00`).toISOString() : new Date().toISOString();
+  };
+
+  const patch: {
+    consenso_marketing?: boolean;
+    data_consenso?: string;
+    consenso_dati_sanitari?: string;
+    consenso_sanitario_il?: string;
+  } = {};
+  if (marketing) {
+    patch.consenso_marketing = true;
+    patch.data_consenso = tsDa("data_marketing");
+  }
+  if (sanitario) {
+    const ts = tsDa("data_sanitario");
+    patch.consenso_dati_sanitari = ts;
+    patch.consenso_sanitario_il = ts;
+  }
+
+  const { error } = await supabase.from("clienti").update(patch).eq("id", clienteId);
+  if (error) return { errore: `Consensi non salvati: ${error.message}` };
+
+  revalidatePath(`/clienti/${clienteId}`);
+  return null;
+}
+
 /* ── Prescrizioni ──────────────────────────────────────────────────── */
 
 export async function creaPrescrizione(
@@ -187,6 +244,24 @@ export async function creaPrescrizione(
     .maybeSingle();
   if (!utenteRow) return { errore: "Profilo non trovato: rifai il login." };
 
+  // Gate consenso dati sanitari (audit A6): la prescrizione crea dati art. 9 GDPR.
+  // Se il cliente non ha il consenso, la spunta è obbligatoria e aggiorna la scheda.
+  const { data: cli } = await supabase
+    .from("clienti")
+    .select("consenso_dati_sanitari")
+    .eq("id", clienteId)
+    .maybeSingle();
+  if (cli && !cli.consenso_dati_sanitari) {
+    if (formData.get("consenso_dati_sanitari") !== "on") {
+      return { errore: "Serve il consenso al trattamento dei dati sanitari per registrare la prescrizione." };
+    }
+    const ora = new Date().toISOString();
+    await supabase
+      .from("clienti")
+      .update({ consenso_dati_sanitari: ora, consenso_sanitario_il: ora })
+      .eq("id", clienteId);
+  }
+
   const { error } = await supabase.from("prescrizioni").insert({
     azienda_id: utenteRow.azienda_id,
     cliente_id: clienteId,
@@ -213,6 +288,8 @@ export async function creaPrescrizione(
     od_diametro: tipo === "lac" ? num(formData, "od_diametro") : null,
     os_raggio: tipo === "lac" ? num(formData, "os_raggio") : null,
     os_diametro: tipo === "lac" ? num(formData, "os_diametro") : null,
+    od_dnp: tipo === "occhiali" ? num(formData, "od_dnp") : null,
+    os_dnp: tipo === "occhiali" ? num(formData, "os_dnp") : null,
     validita_mesi: num(formData, "validita_mesi") ?? 12,
     note: str(formData, "note"),
   });
@@ -427,6 +504,16 @@ export async function creaBusta(_prev: Esito, formData: FormData): Promise<Esito
   if (acconto < 0) acconto = 0;
   if (acconto > totale) acconto = totale;
 
+  // La caparra nasce con un metodo (§2.1 Fase 4c): se c'è acconto, serve il metodo.
+  const accontoMetodo = str(formData, "acconto_metodo");
+  if (acconto > 0 && !accontoMetodo) {
+    return { errore: "Indica con quale metodo hai incassato la caparra." };
+  }
+
+  // Garanzia tipizzata (B1): servizio (default) o polizza di compagnia.
+  const garanziaTipoRaw = str(formData, "garanzia_tipo");
+  const garanzia_tipo = garanziaTipoRaw === "polizza" ? "polizza" : "servizio";
+
   const prof = await profiloCorrente(supabase);
   if ("errore" in prof) return prof;
 
@@ -463,10 +550,13 @@ export async function creaBusta(_prev: Esito, formData: FormData): Promise<Esito
       od_altezza: (od_altezza as { v: number | null }).v,
       os_altezza: (os_altezza as { v: number | null }).v,
       garanzia: str(formData, "garanzia"),
+      garanzia_tipo,
       prezzo_extra,
       sconto,
       totale,
       acconto,
+      acconto_metodo: acconto > 0 ? accontoMetodo : null,
+      acconto_incassato_il: acconto > 0 ? new Date().toISOString() : null,
       laboratorio: str(formData, "laboratorio"),
       data_promessa: str(formData, "data_promessa"),
       note: str(formData, "note"),
@@ -575,7 +665,7 @@ export async function eventoBusta(
 
   const { data: busta } = await supabase
     .from("ordini_occhiali")
-    .select("stato, note, totale")
+    .select("stato, note, totale, acconto, acconto_incassato_il")
     .eq("id", id)
     .maybeSingle();
   if (!busta) return { errore: "Busta non trovata." };
@@ -591,6 +681,13 @@ export async function eventoBusta(
       if (acconto > busta.totale) acconto = busta.totale;
       patch.stato = "lavorazione";
       patch.acconto = acconto;
+      // La caparra entra in cassa alla conferma: metodo obbligatorio, data la prima volta (§2.1).
+      if (acconto > 0) {
+        const accontoMetodo = str(formData, "acconto_metodo");
+        if (!accontoMetodo) return { errore: "Indica con quale metodo hai incassato la caparra." };
+        patch.acconto_metodo = accontoMetodo;
+        if (!busta.acconto_incassato_il) patch.acconto_incassato_il = new Date().toISOString();
+      }
       break;
     }
     case "arriva":
@@ -698,6 +795,7 @@ const TIPI_PRODOTTO = [
   "lac",
   "soluzione",
   "montatura",
+  "sole",
   "lente",
   "accessorio",
   "servizio",
@@ -709,7 +807,7 @@ function prodottoDaForm(fd: FormData) {
     ? (tipoRaw as (typeof TIPI_PRODOTTO)[number])
     : "accessorio";
 
-  // parametri LAC (§2.10); per gli altri tipi resta {}.
+  // Parametri per-tipo nel jsonb (§2.5 Fase 4b); per gli altri tipi resta {}.
   const parametri: Record<string, unknown> =
     tipo === "lac"
       ? {
@@ -717,7 +815,19 @@ function prodottoDaForm(fd: FormData) {
           diametro: num(fd, "par_diametro"),
           confezione: str(fd, "par_confezione"),
         }
-      : {};
+      : tipo === "montatura" || tipo === "sole"
+        ? {
+            calibro: num(fd, "par_calibro"),
+            ponte: num(fd, "par_ponte"),
+            asta: num(fd, "par_asta"),
+            colore_codice: str(fd, "par_colore_codice"),
+            colore_nome: str(fd, "par_colore_nome"),
+            materiale: str(fd, "par_materiale"),
+          }
+        : {};
+
+  // Ricambio LAC → colonna dedicata (raffina l'esaurimento richiami).
+  const ricambio_giorni = tipo === "lac" ? num(fd, "ricambio_giorni") : null;
 
   return {
     tipo,
@@ -730,6 +840,7 @@ function prodottoDaForm(fd: FormData) {
     costo: num(fd, "costo"),
     scorta_minima: Math.max(0, Math.round(num(fd, "scorta_minima") ?? 0)),
     visibile_sito: fd.get("visibile_sito") === "on",
+    ricambio_giorni: ricambio_giorni != null && ricambio_giorni > 0 ? Math.round(ricambio_giorni) : null,
     parametri: parametri as Json,
   };
 }
@@ -1462,13 +1573,26 @@ export async function annullaVendita(id: string, _prev: Esito, formData: FormDat
   const supabase = await createClient();
   const { data: v } = await supabase
     .from("vendite")
-    .select("stato, righe, numero, note, azienda_id")
+    .select("stato, righe, numero, note, azienda_id, data_vendita, busta_id, ordine_lac_id")
     .eq("id", id)
     .maybeSingle();
   if (!v) return { errore: "Vendita non trovata." };
   if (v.stato !== "emessa") return { errore: "La vendita è già annullata." };
   const motivo = str(formData, "motivo");
   if (!motivo) return { errore: "Indica un motivo per l'annullo." };
+
+  // Guardrail temporale (A4): annullo solo su vendite di oggi e a giornata non chiusa;
+  // oltre, la strada è il reso.
+  const oggi = new Date().toISOString().slice(0, 10);
+  const giornoVendita = (v.data_vendita ?? "").slice(0, 10);
+  if (giornoVendita && giornoVendita !== oggi) {
+    return { errore: "La vendita è di un giorno passato: registra un reso, non un annullo." };
+  }
+  const { data: chiusuraGiorno } = await supabase
+    .from("chiusure_cassa").select("id").eq("data", giornoVendita || oggi).maybeSingle();
+  if (chiusuraGiorno) {
+    return { errore: "La giornata è già chiusa: per rendere il denaro registra un reso, non un annullo." };
+  }
 
   const prof = await profiloCorrente(supabase);
   if ("errore" in prof) return prof;
@@ -1479,8 +1603,13 @@ export async function annullaVendita(id: string, _prev: Esito, formData: FormDat
     .eq("id", id);
   if (error) return { errore: `Annullo non riuscito: ${error.message}` };
 
-  const righe = (Array.isArray(v.righe) ? v.righe : []) as RigaVendita[];
-  await movimentiDaRighe(supabase, v.azienda_id, prof.id, righe, "carico", `Annullo ${v.numero}`);
+  // Rientro magazzino SOLO per le vendite libere: se la vendita è la consegna di un
+  // ordine, la merce è dal cliente → nessun rientro (si passa dal reso con righe).
+  const daOrdine = !!(v.busta_id || v.ordine_lac_id);
+  if (!daOrdine) {
+    const righe = (Array.isArray(v.righe) ? v.righe : []) as RigaVendita[];
+    await movimentiDaRighe(supabase, v.azienda_id, prof.id, righe, "carico", `Annullo ${v.numero}`);
+  }
 
   revalidatePath("/cassa");
   revalidatePath(`/cassa/vendite/${id}`);
@@ -1698,7 +1827,7 @@ export async function annullaBustaConRestituzione(
   const supabase = await createClient();
   const { data: b } = await supabase
     .from("ordini_occhiali")
-    .select("stato, acconto, numero, note, caparra_incamerata_il, cliente_id")
+    .select("stato, acconto, numero, note, caparra_incamerata_il, cliente_id, acconto_metodo")
     .eq("id", bustaId)
     .maybeSingle();
   if (!b) return { errore: "Busta non trovata." };
@@ -1708,7 +1837,8 @@ export async function annullaBustaConRestituzione(
 
   const causaleRaw = str(formData, "causale") ?? "modifica_wo";
   const causale = (CAUSALI_RESO as readonly string[]).includes(causaleRaw) ? causaleRaw : "modifica_wo";
-  const metodoRimborso = str(formData, "metodo_rimborso") ?? "Contanti";
+  // Metodo di rimborso: quello scelto, o quello dell'incasso, o Contanti (§2.4).
+  const metodoRimborso = str(formData, "metodo_rimborso") ?? b.acconto_metodo ?? "Contanti";
 
   const prof = await profiloCorrente(supabase);
   if ("errore" in prof) return prof;
@@ -1727,6 +1857,7 @@ export async function annullaBustaConRestituzione(
       causale: causale as (typeof CAUSALI_RESO)[number],
       importo: b.acconto,
       metodo_rimborso: metodoRimborso,
+      busta_id: bustaId,
       doc_origine_numero: b.numero,
       note: `Restituzione caparra busta ${b.numero}`,
     })
@@ -1788,22 +1919,17 @@ export async function chiudiCassa(_prev: Esito, formData: FormData): Promise<Esi
   const inizio = `${oggi}T00:00:00`;
   const fine = `${oggi}T23:59:59`;
 
-  const [{ data: vendite }, { data: resi }] = await Promise.all([
+  const [{ data: vendite }, { data: resi }, { data: accontiOggi }] = await Promise.all([
     supabase.from("vendite").select("pagamenti, righe, totale").eq("stato", "emessa").gte("data_vendita", inizio).lte("data_vendita", fine),
-    supabase.from("resi").select("tipo, metodo_rimborso, importo").eq("tipo", "denaro").gte("created_at", inizio).lte("created_at", fine),
+    supabase.from("resi").select("tipo, metodo_rimborso, importo, busta_id").eq("tipo", "denaro").gte("created_at", inizio).lte("created_at", fine),
+    supabase.from("ordini_occhiali").select("acconto, acconto_metodo").gte("acconto_incassato_il", inizio).lte("acconto_incassato_il", fine),
   ]);
 
-  // Sistema per metodo
-  const sistemaMetodo = new Map<string, number>();
-  for (const v of vendite ?? []) {
-    for (const p of (Array.isArray(v.pagamenti) ? v.pagamenti : []) as PagamentoVendita[]) {
-      sistemaMetodo.set(p.nome, euro2((sistemaMetodo.get(p.nome) ?? 0) + p.importo));
-    }
-  }
-  for (const r of resi ?? []) {
-    const m = r.metodo_rimborso ?? "Contanti";
-    sistemaMetodo.set(m, euro2((sistemaMetodo.get(m) ?? 0) - r.importo));
-  }
+  // Sistema per metodo — formula condivisa con la homepage (§2.2): la caparra scalata
+  // esce dal conteggio, gli acconti incassati oggi entrano col loro metodo.
+  const resiDenaro = resi ?? [];
+  const acconti = accontiOggi ?? [];
+  const sistemaMetodo = sistemaPerMetodo(vendite ?? [], resiDenaro, acconti);
 
   // Sistema per aliquota (imponibile+iva = importo lordo per aliquota)
   const sistemaAliquota = new Map<string, number>();
@@ -1830,6 +1956,7 @@ export async function chiudiCassa(_prev: Esito, formData: FormData): Promise<Esi
   const quadratura: { metodo: string; sistema: number; dichiarato: number; differenza: number; causale: string | null }[] = [];
   for (const q of quadRaw) {
     const metodo = String(q.metodo);
+    if (metodo.toLowerCase() === NOME_CAPARRA) continue; // la caparra non è denaro del giorno
     const isContanti = metodo.toLowerCase() === "contanti";
     const sistema = euro2(sistemaMetodo.get(metodo) ?? 0);
     const dichiarato = euro2(Number(q.dichiarato) || 0);
@@ -1856,25 +1983,21 @@ export async function chiudiCassa(_prev: Esito, formData: FormData): Promise<Esi
     return { aliquota: a, stampante, sistema, differenza: euro2(stampante - sistema) };
   });
 
-  // Caparre del giorno
-  const [{ data: ordiniOggi }, { data: movIncamero }] = await Promise.all([
-    supabase.from("ordini_occhiali").select("acconto").gte("created_at", inizio).lte("created_at", fine),
-    supabase.from("movimenti_cassa").select("importo").eq("tipo", "incamero_caparra").gte("created_at", inizio).lte("created_at", fine),
-  ]);
-  const caparreEmesse = euro2((ordiniOggi ?? []).reduce((s, o) => s + (o.acconto ?? 0), 0));
-  let caparreScontate = 0;
-  for (const v of vendite ?? []) {
-    for (const p of (Array.isArray(v.pagamenti) ? v.pagamenti : []) as PagamentoVendita[]) {
-      if (p.nome.toLowerCase() === "caparra") caparreScontate = euro2(caparreScontate + p.importo);
-    }
-  }
-  const caparreIncamerate = euro2((movIncamero ?? []).reduce((s, m) => s + m.importo, 0));
-
-  const riepilogo = {
-    quadratura,
-    confronto_rt,
-    caparre: { emesse: caparreEmesse, scontate: caparreScontate, incamerate: caparreIncamerate },
+  // Caparre del giorno — quattro contatori (§2.4): emesse ancorate all'incasso,
+  // rese = restituzioni con busta_id, incamerate dai movimenti dedicati.
+  const { data: movIncamero } = await supabase
+    .from("movimenti_cassa").select("importo").eq("tipo", "incamero_caparra").gte("created_at", inizio).lte("created_at", fine);
+  const caparre = {
+    ...contatoriCaparre({
+      accontiEmessiOggi: acconti,
+      venditeOggi: vendite ?? [],
+      resiCaparraOggi: resiDenaro.filter((r) => r.busta_id),
+      incameriOggi: movIncamero ?? [],
+    }),
+    senzaMetodo: caparreSenzaMetodo(acconti),
   };
+
+  const riepilogo = { quadratura, confronto_rt, caparre };
 
   const { error } = await supabase.from("chiusure_cassa").insert({
     azienda_id: prof.azienda_id,

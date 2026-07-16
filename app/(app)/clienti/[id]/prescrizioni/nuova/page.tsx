@@ -13,7 +13,7 @@ export default async function NuovaPrescrizionePage({
 
   const { data: cliente } = await supabase
     .from("clienti")
-    .select("id, nome, cognome")
+    .select("id, nome, cognome, consenso_dati_sanitari")
     .eq("id", id)
     .maybeSingle();
 
@@ -25,7 +25,7 @@ export default async function NuovaPrescrizionePage({
         titolo="Nuova prescrizione"
         sotto={`Per ${cliente.cognome} ${cliente.nome} · convenzione cilindro negativo, asse 0–180`}
       />
-      <PrescrizioneForm clienteId={cliente.id} />
+      <PrescrizioneForm clienteId={cliente.id} consensoSanitario={!!cliente.consenso_dati_sanitari} />
     </div>
   );
 }

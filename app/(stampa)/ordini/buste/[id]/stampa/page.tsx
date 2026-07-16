@@ -99,6 +99,12 @@ export default async function StampaBustaPage({
                 {fmtDiottria(p.addizione)}
               </p>
             )}
+            {(p.od_dnp != null || p.os_dnp != null) && (
+              <p>
+                <span className="mr-3 inline-block w-8 font-bold">DNP</span>
+                OD {p.od_dnp ?? "—"} · OS {p.os_dnp ?? "—"} mm
+              </p>
+            )}
           </div>
         ) : (
           <p className="text-neutral-600">Nessuna prescrizione collegata.</p>

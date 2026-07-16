@@ -20,13 +20,24 @@ export default async function NuovaBustaPage({
     clientePre = data;
   }
 
+  // Metodi con cui si può incassare la caparra (esclusa la voce 'Caparra').
+  const { data: metodiRow } = await supabase
+    .from("metodi_pagamento")
+    .select("nome, tipo")
+    .eq("attivo", true)
+    .order("ordine");
+  const metodi = (metodiRow ?? [])
+    .filter((m) => m.tipo !== "caparra")
+    .map((m) => m.nome);
+  const metodiCaparra = metodi.length ? metodi : ["Contanti", "Bancomat", "Mastercard"];
+
   return (
     <>
       <PageHeader
         titolo="Nuova busta lavoro"
         sotto="Dalla montatura alla centratura: l'ordine dell'occhiale, passo per passo."
       />
-      <WizardBusta clientePreselezionato={clientePre} />
+      <WizardBusta clientePreselezionato={clientePre} metodiCaparra={metodiCaparra} />
     </>
   );
 }

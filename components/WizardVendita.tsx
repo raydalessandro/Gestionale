@@ -35,6 +35,7 @@ export default function WizardVendita({
   pagamentiIniziali,
   cfIniziale,
   consegna,
+  giorniChiusi = [],
 }: {
   clientePreselezionato: ClienteMini | null;
   metodi: Metodo[];
@@ -42,6 +43,7 @@ export default function WizardVendita({
   pagamentiIniziali?: PagV[];
   cfIniziale?: string | null;
   consegna?: { tipo: "busta" | "lac"; id: string } | null;
+  giorniChiusi?: string[];
 }) {
   const azione = consegna ? incassaConsegna.bind(null, consegna.tipo, consegna.id) : creaVendita;
   const [stato, run, inCorso] = useActionState(azione, null);
@@ -55,6 +57,8 @@ export default function WizardVendita({
     pagamentiIniziali?.length ? pagamentiIniziali : [{ metodo_id: null, nome: "", importo: "0", consegnato: "" }]
   );
   const [riallineamento, setRiall] = useState(false);
+  const [dataVendita, setDataVendita] = useState("");
+  const giornoChiuso = riallineamento && dataVendita !== "" && giorniChiusi.includes(dataVendita);
   const [catAperto, setCatAperto] = useState(false);
   const [catTerm, setCatTerm] = useState("");
   const [catRis, setCatRis] = useState<{ id: string; marca: string | null; nome: string; prezzo: number; tipo: string }[]>([]);
@@ -262,7 +266,14 @@ export default function WizardVendita({
                 <span>Vendita di riallineamento (emergenza)<span className="block text-xs text-faint">l'unico modo per retrodatare: richiede numero e data del documento emesso a mano.</span></span>
               </label>
               {riallineamento && (
-                <Field label="Data vendita (passata)" className="mt-2"><input name="data_vendita" type="date" className={inputCls} /></Field>
+                <>
+                  <Field label="Data vendita (passata)" className="mt-2"><input name="data_vendita" type="date" value={dataVendita} onChange={(e) => setDataVendita(e.target.value)} className={inputCls} /></Field>
+                  {giornoChiuso && (
+                    <p className="mt-2 rounded-lg border border-ambra/40 bg-ambra-soft px-3 py-2 text-xs text-ambra">
+                      Questa giornata è già chiusa: la vendita resterà fuori dalle quadrature (comparirà nella lista, non nella chiusura).
+                    </p>
+                  )}
+                </>
               )}
             </div>
           )}

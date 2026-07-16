@@ -10,6 +10,8 @@ export type Proposta = {
   clienteNome: string;
   telefono: string | null;
   commerciale: boolean;
+  nonContattare: boolean;
+  canalePreferito: string | null;
   motivo: string;
   riferimento: string | null;
   valore: number | null;
@@ -81,7 +83,7 @@ export async function calcolaProposte(
   const conControlloFuturo = new Set((contrFuturi.data ?? []).map((a) => a.cliente_id).filter(Boolean));
 
   // ── Costruzione proposte grezze ──────────────────────────────────
-  type Grezza = Omit<Proposta, "clienteNome" | "telefono" | "commerciale">;
+  type Grezza = Omit<Proposta, "clienteNome" | "telefono" | "commerciale" | "nonContattare" | "canalePreferito">;
   const grezze: Grezza[] = [];
 
   // ritiro_sollecito — buste pronte non avvisate o avvisate da > 3gg
@@ -163,7 +165,7 @@ export async function calcolaProposte(
   // ── Dati cliente + GDPR + dedupe ─────────────────────────────────
   const clienteIds = [...new Set(grezze.map((g) => g.cliente_id))];
   const { data: clienti } = clienteIds.length
-    ? await supabase.from("clienti").select("id, nome, cognome, telefono, consenso_marketing").in("id", clienteIds)
+    ? await supabase.from("clienti").select("id, nome, cognome, telefono, consenso_marketing, non_contattare, canale_preferito").in("id", clienteIds)
     : { data: [] };
   const infoCliente = new Map((clienti ?? []).map((c) => [c.id, c]));
 
@@ -181,13 +183,17 @@ export async function calcolaProposte(
     if (bloccati.has(`${g.tipo}|${g.cliente_id}|${g.riferimento ?? ""}`)) continue;
 
     const commerciale = COMMERCIALI.has(g.tipo);
-    if (commerciale && !c.consenso_marketing) {
+    // Le proposte commerciali spariscono sia senza consenso marketing sia col
+    // "Non contattare" (stessa meccanica, stessa riga di conteggio §2.3).
+    if (commerciale && (!c.consenso_marketing || c.non_contattare)) {
       nascosteCommerciali++;
       continue;
     }
     proposte.push({
       ...g,
       commerciale,
+      nonContattare: c.non_contattare ?? false,
+      canalePreferito: c.canale_preferito ?? null,
       clienteNome: `${c.cognome} ${c.nome}`,
       telefono: c.telefono,
     });

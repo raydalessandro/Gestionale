@@ -38,6 +38,10 @@ export default async function NuovaVenditaPage({
   }
   const metodiAttivi = (metodi ?? []).filter((m) => m.attivo).map((m) => ({ id: m.id, nome: m.nome, tipo: m.tipo }));
 
+  // Giornate già chiuse: avviso non bloccante sul riallineamento (A5).
+  const { data: chiusureRows } = await supabase.from("chiusure_cassa").select("data");
+  const giorniChiusi = (chiusureRows ?? []).map((c) => c.data);
+
   let righeIniziali: RigaV[] | undefined;
   let pagamentiIniziali: PagV[] | undefined;
   let clientePre: { id: string; nome: string; cognome: string; codice_fiscale?: string | null } | null = null;
@@ -53,7 +57,8 @@ export default async function NuovaVenditaPage({
       if (b.prezzo_montatura > 0 || b.prezzo_lenti > 0) {
         if (b.prezzo_montatura > 0) rr.push(riga({ descrizione: `Montatura ${[b.montatura_marca, b.montatura_modello].filter(Boolean).join(" ")}`.trim(), prezzo_unitario: String(b.prezzo_montatura), aliquota: aliqMont, dm: true }));
         if (b.prezzo_lenti > 0) rr.push(riga({ descrizione: `Lenti${b.lente_tipo ? ` ${b.lente_tipo}` : ""}${b.lente_indice ? ` ${b.lente_indice}` : ""}`.trim(), prezzo_unitario: String(b.prezzo_lenti), aliquota: "4", dm: true }));
-        if (b.prezzo_extra > 0) rr.push(riga({ descrizione: b.garanzia ? `Extra / ${b.garanzia}` : "Extra", prezzo_unitario: String(b.prezzo_extra), aliquota: "22", dm: false }));
+        // Garanzia tipizzata (B1): polizza di compagnia → esente (fuori campo IVA); servizio → 22%.
+        if (b.prezzo_extra > 0) rr.push(riga({ descrizione: b.garanzia ? `Extra / ${b.garanzia}` : "Extra", prezzo_unitario: String(b.prezzo_extra), aliquota: b.garanzia_tipo === "polizza" ? "esente" : "22", dm: false }));
         if (b.sconto > 0 && rr.length > 0) rr[0].sconto = String(b.sconto);
       } else {
         rr.push(riga({ descrizione: `Occhiale — ${b.numero}`, prezzo_unitario: String(b.totale), aliquota: aliqMont, dm: true }));
@@ -95,6 +100,7 @@ export default async function NuovaVenditaPage({
         pagamentiIniziali={pagamentiIniziali}
         cfIniziale={cfIniziale}
         consegna={consegna}
+        giorniChiusi={giorniChiusi}
       />
     </>
   );

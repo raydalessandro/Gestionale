@@ -1,4 +1,4 @@
-*Aggiornato a: v0.3 (Fase 2)*
+*Aggiornato a: v0.5.1 (Fase 4b)*
 
 # Magazzino
 
@@ -16,21 +16,38 @@ Il modulo ha tre schede in alto: **Prodotti**, **Movimenti**, **Fermi**.
 ### Creare un prodotto
 
 1. In **Magazzino**, scheda **Prodotti**, premi **"Nuovo prodotto"**.
-2. Scegli il **Tipo**: Lente a contatto, Soluzione, Montatura, Lente
-   oftalmica, Accessorio o Servizio.
+2. Scegli il **Tipo**: Lente a contatto, Soluzione, Montatura, **Occhiale da
+   sole**, Lente oftalmica, Accessorio o Servizio.
 3. Metti **Marca** e **Nome** (il nome è obbligatorio, es. "Acuvue Oasys
    1-Day 30pz").
 4. Se vuoi, aggiungi lo **SKU / barcode** (il codice EAN/UPC, uno per
    prodotto) e il **Fornitore**.
-5. Quando il tipo è **Lente a contatto** compaiono tre campi dedicati:
-   **Raggio (BC)**, **Diametro (DIA)** e **Confezione** (es. "×6"). Sono i
-   valori che ritrovi in automatico quando ordini quella lente da catalogo.
-6. Imposta **Prezzo** (obbligatorio), eventuale **Costo** e la **Scorta
+5. In base al tipo compaiono i campi dedicati (vedi sotto: LAC, montature e
+   occhiali da sole).
+6. Imposta **Prezzo (€)** (obbligatorio), eventuale **Costo (€)** e la **Scorta
    minima** (0 = nessun avviso).
 7. Premi **"Crea prodotto"**.
 
 La **giacenza non è nel form**: un prodotto nuovo parte da zero e cresce con i
 carichi.
+
+### I campi delle lenti a contatto
+
+Quando il tipo è **Lente a contatto** compaiono i campi dedicati: **Raggio
+(BC)**, **Diametro (DIA)**, **Confezione** (es. "×6") e il **Ricambio**. Il
+ricambio dice ogni quanto la lente va cambiata — **Giornaliere**,
+**Quindicinali**, **Mensili**, **Trimestrali** — e serve a VISTA per stimare
+quando il cliente sta finendo la scorta, così i Richiami sanno quando
+proporlo.
+
+### I campi delle montature e degli occhiali da sole
+
+Per una **Montatura** o un **Occhiale da sole** compili i parametri della
+montatura: **Calibro (mm)**, **Ponte (mm)**, **Asta (mm)**, il colore in due
+campi (**Colore — codice** e **Colore — nome**) e il **Materiale** (es.
+Acetato). Il **calibro** poi lo ritrovi accanto al nome nella lista prodotti e
+nella scheda: così distingui a colpo d'occhio due montature uguali di calibro
+diverso.
 
 ### Caricare la merce da una bolla
 
@@ -85,6 +102,12 @@ tipo con le pastiglie in alto.
 
 ## Casi particolari
 
+- **Le lenti a contatto colorate senza gradazione.** Le LAC puramente
+  estetiche (colorate, di carnevale, senza correzione) **non** vanno create
+  come "Lente a contatto": creale come **Accessorio**. Le LAC graduate sono
+  dispositivi medici e vanno al 4%; quelle solo estetiche no, vanno al 22% e
+  senza dispositivo medico. Creandole come accessorio, in vendita escono
+  subito con l'aliquota giusta.
 - **Sotto scorta.** Se un prodotto attivo ha una scorta minima e la giacenza
   scende a quel livello o sotto, compare tra i **"Sotto scorta"**: lo vedi nel
   contatore in cima al Magazzino, con il filtro apposito e con un avviso nella
@@ -98,9 +121,12 @@ tipo con le pastiglie in alto.
   ricerche di default e da "Da catalogo", ma resta nei movimenti e lo ritrovi
   col filtro **"Disattivati"**. Puoi disattivarlo anche se ha ancora giacenza
   o fermi: VISTA avvisa, non blocca.
-- **Ordini LAC dal catalogo.** Quando in un ordine di lenti a contatto usi
-  **"Da catalogo"**, alla consegna dell'ordine la giacenza scende in
-  automatico (vedi il capitolo Ordini LAC).
+- **Quando la giacenza scende da sola.** La merce esce dal magazzino senza che
+  tu scriva niente in due casi: quando consegni un ordine di lenti a contatto
+  con righe **"Da catalogo"**, e quando incassi un ordine dalla cassa con
+  **"Consegna e incassa"**. In entrambi i casi lo scarico avviene una volta
+  sola, con il numero dell'ordine come riferimento (vedi i capitoli Ordini LAC
+  e Cassa).
 
 ## Se qualcosa non torna
 

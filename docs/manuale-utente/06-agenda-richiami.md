@@ -1,4 +1,4 @@
-*Aggiornato a: v0.4 (Fase 3)*
+*Aggiornato a: v0.5.1 (Fase 4b)*
 
 # Agenda e Richiami
 
@@ -110,8 +110,10 @@ Per lavorare un richiamo:
   chat con un messaggio già pronto (diverso per ogni motivo).
 - Poi premi **"Registra esito"**: scegli il **Canale** (Telefono, WhatsApp,
   SMS, Email, Di persona) e l'**Esito** (Appuntamento fissato, Da richiamare,
-  Non risponde, Non interessato, Gestito). Se c'è un valore te lo trova già
-  compilato, e puoi aggiungere una nota. Premi **"Salva esito"**.
+  Non risponde, Non interessato, Gestito). Se il cliente ha un **canale
+  preferito** nella sua scheda, il Canale è già proposto su quello, così non
+  devi ricordartelo. Se c'è un valore te lo trova già compilato, e puoi
+  aggiungere una nota. Premi **"Salva esito"**.
 
 Se scegli esito **"Appuntamento fissato"**, dopo il salvataggio VISTA ti porta
 in agenda già compilata, pronto a fissare l'orario.
@@ -156,14 +158,19 @@ resta tutta.
 
 ## Casi particolari
 
-- **Il consenso marketing conta (GDPR).** Sollecito ritiro, Promessa in
-  ritardo e Fermo in scadenza sono contatti operativi: il cliente aspetta la
-  sua merce, quindi te li proponiamo sempre. **LAC in esaurimento** e
-  **Controllo vista** sono invece contatti commerciali: compaiono **solo** per
-  i clienti che hanno dato il consenso marketing. Se qualcuno resta escluso,
-  in testa alla sezione leggi una riga sobria: "N proposte commerciali nascoste
-  per mancanza di consenso marketing". Togli o rimetti il consenso dalla scheda
-  cliente e le proposte spariscono o ricompaiono.
+- **Chi non vuole essere disturbato resta fuori dalle offerte.** Sollecito
+  ritiro, Promessa in ritardo e Fermo in scadenza sono contatti operativi: il
+  cliente aspetta la sua merce, quindi te li proponiamo sempre. **LAC in
+  esaurimento** e **Controllo vista** sono invece contatti commerciali:
+  compaiono **solo** per i clienti che hanno dato il consenso marketing e che
+  non hanno la spunta **"Non contattare per promozioni"**. Se qualcuno resta
+  escluso, in testa alla sezione leggi una riga sobria che conta le proposte
+  commerciali nascoste. Togli o rimetti il consenso (o la spunta "Non
+  contattare") dalla scheda cliente e le proposte spariscono o ricompaiono.
+- **Il badge "Non contattare" sulle proposte operative.** Un cliente con "Non
+  contattare" resta comunque tra le proposte operative (aspetta la sua merce),
+  ma accanto vedi il segnalino "Non contattare": ti ricorda di tenere la
+  telefonata sul pezzo, senza infilarci offerte.
 - **Richiamare non è fallire.** Se registri esito "Da richiamare", il tentativo
   resta nello storico e ti compare sotto un bottone **"Ripianifica"**: premilo,
   ti propone già la data fra tre giorni (puoi cambiarla) e con un clic rimette

@@ -50,8 +50,10 @@ function fuoriRange(s: string, min: number, max: number): boolean {
 
 export default function WizardBusta({
   clientePreselezionato,
+  metodiCaparra,
 }: {
   clientePreselezionato: ClienteMini | null;
+  metodiCaparra: string[];
 }) {
   const [stato, azione, inCorso] = useActionState(creaBusta, null);
   const supabase = createClient();
@@ -369,6 +371,17 @@ export default function WizardBusta({
               placeholder="Garanzia 24 mesi inclusa"
             />
           </Field>
+          <fieldset className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            <legend className="mb-1 text-[11px] uppercase tracking-wide text-faint">Tipo di garanzia</legend>
+            <label className="flex items-start gap-2 rounded-xl border border-linea bg-carta px-3 py-2 text-sm">
+              <input type="radio" name="garanzia_tipo" value="servizio" defaultChecked className="mt-0.5 accent-[#A67C42]" />
+              <span>Servizio del negozio<span className="block text-xs text-faint">In consegna nasce al 22%.</span></span>
+            </label>
+            <label className="flex items-start gap-2 rounded-xl border border-linea bg-carta px-3 py-2 text-sm">
+              <input type="radio" name="garanzia_tipo" value="polizza" className="mt-0.5 accent-[#A67C42]" />
+              <span>Polizza di compagnia<span className="block text-xs text-faint">In consegna nasce esente (fuori campo IVA).</span></span>
+            </label>
+          </fieldset>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <Field label="Prezzo extra (€)" hint="Accessori, servizi aggiuntivi.">
               <input
@@ -504,6 +517,16 @@ export default function WizardBusta({
               />
             </Field>
           </div>
+
+          {n(acconto) > 0 && (
+            <Field label="Metodo della caparra" hint="Con cosa incassi l'acconto: entra nella quadratura serale.">
+              <select name="acconto_metodo" defaultValue={metodiCaparra[0] ?? ""} className={inputCls} aria-label="metodo della caparra">
+                {metodiCaparra.map((m) => (
+                  <option key={m} value={m}>{m}</option>
+                ))}
+              </select>
+            </Field>
+          )}
 
           <div className="flex items-center justify-between rounded-xl border border-linea px-4 py-3">
             <span className="text-xs font-semibold uppercase tracking-wide text-soft">

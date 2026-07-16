@@ -5,6 +5,7 @@ export const ETICHETTE_TIPO_PRODOTTO: Record<string, string> = {
   lac: "Lente a contatto",
   soluzione: "Soluzione",
   montatura: "Montatura",
+  sole: "Occhiale da sole",
   lente: "Lente oftalmica",
   accessorio: "Accessorio",
   servizio: "Servizio",
@@ -39,6 +40,28 @@ export function parametriLac(parametri: unknown): {
     raggio: n(p.raggio),
     diametro: n(p.diametro),
     confezione: typeof p.confezione === "string" ? p.confezione : null,
+  };
+}
+
+/** Parametri montatura / sole salvati nel jsonb prodotti.parametri. */
+export function parametriMontatura(parametri: unknown): {
+  calibro: number | null;
+  ponte: number | null;
+  asta: number | null;
+  colore_codice: string | null;
+  colore_nome: string | null;
+  materiale: string | null;
+} {
+  const p = (parametri ?? {}) as Record<string, unknown>;
+  const n = (v: unknown) => (typeof v === "number" ? v : null);
+  const s = (v: unknown) => (typeof v === "string" && v !== "" ? v : null);
+  return {
+    calibro: n(p.calibro),
+    ponte: n(p.ponte),
+    asta: n(p.asta),
+    colore_codice: s(p.colore_codice),
+    colore_nome: s(p.colore_nome),
+    materiale: s(p.materiale),
   };
 }
 

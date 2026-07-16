@@ -9,6 +9,7 @@ export const ALIQUOTA_DA_TIPO: Record<
   lac: { aliquota: "4", dm: true },
   lente: { aliquota: "4", dm: true },
   montatura: { aliquota: "22", dm: true },
+  sole: { aliquota: "22", dm: true },
   soluzione: { aliquota: "22", dm: true },
   servizio: { aliquota: "22", dm: false },
   accessorio: { aliquota: "22", dm: false },
