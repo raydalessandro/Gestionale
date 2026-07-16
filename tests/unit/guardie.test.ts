@@ -302,4 +302,33 @@ describe("L4b · guardie di coerenza (codice morto, orfani, fantasmi)", () => {
       `moduli attivi senza capitolo di manuale (né in allowlist): ${scoperti.join(", ")}`
     ).toEqual([]);
   });
+
+  it("G10 · una sola formula di quadratura: i consumatori importano lib/cassa-calcoli, non la ricalcolano", () => {
+    // Audit A3 (Fase 4c): chiusura serale e homepage /cassa devono usare la
+    // STESSA formula pura di lib/cassa-calcoli, così il numero non litiga mai
+    // con se stesso. Guardia: i tre consumatori noti importano `sistemaPerMetodo`
+    // da cassa-calcoli e nessuno reimplementa a mano l'esclusione della voce
+    // 'Caparra' (il tranello classico dell'audit).
+    const consumatori = [
+      "app/(app)/cassa/page.tsx",
+      "app/(app)/cassa/chiusura/page.tsx",
+      "lib/actions.ts",
+    ];
+    const senzaImport: string[] = [];
+    const reimplementano: string[] = [];
+    for (const rel of consumatori) {
+      const src = leggi(rel);
+      if (!/from\s+["']@\/lib\/cassa-calcoli["']/.test(src)) senzaImport.push(rel);
+      if (!/\bsistemaPerMetodo\b/.test(src)) senzaImport.push(rel);
+      // reimplementazione = confronto letterale con la voce 'Caparra' fuori dal modulo pure
+      if (/["'`]caparra["'`]\s*(?:===|==|\.includes|\.toLowerCase)/i.test(src)) {
+        reimplementano.push(rel);
+      }
+    }
+    expect(senzaImport, `consumatori che non usano cassa-calcoli: ${senzaImport.join(", ")}`).toEqual([]);
+    expect(
+      reimplementano,
+      `consumatori che reimplementano l'esclusione 'Caparra' a mano: ${reimplementano.join(", ")}`
+    ).toEqual([]);
+  });
 });
