@@ -46,3 +46,48 @@ export function brandSicuro(grezzo: BrandGrezzo | null | undefined): BrandNegozi
   }
   return out;
 }
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * Leggibilità della testata (G5) — aritmetica, non estetica.
+ * La testata è testo sopra `brand.primary`. Un'insegna chiara (beige, avorio,
+ * azzurro pastello) con testo bianco fisso dà una pagina illeggibile davanti al
+ * cliente. Qui si sceglie il testo per contrasto, con la formula WCAG standard.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+const INCHIOSTRO = "#171512";
+const BIANCO = "#FFFFFF";
+
+/** "#RGB"/"#RRGGBB" → [r,g,b] in 0–255. Assume input già validato (coloreValido). */
+function canali(hex: string): [number, number, number] {
+  let h = hex.slice(1);
+  if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2];
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+
+/** Correzione gamma di un canale normalizzato 0–1, secondo WCAG. */
+function linearizza(c: number): number {
+  return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+
+/** Luminanza relativa (0–1) secondo WCAG 2.x, da un colore già validato. */
+export function luminanza(hex: string): number {
+  const [r, g, b] = canali(hex).map((v) => linearizza(v / 255));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** Rapporto di contrasto WCAG fra due colori: (Lchiaro+0.05)/(Lscuro+0.05). */
+export function contrasto(a: string, b: string): number {
+  const la = luminanza(a);
+  const lb = luminanza(b);
+  const [hi, lo] = la >= lb ? [la, lb] : [lb, la];
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+/**
+ * Il colore di testo leggibile sopra `fondo`: inchiostro Limpidia o bianco,
+ * quello col rapporto di contrasto più alto. Su un fondo chiaro vince
+ * l'inchiostro, su uno scuro il bianco.
+ */
+export function testoSuFondo(fondo: string): typeof INCHIOSTRO | typeof BIANCO {
+  return contrasto(fondo, INCHIOSTRO) >= contrasto(fondo, BIANCO) ? INCHIOSTRO : BIANCO;
+}

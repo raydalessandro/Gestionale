@@ -518,3 +518,29 @@ export type NegozioPubblicoRow = {
   provincia: string | null;
   brand: BrandGrezzo | null;
 };
+
+/* Portale G5 — righe delle viste pubbliche di orari/servizi/chiusure (mig 010). */
+
+/** Riga di `orari_pubblici`. `apre`/`chiude` sono `time` → "HH:MM:SS". */
+export type OrarioPubblicoRow = {
+  slug: string;
+  giorno: number; // 0=domenica … 6=sabato
+  apre: string;
+  chiude: string;
+};
+
+/** Riga di `chiusure_pubbliche` — SENZA `motivo` (fatto interno del negozio). */
+export type ChiusuraPubblicaRow = {
+  slug: string;
+  dal: string; // date "YYYY-MM-DD"
+  al: string;
+};
+
+/** Riga di `servizi_pubblici`. `durata_minuti` = deroga del negozio o predefinita. */
+export type ServizioPubblicoRow = {
+  slug: string;
+  codice: string;
+  etichetta: string;
+  durata_minuti: number;
+  ordine: number;
+};

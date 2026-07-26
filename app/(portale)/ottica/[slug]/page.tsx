@@ -1,26 +1,49 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
-import { negozioDaSlug } from "@/lib/portale/negozio";
-import { brandSicuro } from "@/lib/portale/brand";
-import type { NegozioPubblicoRow } from "@/lib/database.types";
+import {
+  negozioDaSlug,
+  orariDaSlug,
+  chiusureDaSlug,
+  serviziDaSlug,
+} from "@/lib/portale/negozio";
+import { brandSicuro, testoSuFondo } from "@/lib/portale/brand";
+import {
+  raggruppaOrari,
+  statoApertura,
+  dataItaliana,
+  type RigaOrario,
+} from "@/lib/portale/orari";
+import type {
+  NegozioPubblicoRow,
+  OrarioPubblicoRow,
+  ServizioPubblicoRow,
+} from "@/lib/database.types";
 import { Btn, Eyebrow } from "@/components/portale/primitivi";
 import { Icona } from "@/components/portale/Icone";
 import { LogoLimpidia, SimboloLimpidia } from "@/components/portale/Marchio";
 
 /**
- * Pagina pubblica del negozio (G4): /ottica/[slug]. Ci atterra il QR in vetrina.
- * Server component, nessuna interattività, nessun service role: legge solo la
- * vista `negozi_pubblici` con la chiave anon (vedi lib/portale/negozio.ts).
+ * Pagina pubblica del negozio: /ottica/[slug]. Ci atterra il QR in vetrina.
+ * Server component, nessuna interattività, nessun service role: legge solo le
+ * viste pubbliche con la chiave anon (vedi lib/portale/negozio.ts).
  *
- * In questa consegna NON si prenota: il motore (disponibilità/prenotazioni)
- * arriva in G6/G7 e si innesta qui. Vedi le due cuciture per il futuro:
- *  • `modalita` — oggi sempre "portale"; domani "sito_negozio" sarà QUESTA
- *    stessa pagina con gli elementi dell'aggregatore spenti;
- *  • il CTA di prenotazione — presente nella posizione definitiva, ma inerte.
+ * G4: chi è, dov'è. G5: quando è aperto e cosa fa — le due domande per cui una
+ * persona apre la pagina dopo un QR alle nove di sera. NON si prenota ancora
+ * (motore in G6/G7): il CTA resta inerte.
  */
 
+// force-dynamic: l'indicatore «Aperto ora» è calcolato in ora corrente; una
+// pagina statica lo congelerebbe al momento della build. Oggi la correttezza
+// vale più di qualche millisecondo — la strategia di cache si rivede col traffico.
+export const dynamic = "force-dynamic";
+
 type Modalita = "portale" | "sito_negozio";
+
+// Nomi giorno di schema.org, indicizzati per `giorno` (0=domenica … 6=sabato).
+const GIORNI_SCHEMA = [
+  "Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday",
+] as const;
 
 /** URL assoluto della pagina corrente, per canonical e JSON-LD. */
 async function urlCanonico(slug: string): Promise<string> {
@@ -72,28 +95,50 @@ export default async function PaginaNegozio({
   const { slug } = await params;
   const negozio = await negozioDaSlug(slug);
 
-  // Slug inesistente o negozio non pubblicato (la vista filtra portale_attivo):
+  // Slug inesistente o negozio non pubblicato (le viste filtrano portale_attivo):
   // 404 vera, non 500 e non pagina vuota. Per il pubblico quel negozio non esiste.
   if (!negozio) notFound();
 
+  // Le tre letture di vetrina sono indipendenti: in parallelo.
+  const [orari, chiusure, servizi] = await Promise.all([
+    orariDaSlug(slug),
+    chiusureDaSlug(slug),
+    serviziDaSlug(slug),
+  ]);
+
   const brand = brandSicuro(negozio.brand);
+  // Contrasto della testata: aritmetica, non estetica. Il testo (e quindi bordi
+  // e sfumature che ne seguono il colore) si sceglie per leggibilità sul primary.
+  const testo = testoSuFondo(brand.primary);
   const modalita: Modalita = "portale"; // cucitura §8: domani anche "sito_negozio"
   const canonico = await urlCanonico(slug);
   const indirizzo = indirizzoInLinea(negozio);
 
+  const stato = statoApertura(orari, chiusure, new Date());
+  const righeOrario = raggruppaOrari(orari);
+  const haOrari = orari.length > 0;
+
   return (
     <div className="mx-auto min-h-screen max-w-[520px] pb-16">
-      <JsonLdOptician negozio={negozio} url={canonico} indirizzo={indirizzo} />
+      <JsonLdOptician
+        negozio={negozio}
+        url={canonico}
+        indirizzo={indirizzo}
+        orari={orari}
+        servizi={servizi}
+      />
 
-      {/* Testata brandata col colore del negozio. brand.* è VALIDATO
-          (lib/portale/brand.ts): solo qui, come colore inline, entra un valore
-          dinamico — mai grezzo dal DB. */}
+      {/* Testata brandata. brand.primary è VALIDATO; `testo` (inchiostro o bianco)
+          è scelto per contrasto e guida anche il bordo del tondo e la tagline. */}
       <header
-        className="px-5 pb-7 pt-8 text-white"
-        style={{ backgroundColor: brand.primary }}
+        className="px-5 pb-7 pt-8"
+        style={{ backgroundColor: brand.primary, color: testo }}
       >
         <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-white/50 font-lim-display text-[22px] font-bold">
+          <div
+            className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 font-lim-display text-[22px] font-bold"
+            style={{ borderColor: `${testo}80` }}
+          >
             {negozio.logo_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={negozio.logo_url} alt="" className="h-full w-full object-cover" />
@@ -113,14 +158,67 @@ export default async function PaginaNegozio({
       </header>
 
       <main className="px-5 pt-6">
-        {/* CTA di prenotazione — posizione definitiva, ma INERTE (§8). Il motore
-            di prenotazione arriva in G6/G7. */}
+        {/* Aperto ora / Chiuso — calcolato in ora italiana, tenuto conto delle ferie. */}
+        <StatoApertura stato={stato} />
+
+        {/* CTA di prenotazione — posizione definitiva, ma INERTE (§8, G6/G7). */}
         <Btn full disabled>
           Prenotazione in arrivo
         </Btn>
         <p className="mb-7 mt-2.5 text-center text-[13px] text-lim-soft">
           Presto potrai prenotare un appuntamento da qui.
         </p>
+
+        {/* Servizi attivi, nell'ordine del catalogo. Nessun prezzo: non li abbiamo. */}
+        {servizi.length > 0 && (
+          <>
+            <Eyebrow>Servizi</Eyebrow>
+            <div className="mb-6 overflow-hidden rounded-2xl border border-lim-linea bg-white">
+              {servizi.map((s, i) => (
+                <div
+                  key={s.codice}
+                  className={`flex items-center justify-between gap-3 px-[18px] py-4 ${
+                    i < servizi.length - 1 ? "border-b border-lim-linea" : ""
+                  }`}
+                >
+                  <span className="text-[15.5px] font-semibold text-lim-inchiostro">
+                    {s.etichetta}
+                  </span>
+                  <span className="shrink-0 text-[13px] text-lim-soft">{s.durata_minuti} min</span>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
+
+        {/* Orari raggruppati come li legge una persona. */}
+        {haOrari && (
+          <>
+            <Eyebrow>Orari di apertura</Eyebrow>
+            <div className="mb-6 rounded-2xl border border-lim-linea bg-white p-[18px]">
+              <div className="mb-3 flex items-center gap-3 text-lim-soft">
+                <Icona nome="orologio" size={19} />
+                <span className="text-[13px] font-semibold uppercase tracking-wide">
+                  La settimana
+                </span>
+              </div>
+              <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1.5 text-[14.5px]">
+                {righeOrario.map((r: RigaOrario) => (
+                  <div key={r.giorni} className="contents">
+                    <dt className="font-semibold text-lim-inchiostro">{r.giorni}</dt>
+                    <dd
+                      className={`text-right ${
+                        r.orario === "Chiuso" ? "text-lim-faint" : "text-lim-soft"
+                      }`}
+                    >
+                      {r.orario}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </div>
+          </>
+        )}
 
         {/* Dove siamo */}
         {indirizzo && (
@@ -150,21 +248,68 @@ export default async function PaginaNegozio({
   );
 }
 
-/** Dati strutturati minimi: Optician con nome, indirizzo e URL canonico (§9). */
+/** Indicatore «Aperto ora / Chiuso», con eventuale nota di chiusura per ferie. */
+function StatoApertura({
+  stato,
+}: {
+  stato: { aperto: boolean; feriaAlISO: string | null };
+}) {
+  if (stato.feriaAlISO) {
+    return (
+      <div className="mb-4 flex items-center gap-2.5 text-[14px]">
+        <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-lim-faint" />
+        <span className="font-semibold text-lim-soft">
+          Chiuso per ferie fino al {dataItaliana(stato.feriaAlISO)}
+        </span>
+      </div>
+    );
+  }
+  return (
+    <div className="mb-4 flex items-center gap-2.5 text-[14px]">
+      <span
+        className="h-2.5 w-2.5 shrink-0 rounded-full"
+        style={{ backgroundColor: stato.aperto ? "#1E7A52" : "#8B877F" }}
+      />
+      <span
+        className="font-semibold"
+        style={{ color: stato.aperto ? "#1E7A52" : "#6E6A64" }}
+      >
+        {stato.aperto ? "Aperto ora" : "Chiuso ora"}
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Dati strutturati: Optician con nome, indirizzo, URL, orari veri
+ * (openingHoursSpecification) e servizi (hasOfferCatalog). Le chiusure
+ * straordinarie NON entrano nei dati strutturati.
+ */
 function JsonLdOptician({
   negozio,
   url,
   indirizzo,
+  orari,
+  servizi,
 }: {
   negozio: NegozioPubblicoRow;
   url: string;
   indirizzo: string | null;
+  orari: OrarioPubblicoRow[];
+  servizi: ServizioPubblicoRow[];
 }) {
   const address: Record<string, string> = { "@type": "PostalAddress", addressCountry: "IT" };
   if (negozio.indirizzo) address.streetAddress = negozio.indirizzo;
   if (negozio.citta) address.addressLocality = negozio.citta;
   if (negozio.cap) address.postalCode = negozio.cap;
   if (negozio.provincia) address.addressRegion = negozio.provincia;
+
+  const opening = orari.map((o) => ({
+    "@type": "OpeningHoursSpecification",
+    dayOfWeek: GIORNI_SCHEMA[o.giorno],
+    opens: o.apre.slice(0, 5),
+    closes: o.chiude.slice(0, 5),
+  }));
 
   const dati = {
     "@context": "https://schema.org",
@@ -173,13 +318,24 @@ function JsonLdOptician({
     url,
     ...(negozio.tagline ? { description: negozio.tagline } : {}),
     ...(indirizzo ? { address } : {}),
+    ...(opening.length ? { openingHoursSpecification: opening } : {}),
+    ...(servizi.length
+      ? {
+          hasOfferCatalog: {
+            "@type": "OfferCatalog",
+            name: "Servizi",
+            itemListElement: servizi.map((s) => ({
+              "@type": "Offer",
+              itemOffered: { "@type": "Service", name: s.etichetta },
+            })),
+          },
+        }
+      : {}),
   };
 
   return (
     <script
       type="application/ld+json"
-      // JSON.stringify basta contro l'injection (niente </script> possibile
-      // dai campi, sono testo semplice dalla vista pubblica).
       dangerouslySetInnerHTML={{ __html: JSON.stringify(dati) }}
     />
   );

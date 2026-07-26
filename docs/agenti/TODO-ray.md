@@ -65,8 +65,20 @@ esce senza icona e con anteprima social vuota.
   ordini con `fonte='sito'`; dopo la migrazione 009 il valore è `sito_negozio`.
   È **solo un commento** (nessun DDL). Da correggere quando si riordina lo schema
   (portale on). Vedi `docs/fasi/fase-g3bis-fonte-ordini.md`.
-- **Contrasto testata del portale → pianificato per G5.** Non è una regola di
-  stile ma una **funzione deterministica**: luminanza relativa WCAG di
-  `brand.primary` → scelta automatica fra testo inchiostro e testo bianco, con la
-  stessa logica applicata a bordi (oggi `white/50`) e opacità (oggi `opacity-90`).
-  Aritmetica, nessuna decisione estetica.
+- **Contrasto testata del portale → FATTO in G5.** Funzione deterministica
+  `testoSuFondo` (luminanza WCAG di `brand.primary` → inchiostro o bianco, stessa
+  logica su bordo e sfumature). Voce chiusa.
+
+## 6 · Fuso orario preesistente in `lib/utils.ts` (TERMINE: prima di stampare date)
+
+Difetto **preesistente**, scoperto in G5. `lib/utils.ts` formatta le date con
+`Intl.DateTimeFormat("it-IT")` **senza `timeZone`**, quindi eredita il fuso del
+server: su Vercel è **UTC**, non l'ora italiana. Riguarda anche l'agenda del
+gestionale (orari e date mostrati/stampati possono slittare di 1–2 ore).
+
+- **Non risolto in G5** (fuori ambito): il portale ha una gestione del fuso
+  **tutta sua** in `lib/portale/orari.ts`, che àncora ogni confronto e ogni
+  formattazione a `Europe/Rome`. Quel codice è al sicuro.
+- **Da chiudere PRIMA che si stampi qualcosa con delle date** (buste, quietanze,
+  agenda): passare `timeZone: "Europe/Rome"` esplicito nei formatter di
+  `lib/utils.ts`, o centralizzare un helper unico come nel portale.

@@ -239,3 +239,76 @@ values (
   }'::jsonb
 )
 on conflict (slug) do nothing;
+
+-- ============================================================================
+-- PORTALE G5 — orari, servizi, chiusure + secondo negozio a brand CHIARO
+-- ----------------------------------------------------------------------------
+-- Dà ai due negozi demo ciò che serve a dimostrare G5 in preview:
+--  • ottica-demo: orari con UNA pausa pranzo (Lun–Ven) e un giorno RIDOTTO
+--    (Sab mattina), Dom chiuso → prova del raggruppamento; una chiusura futura
+--    per ferie; tre servizi attivi con durate diverse.
+--  • ottica-chiara: secondo negozio con `brand.primary` CHIARO → prova visiva
+--    che il contrasto della testata si adatta (testo scuro su insegna chiara).
+-- Richiede la migrazione 010 già applicata. Idempotente (guardie not-exists /
+-- on conflict). Non serve un utente: le pagine pubbliche leggono solo le viste.
+-- ============================================================================
+insert into public.aziende
+  (slug, nome, email, nome_pubblico, tagline, indirizzo, citta, cap, provincia, portale_attivo, brand)
+values (
+  'ottica-chiara', 'Ottica Luce', 'demo+ottica-chiara@limpidia.it',
+  'Ottica Luce', 'Luce naturale e montature leggere, dal 2005.',
+  'Corso Vittorio Emanuele 10', 'Lecce', '73100', 'LE', true,
+  '{"primary":"#F0E4CE","accent":"#B4551A","accentSoft":"#F6E8DE","surface":"#FAF6EE","textSoft":"#6E6A64","textFaint":"#8B877F"}'::jsonb
+)
+on conflict (slug) do nothing;
+
+do $$
+declare
+  v_demo   uuid;
+  v_chiara uuid;
+begin
+  select id into v_demo   from public.aziende where slug = 'ottica-demo';
+  select id into v_chiara from public.aziende where slug = 'ottica-chiara';
+
+  -- ── ottica-demo · orari (pausa pranzo Lun–Ven, Sab ridotto, Dom chiuso) ──
+  if v_demo is not null and not exists (select 1 from public.orari_apertura where azienda_id = v_demo) then
+    insert into public.orari_apertura (azienda_id, giorno, apre, chiude) values
+      (v_demo, 1, '09:00', '13:00'), (v_demo, 1, '15:00', '19:30'),
+      (v_demo, 2, '09:00', '13:00'), (v_demo, 2, '15:00', '19:30'),
+      (v_demo, 3, '09:00', '13:00'), (v_demo, 3, '15:00', '19:30'),
+      (v_demo, 4, '09:00', '13:00'), (v_demo, 4, '15:00', '19:30'),
+      (v_demo, 5, '09:00', '13:00'), (v_demo, 5, '15:00', '19:30'),
+      (v_demo, 6, '09:00', '12:30');
+  end if;
+
+  -- ── ottica-demo · servizi attivi (durate diverse; 'lenti' in deroga) ──
+  if v_demo is not null then
+    insert into public.negozi_servizi (azienda_id, servizio_codice, durata_minuti, attivo) values
+      (v_demo, 'visita',   null, true),
+      (v_demo, 'occhiale', null, true),
+      (v_demo, 'lenti',    45,   true)
+    on conflict (azienda_id, servizio_codice) do nothing;
+  end if;
+
+  -- ── ottica-demo · chiusura futura per ferie ──
+  if v_demo is not null and not exists (select 1 from public.chiusure where azienda_id = v_demo) then
+    insert into public.chiusure (azienda_id, dal, al, motivo) values
+      (v_demo, current_date + 30, current_date + 44, 'Ferie estive');
+  end if;
+
+  -- ── ottica-chiara · orario continuato + Sab mattina ──
+  if v_chiara is not null and not exists (select 1 from public.orari_apertura where azienda_id = v_chiara) then
+    insert into public.orari_apertura (azienda_id, giorno, apre, chiude) values
+      (v_chiara, 1, '09:30', '19:00'), (v_chiara, 2, '09:30', '19:00'),
+      (v_chiara, 3, '09:30', '19:00'), (v_chiara, 4, '09:30', '19:00'),
+      (v_chiara, 5, '09:30', '19:00'), (v_chiara, 6, '10:00', '13:00');
+  end if;
+
+  -- ── ottica-chiara · servizi ──
+  if v_chiara is not null then
+    insert into public.negozi_servizi (azienda_id, servizio_codice, durata_minuti, attivo) values
+      (v_chiara, 'visita',    null, true),
+      (v_chiara, 'controllo', null, true)
+    on conflict (azienda_id, servizio_codice) do nothing;
+  end if;
+end $$;
