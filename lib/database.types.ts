@@ -210,13 +210,24 @@ export type AppuntamentoRow = {
   // `in_attesa` (013): lo slot è impegnato da una richiesta del portale non
   // ancora confermata dall'ottico. Occupa l'agenda ma è graficamente distinto.
   stato: "in_attesa" | "prenotato" | "completato" | "mancato" | "annullato";
-  // `risorsa_id` (013): la saletta/poltrona. Nullo = poltrona unica (comportamento
-  // storico). Nessuna FK per ora: la tabella delle risorse arriva con la sua consegna.
-  risorsa_id: string | null;
+  // `risorsa_id` (013→014): la sala/poltrona in cui sta l'appuntamento. Dalla 014
+  // è OBBLIGATORIA (FK a `risorse`): ogni negozio ha almeno una sala e un trigger
+  // la assegna quando l'inserimento non la passa (es. l'agenda del gestionale).
+  risorsa_id: string;
   riferimento: string | null;
   note: string | null;
   created_at: string;
   updated_at: string;
+}
+
+/** Le sale (risorse) di un negozio — l'appuntamento sta in una sala (014). */
+export type RisorsaRow = {
+  id: string;
+  azienda_id: string;
+  nome: string;
+  ordine: number;
+  attiva: boolean;
+  created_at: string;
 }
 
 export type RichiamoRow = {
@@ -463,6 +474,7 @@ export type Database = {
       movimenti_magazzino: { Row: MovimentoMagazzinoRow; Insert: Omit<Partial<MovimentoMagazzinoRow>, "id" | "created_at"> & { id?: string }; Update: never; Relationships: [] };
       fermi: { Row: FermoRow; Insert: Ins<FermoRow>; Update: Upd<FermoRow>; Relationships: [] };
       appuntamenti: { Row: AppuntamentoRow; Insert: Ins<AppuntamentoRow>; Update: Upd<AppuntamentoRow>; Relationships: [] };
+      risorse: { Row: RisorsaRow; Insert: Ins<RisorsaRow>; Update: Upd<RisorsaRow>; Relationships: [] };
       richiami: { Row: RichiamoRow; Insert: Ins<RichiamoRow>; Update: Upd<RichiamoRow>; Relationships: [] };
       metodi_pagamento: { Row: MetodoPagamentoRow; Insert: Ins<MetodoPagamentoRow>; Update: Upd<MetodoPagamentoRow>; Relationships: [] };
       vendite: { Row: VenditaRow; Insert: Ins<VenditaRow>; Update: Upd<VenditaRow>; Relationships: [] };
