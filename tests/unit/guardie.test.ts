@@ -722,3 +722,56 @@ describe("L4g · guardie portale prenotazioni/persone (011)", () => {
     ).toBe(true);
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * L4h · GUARDIE SCRITTURA PRENOTAZIONE (G7 · migrazione 012)
+ *
+ * La prima SCRITTURA del portale. `crea_prenotazione` è SECURITY DEFINER ed
+ * eseguibile da anon: se il BROWSER la chiamasse direttamente, il rate limit
+ * (che vive solo nell'azione server) sarebbe aggirabile e avremmo un modulo di
+ * spam col nostro marchio. L'invariante d'architettura: la RPC di scrittura si
+ * INVOCA solo da un file server (`"use server"`), mai da un componente client né
+ * dal modulo di sola lettura degli slot. La guardia distingue l'INVOCAZIONE
+ * (`rpc("crea_prenotazione"…)`) dalla semplice menzione in un commento — così i
+ * commenti che spiegano «il browser non la chiama mai» non la fanno scattare.
+ * ════════════════════════════════════════════════════════════════════════ */
+describe("L4h · guardia scrittura prenotazione (012)", () => {
+  // L'INVOCAZIONE vera e propria: `.rpc("crea_prenotazione"` (virgolette singole
+  // o doppie, spazi tollerati). NON matcha una menzione in un commento.
+  const RE_INVOCA = /\.rpc\(\s*["']crea_prenotazione["']/;
+
+  it("G16 · `crea_prenotazione` si INVOCA solo da un file server (\"use server\"), mai da un client", () => {
+    const files = [...sorgenti("app"), ...sorgenti("components"), ...sorgenti("lib")];
+    const violazioni: string[] = [];
+    for (const f of files) {
+      const src = readFileSync(f, "utf8");
+      if (!RE_INVOCA.test(src)) continue;
+      const isServer = /^\s*["']use server["'];?/m.test(src);
+      const isClient = /^\s*["']use client["'];?/m.test(src);
+      // deve stare in un modulo server e MAI in un componente client.
+      if (isClient || !isServer) violazioni.push(rel(f));
+    }
+    expect(
+      violazioni,
+      `crea_prenotazione invocata fuori da un file server (o da un client): ${violazioni.join(", ")}`
+    ).toEqual([]);
+  });
+
+  it("G16b · l'azione server della prenotazione esiste, è \"use server\" e invoca la RPC", () => {
+    const azioni = leggi("app/(portale)/ottica/[slug]/prenota/azioni.ts");
+    expect(/^\s*["']use server["'];?/m.test(azioni), "azioni.ts non è più \"use server\"").toBe(true);
+    expect(RE_INVOCA.test(azioni), "azioni.ts non invoca più crea_prenotazione").toBe(true);
+    // e la porta d'ingresso dal browser è la server action, non la RPC.
+    expect(azioni).toMatch(/export\s+async\s+function\s+inviaPrenotazione/);
+  });
+
+  it("G16c · il percorso guidato (client) chiama inviaPrenotazione e NON invoca la RPC di scrittura", () => {
+    const wiz = leggi("app/(portale)/ottica/[slug]/prenota/WizardPrenota.tsx");
+    expect(/^\s*["']use client["'];?/m.test(wiz), "WizardPrenota non è più un client component").toBe(true);
+    expect(wiz.includes("inviaPrenotazione"), "il wizard non passa più dall'azione server").toBe(true);
+    expect(RE_INVOCA.test(wiz), "il wizard invoca crea_prenotazione dal browser (rate limit aggirabile!)").toBe(false);
+    // il modulo di SOLA LETTURA degli slot non deve scrivere.
+    const slot = leggi("lib/portale/slot.ts");
+    expect(RE_INVOCA.test(slot), "lib/portale/slot.ts invoca la RPC di scrittura: è di sola lettura").toBe(false);
+  });
+});

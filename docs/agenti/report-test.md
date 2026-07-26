@@ -1,8 +1,12 @@
 # Report — Agente Test & CI
 
-Aggiornato: 2026-07-26 · Fasi coperte: 1, 2, 3, 4 (v0.1–v0.5) +
-interfasi **4b anagrafiche (006)**, **4c caparra in cassa (007)**,
-**4d consensi (007)**. Branch `gest/next-16`: upgrade framework
+Aggiornato: 2026-07-26 · Fasi coperte: 1, 2, 3, 4 (v0.1–v0.5) + interfasi
+**4b/4c/4d**; portale **G3–G6** (vocabolario fonte, pagina negozio, orari/servizi,
+slot) e ora **G7 · percorso di prenotazione** (branch `portale/prenota`,
+migrazione **012 · crea_prenotazione**). La copertura G7 è descritta in fondo
+(«giro G7»); questo cappello resta al giro Next 16.
+
+Branch `gest/next-16`: upgrade framework
 **Next 15.5.20 → 16.2.12 · React 19.0 → 19.2.8** (solo codemod, zero cambi di
 comportamento). Il codemod ha rinominato `middleware.ts → proxy.ts` (Next 16
 cerca l'export `proxy`); logica byte-identica tranne la firma. Rete di sicurezza
@@ -16,13 +20,13 @@ pura, guardie statiche. Nessun file dell'app è stato toccato dall'agente.
 
 `npm test` (= L1 unit + L4 guardie, gli unici eseguibili senza rete/DB):
 
-    Test Files  4 passed (4)
-         Tests  60 passed (60)   ← 46 unit + 6 guardie base + 5 coerenza + 3 rename-proxy
+    Test Files  8 passed (8)
+         Tests  117 passed (117)
 
-Dettaglio: `utils` 24 · `cassa-calcoli` 17 · `anagrafiche-utils` 5 ·
-`guardie` 14 (G1–G4b base, G5–G10 coerenza, G11/G11b/G11c rename-proxy Next 16).
-Verde su Next 16.2.12; `tsc --noEmit` exit 0, build Turbopack ok (non rieseguiti
-qui, riferiti dall'orchestratore).
+Dettaglio: `utils` 24 · `cassa-calcoli` 17 · `portale-orari` 13 ·
+`portale-brand` 13 · `guardie` 32 · `ratelimit` 7 (nuovo G7) ·
+`anagrafiche-utils` 5 · `fonte` 6. Verde su Next 16.2.12; `tsc --noEmit`
+sull'intero progetto exit 0 (i test sono `exclude` dal tsconfig e non vi entrano).
 
 `npm run test:contratto` senza le env `TEST_SUPABASE_*` → tutti i test skippati
 (come da progetto: il contratto non gira senza il suo DB; i due file nuovi
@@ -32,6 +36,77 @@ sull'intero progetto (test inclusi) → exit 0.
 L2 (contratto) ed L3 (E2E) non sono stati eseguiti qui: mancano il progetto
 Supabase di test e i suoi secret (li prepara Ray — vedi `docs/agenti/TODO-ray.md`).
 Il codice è scritto e tipizzato, ma il loro esito reale lo darà la CI.
+
+> Nota schema di test G6/G7: L2 ed L3 girano ora sullo **stesso** progetto
+> Supabase (`uijfhhctrgirglmkrgoo`) dei restanti — nessun DB dedicato «per ora».
+> Cleanup rigoroso per prefisso `test-<runid>-`, con il limite append-only
+> descritto nel giro G7 (le prenotazioni non si cancellano).
+
+## Giro G7 · percorso di prenotazione (branch `portale/prenota`, migrazione 012)
+
+Prima **scrittura** del portale: si estende la rete alla RPC `crea_prenotazione`,
+al limitatore anti-spam e al percorso guidato a 5 passi. Nessun file dell'app
+toccato. `npm test` (L1+L4) → **117/117 verde**.
+
+### L1 · Unit — `tests/unit/ratelimit.test.ts` (7 test)
+`lib/ratelimit.ts` è puro (con `now`/`store` iniettabili). Coperto: l'IP scatta
+al 9° tentativo dentro la finestra (letta da `LIMITE_IP`, non ricopiata) e i
+tentativi riusciti sono registrati; il telefono scatta al 4° (`LIMITE_TELEFONO`);
+una chiave già bloccata **non consuma** il budget dell'altra (i controlli
+precedono le registrazioni → il telefono resta intatto quando è l'IP a saturare);
+la finestra è scorrevole (avanzando `now` oltre `finestraMs` il conto riparte e i
+timbri vecchi sono potati); `azzeraLimite()` e store iniettati isolano ogni caso;
+chiavi nulle non impongono limiti. `fonte.test.ts` (G6, `fonteDaParametro`) già
+copriva qr→qr_vetrina / sito→sito_negozio / altro→portale: **non duplicato**.
+
+### L2 · Contratto — `tests/contratto/crea-prenotazione.test.ts` (11 test, in CI)
+La RPC si chiama da un client **anon** (com'è esposta al browser via l'azione
+server); il setup e le letture di verifica passano dal service role (prenotazioni
+e persone sono revocate all'anon). Anti-fuso: gli istanti di prova vengono da
+`slot_liberi` (candidati assoluti già corretti), distanziati ≥60' così una
+prenotazione da 30' non svuota lo slot del test dopo. Invarianti:
+- **valida** → 1 riga `stato=in_attesa`, `fonte` valorizzata, `codice` che matcha
+  `LMP-XXXX` sull'alfabeto senza O/0/I/1, contatto (nome/telefono/email) COPIATO
+  sulla riga, `informativa_accettata_at` valorizzato;
+- **idempotenza**: due invii con la stessa `chiave_richiesta` → una sola riga,
+  stesso `id`/`codice`;
+- **doppio slot** (chiavi diverse) → la seconda `SLOT_OCCUPATO`;
+- **overlap con un appuntamento** `prenotato` del gestionale → `SLOT_OCCUPATO`
+  (verificato: è questo il codice reale, non `FUORI_ORARIO`);
+- errori distinti: `FUORI_ORARIO` (18:00 su 09–17), `FUORI_ORIZZONTE` (>90gg),
+  `TROPPO_TARDI` (<2h), `SERVIZIO_NON_ATTIVO` (servizio non attivato per il
+  negozio), `NEGOZIO_NON_TROVATO` (slug inesistente);
+- **dedup persona**: `«3XX XXX XXXX»` e `«+39 3XX XXXXXXX»` collassano su una sola
+  riga di `persone` e le due prenotazioni puntano alla stessa `persona_id`;
+- **consumo slot**: dopo la prenotazione, `slot_liberi` non restituisce più quello
+  slot (era presente prima).
+- `informativa_accettata_at`: la RPC la valorizza sempre (`now()`); l'obbligo del
+  consenso è imposto **a monte** dall'azione server (guardia G16 + E2E), non dalla
+  funzione — annotato nel test.
+
+### L3 · E2E — `e2e/g7-prenota.spec.ts` (viewport mobile 390×844, in CI)
+Percorso completo dal QR: `/ottica/<slug>?da=qr` → CTA «Prenota» (link vero che
+trascina `?da=qr`) → passo 1 servizio → passo 2 copertura → passo 3 nome+telefono
+→ passo 4 «Giorno successivo» + primo slot → passo 5 con informativa. Assicura che
+«Invia la richiesta» **nasce disabilitato** e si abilita solo dopo la spunta
+informativa. Schermata finale: mostra un `codice` (`LMP-XXXX`), dice «richiesta …
+non è ancora confermata» e **non** contiene mai «prenotazione confermata». A valle
+verifica nel DB (service role) che la prenotazione col quel codice abbia
+`fonte=qr_vetrina` e `stato=in_attesa` (la provenienza QR ha attraversato tutto).
+
+### L4 · Guardia statica — `tests/unit/guardie.test.ts` (L4h, +3 → 32 test)
+- **G16**: `crea_prenotazione` si **INVOCA** (`.rpc("crea_prenotazione"…)`) solo da
+  un file server (`"use server"`), mai da un componente client né da `lib/portale/
+  slot.ts`. La guardia distingue l'invocazione dalla semplice **menzione in un
+  commento** (WizardPrenota e la pagina negozio la citano a parole: non scattano).
+  Se il browser chiamasse la RPC, il rate limit — che vive solo nell'azione server
+  — sarebbe aggirabile.
+- **G16b**: l'azione `inviaPrenotazione` esiste, è `"use server"` e invoca la RPC.
+- **G16c**: `WizardPrenota.tsx` è client, chiama `inviaPrenotazione` e **non**
+  invoca la RPC di scrittura; `lib/portale/slot.ts` (sola lettura) neppure.
+- Sentinelle fonte: la 012 **non** aggiunge un nuovo `check (fonte …)` (il check
+  delle prenotazioni è nella 011), quindi il conto colonne di G12e resta 5 e non
+  serve toccarlo. Verificato verde.
 
 ## Cosa è coperto
 
@@ -237,10 +312,46 @@ fuso del runner (l'action ancora a `T12:00:00`, margine ampio).
    `getByLabel`; migliora anche l'accessibilità.
 3. `tsconfig.json` `exclude` di `tests`/`e2e` e `.gitignore` degli artefatti
    Playwright: **applicati dall'orchestratore** (fuori dalla proprietà dell'agente test).
+4. **(G7) Residuo append-only nei test di prenotazione — gancio DB.** Una volta
+   creata, una `prenotazioni` non è cancellabile (trigger `trg_prenotazioni_no_delete`
+   011 §7), pinna la `persona` (FK `on delete restrict`) e **blocca in cascata la
+   delete dell'azienda**. Perciò `crea-prenotazione.test.ts` e `g7-prenota.spec.ts`
+   lasciano un residuo (azienda + prenotazioni + persone) sul progetto di test:
+   il teardown ripulisce solo il ripulibile (lista_attesa, appuntamenti) ed è
+   best-effort sull'azienda. Mitigazione già in atto: **slug e telefoni unici per
+   RUN_ID** → nessuna collisione fra run sull'indice unico di `persone`. Azione
+   richiesta per una bonifica vera: una **RPC `SECURITY DEFINER` di pulizia per
+   prefisso** sul progetto di test (che possa saltare i trigger append-only), o un
+   reset periodico del DB di test. Non applicabile dall'agente test (tocca il DB).
+5. **(G7) Campi del percorso senza label associata — gancio UI (accessibilità).**
+   In `WizardPrenota.tsx` il componente `Campo` rende un `<label>` e l'`<input>`
+   come fratelli, **senza** `htmlFor`/`id` né wrapping: `getByLabel("Nome e
+   cognome")`/`"Telefono"` non aggancia i campi. L'E2E ripiega su
+   `getByRole("textbox").nth(0|1)` (posizionale, più fragile). Azione richiesta al
+   codice app: associare label e input (id/for o wrapping) — migliora accessibilità
+   e rende gli E2E robusti a `getByLabel`. Non applicato (proprietà del codice app).
 
 ## Cosa resta a Ray / CI
 Vedi `docs/agenti/TODO-ray.md`: creare `gestionale-test`, impostare i 3 secret,
 primo `workflow_dispatch` per far girare L2+L3 e rifinire i selettori E2E.
+
+## File creati / aggiornati (giro G7 · branch `portale/prenota`)
+Creati:
+- `tests/unit/ratelimit.test.ts` — L1 su `lib/ratelimit.ts` (7 test).
+- `tests/contratto/crea-prenotazione.test.ts` — L2 migrazione 012 (11 test, in CI).
+- `e2e/g7-prenota.spec.ts` — L3 percorso completo QR→richiesta (viewport mobile, in CI).
+
+Aggiornati:
+- `tests/unit/guardie.test.ts` — +L4h (G16/G16b/G16c: la scrittura passa solo
+  dall'azione server). +3 test → `guardie` a 32, totale L1+L4 a **117**.
+- `docs/agenti/report-test.md`.
+
+**CI (`ci.yml`) e `package.json` invariati.** Gli script sono glob
+(`vitest run tests/unit` / `tests/contratto`, `playwright test` su `testDir: e2e`)
+e raccolgono i tre file nuovi da soli. Nessuna nuova devDep: bastano `vitest` e
+`@playwright/test` già presenti. Esito L1+L4: `npm test` → **117/117 verde**;
+`crea-prenotazione.test.ts` skippa pulito senza le env (11 test), il g7 spec è
+elencato da Playwright (`--list`). L2/L3 restano alla CI.
 
 ## File creati / aggiornati (giro Next 16 · branch `gest/next-16`)
 Aggiornati:

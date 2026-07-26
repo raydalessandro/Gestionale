@@ -25,12 +25,15 @@ export function Btn({
   tinta = "primary",
   full = false,
   disabled = false,
+  onClick,
   className = "",
 }: {
   children: ReactNode;
   tinta?: TintaBtn;
   full?: boolean;
   disabled?: boolean;
+  /** Se presente, il bottone è interattivo (usato dal percorso di prenotazione). */
+  onClick?: () => void;
   className?: string;
 }) {
   return (
@@ -38,6 +41,7 @@ export function Btn({
       type="button"
       disabled={disabled}
       aria-disabled={disabled}
+      onClick={onClick}
       className={[
         "inline-flex min-h-[52px] items-center justify-center rounded-2xl px-6 py-4 text-base font-semibold",
         full ? "w-full" : "",

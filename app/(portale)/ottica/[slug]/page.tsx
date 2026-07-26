@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { headers } from "next/headers";
 import { notFound } from "next/navigation";
 import {
@@ -24,7 +25,7 @@ import type {
   OrarioPubblicoRow,
   ServizioPubblicoRow,
 } from "@/lib/database.types";
-import { Btn, Eyebrow } from "@/components/portale/primitivi";
+import { Eyebrow } from "@/components/portale/primitivi";
 import { Icona } from "@/components/portale/Icone";
 import { LogoLimpidia, SimboloLimpidia } from "@/components/portale/Marchio";
 
@@ -97,7 +98,7 @@ export default async function PaginaNegozio({
   searchParams,
 }: {
   params: Promise<{ slug: string }>;
-  searchParams: Promise<{ servizio?: string; giorno?: string }>;
+  searchParams: Promise<{ servizio?: string; giorno?: string; da?: string }>;
 }) {
   const { slug } = await params;
   const sp = await searchParams;
@@ -131,6 +132,11 @@ export default async function PaginaNegozio({
   const giorno = typeof sp.giorno === "string" && sp.giorno >= oggi ? sp.giorno : oggi;
   const servizioSel = servizi.find((s) => s.codice === sp.servizio) ?? null;
   const slots = servizioSel ? await slotLiberi(slug, servizioSel.codice, giorno) : [];
+
+  // La provenienza (?da=qr|sito) segue la persona dentro il percorso di
+  // prenotazione, così crea_prenotazione registra la fonte giusta (G7).
+  const da = typeof sp.da === "string" ? sp.da : null;
+  const hrefPrenota = `/ottica/${slug}/prenota${da ? `?da=${encodeURIComponent(da)}` : ""}`;
 
   return (
     <div className="mx-auto min-h-screen max-w-[520px] pb-16">
@@ -175,12 +181,16 @@ export default async function PaginaNegozio({
         {/* Aperto ora / Chiuso — calcolato in ora italiana, tenuto conto delle ferie. */}
         <StatoApertura stato={stato} />
 
-        {/* CTA di prenotazione — posizione definitiva, ma INERTE (§8, G6/G7). */}
-        <Btn full disabled>
-          Prenotazione in arrivo
-        </Btn>
+        {/* CTA di prenotazione — ora attivo (G7). Porta al percorso guidato,
+            trascinando la provenienza. È un vero link: funziona senza JS. */}
+        <Link
+          href={hrefPrenota}
+          className="inline-flex min-h-[52px] w-full cursor-pointer items-center justify-center rounded-2xl bg-lim-ambra px-6 py-4 text-base font-semibold text-white"
+        >
+          Prenota un appuntamento
+        </Link>
         <p className="mb-7 mt-2.5 text-center text-[13px] text-lim-soft">
-          Presto potrai prenotare un appuntamento da qui.
+          Scegli servizio, giorno e orario. Ci vuole un minuto.
         </p>
 
         {/* Servizi attivi, nell'ordine del catalogo. Nessun prezzo: non li abbiamo. */}
