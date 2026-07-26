@@ -185,7 +185,7 @@ export default function WizardPrenota({
           </button>
         ) : (
           <Link href={`/ottica/${slug}`} className="font-semibold text-lim-inchiostro">
-            ‹ Al negozio
+            ‹ {nomeNegozio}
           </Link>
         )}
         <span className="tabular-nums text-lim-faint">Passo {passo} di 5</span>
