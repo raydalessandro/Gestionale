@@ -12,8 +12,13 @@ import {
   raggruppaOrari,
   statoApertura,
   dataItaliana,
+  oggiISO,
+  giornoRelativo,
+  etichettaGiorno,
+  oraDaISO,
   type RigaOrario,
 } from "@/lib/portale/orari";
+import { slotLiberi } from "@/lib/portale/slot";
 import type {
   NegozioPubblicoRow,
   OrarioPubblicoRow,
@@ -89,10 +94,13 @@ function indirizzoInLinea(n: NegozioPubblicoRow): string | null {
 
 export default async function PaginaNegozio({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ servizio?: string; giorno?: string }>;
 }) {
   const { slug } = await params;
+  const sp = await searchParams;
   const negozio = await negozioDaSlug(slug);
 
   // Slug inesistente o negozio non pubblicato (le viste filtrano portale_attivo):
@@ -117,6 +125,12 @@ export default async function PaginaNegozio({
   const stato = statoApertura(orari, chiusure, new Date());
   const righeOrario = raggruppaOrari(orari);
   const haOrari = orari.length > 0;
+
+  // ── Slot liberi (G6) ── servizio e giorno si scelgono via query (link, no JS).
+  const oggi = oggiISO(new Date());
+  const giorno = typeof sp.giorno === "string" && sp.giorno >= oggi ? sp.giorno : oggi;
+  const servizioSel = servizi.find((s) => s.codice === sp.servizio) ?? null;
+  const slots = servizioSel ? await slotLiberi(slug, servizioSel.codice, giorno) : [];
 
   return (
     <div className="mx-auto min-h-screen max-w-[520px] pb-16">
@@ -191,6 +205,19 @@ export default async function PaginaNegozio({
           </>
         )}
 
+        {/* Orari liberi (G6). Servizio e giorno si scelgono con dei link
+            (?servizio / ?giorno): nessun componente client, tutta navigazione
+            server. In sola lettura: il percorso guidato di prenotazione è G7. */}
+        {servizi.length > 0 && (
+          <SezioneSlot
+            servizi={servizi}
+            servizioSel={servizioSel}
+            giorno={giorno}
+            oggi={oggi}
+            slots={slots}
+          />
+        )}
+
         {/* Orari raggruppati come li legge una persona. */}
         {haOrari && (
           <>
@@ -245,6 +272,102 @@ export default async function PaginaNegozio({
         )}
       </main>
     </div>
+  );
+}
+
+/**
+ * Griglia degli orari liberi (G6). Servizio e giorno via query-string (link,
+ * navigazione server, zero JavaScript). Gli slot sono in SOLA LETTURA: il
+ * percorso guidato di prenotazione arriva in G7.
+ */
+function SezioneSlot({
+  servizi,
+  servizioSel,
+  giorno,
+  oggi,
+  slots,
+}: {
+  servizi: ServizioPubblicoRow[];
+  servizioSel: ServizioPubblicoRow | null;
+  giorno: string;
+  oggi: string;
+  slots: string[];
+}) {
+  const q = (servizio: string, g: string) =>
+    `?servizio=${encodeURIComponent(servizio)}&giorno=${g}`;
+  const navCls =
+    "flex h-9 w-9 items-center justify-center rounded-full border border-lim-linea bg-white text-lim-inchiostro";
+
+  return (
+    <section className="mb-6">
+      <Eyebrow>Prenota un servizio</Eyebrow>
+      <div className="mb-4 flex flex-wrap gap-2">
+        {servizi.map((s) => {
+          const sel = servizioSel?.codice === s.codice;
+          return (
+            <a
+              key={s.codice}
+              href={q(s.codice, giorno)}
+              className={`rounded-xl border px-3 py-2 text-[13.5px] font-semibold ${
+                sel
+                  ? "border-lim-inchiostro bg-lim-inchiostro text-white"
+                  : "border-lim-linea bg-white text-lim-inchiostro"
+              }`}
+            >
+              {s.etichetta}
+            </a>
+          );
+        })}
+      </div>
+
+      {servizioSel && (
+        <div className="rounded-2xl border border-lim-linea bg-white p-[18px]">
+          <div className="mb-4 flex items-center justify-between gap-2">
+            {giorno > oggi ? (
+              <a href={q(servizioSel.codice, giornoRelativo(giorno, -1))} className={navCls} aria-label="Giorno precedente">
+                ‹
+              </a>
+            ) : (
+              <span className="h-9 w-9" aria-hidden="true" />
+            )}
+            <span className="text-[14.5px] font-semibold capitalize text-lim-inchiostro">
+              {etichettaGiorno(giorno)}
+            </span>
+            <a href={q(servizioSel.codice, giornoRelativo(giorno, 1))} className={navCls} aria-label="Giorno successivo">
+              ›
+            </a>
+          </div>
+
+          {slots.length > 0 ? (
+            <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+              {slots.map((iso) => (
+                <span
+                  key={iso}
+                  className="rounded-xl border border-lim-linea bg-lim-carta px-2 py-2.5 text-center text-[14px] font-semibold tabular-nums text-lim-inchiostro"
+                >
+                  {oraDaISO(iso)}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="text-[14px] leading-relaxed text-lim-soft">
+              Nessun orario libero {etichettaGiorno(giorno)}.{" "}
+              <a
+                href={q(servizioSel.codice, giornoRelativo(giorno, 1))}
+                className="font-semibold text-lim-ambra underline"
+              >
+                Prova {etichettaGiorno(giornoRelativo(giorno, 1))}
+              </a>
+              .
+            </p>
+          )}
+
+          <p className="mt-4 text-center text-[12.5px] text-lim-faint">
+            Orari in sola lettura — la prenotazione arriva a breve.
+          </p>
+        </div>
+      )}
+    </section>
   );
 }
 

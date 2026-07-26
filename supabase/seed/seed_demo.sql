@@ -307,3 +307,37 @@ begin
     end if;
   end if;
 end $$;
+
+-- ============================================================================
+-- PORTALE G6 — buchi veri nella griglia degli slot del negozio principale
+-- ----------------------------------------------------------------------------
+-- Qualche appuntamento sparso nei prossimi giorni + un blocco_slot di due ore,
+-- così slot_liberi() mostra una griglia con dei BUCHI e non una fila piena.
+-- Richiede la migrazione 011 applicata. Idempotente (guardie su note/motivo).
+-- Ora di parete italiana → istante assoluto con `at time zone 'Europe/Rome'`.
+-- ============================================================================
+do $g6$
+declare
+  v_a uuid; v_u uuid; v_c uuid;
+begin
+  select id into v_a from public.aziende order by created_at limit 1;
+  select id into v_u from public.utenti  where azienda_id = v_a order by created_at limit 1;
+  select id into v_c from public.clienti where azienda_id = v_a order by created_at limit 1;
+
+  if v_a is not null and v_u is not null
+     and not exists (select 1 from public.appuntamenti where azienda_id = v_a and note = 'seed-g6') then
+    insert into public.appuntamenti (azienda_id, cliente_id, utente_id, tipo, inizio, durata_minuti, stato, note) values
+      (v_a, v_c, v_u, 'controllo_vista', ((current_date + 1)::text || ' 10:00')::timestamp at time zone 'Europe/Rome', 30, 'prenotato', 'seed-g6'),
+      (v_a, v_c, v_u, 'controllo_vista', ((current_date + 1)::text || ' 15:30')::timestamp at time zone 'Europe/Rome', 45, 'prenotato', 'seed-g6'),
+      (v_a, v_c, v_u, 'controllo_vista', ((current_date + 2)::text || ' 11:00')::timestamp at time zone 'Europe/Rome', 30, 'prenotato', 'seed-g6');
+  end if;
+
+  if v_a is not null
+     and not exists (select 1 from public.blocchi_slot where azienda_id = v_a and motivo = 'seed-g6') then
+    insert into public.blocchi_slot (azienda_id, inizio, fine, motivo) values
+      (v_a,
+       ((current_date + 2)::text || ' 15:00')::timestamp at time zone 'Europe/Rome',
+       ((current_date + 2)::text || ' 17:00')::timestamp at time zone 'Europe/Rome',
+       'seed-g6');
+  end if;
+end $g6$;
