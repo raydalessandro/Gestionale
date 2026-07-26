@@ -16,11 +16,19 @@ un aggiornamento di framework è una decisione, non un effetto collaterale di
 | react-dom        | `19.2.8`    | esatta                                            |
 | @types/react     | `19.2.17`   | esatta (+ `overrides` per coerenza transitiva)   |
 | @types/react-dom | `19.2.3`    | esatta (+ `overrides`)                            |
-| typescript       | `^5`        | invariata (≥ 5.6 risolto)                         |
-| tailwindcss      | `^3.4.17`   | invariata — NON aggiornata a Tailwind 4          |
-| @supabase/ssr    | `^0.12.0`   | invariata — pattern cookie `getAll/setAll` intatto |
-| @supabase/supabase-js | `^2.110.2` | invariata                                     |
+| typescript       | `5.9.3`     | esatta (ST-02) — ≥ 5.6                            |
+| tailwindcss      | `3.4.19`    | esatta (ST-02) — 3.4.x, NON aggiornata a Tailwind 4 |
+| @supabase/ssr    | `0.12.0`    | esatta (ST-02) — è la libreria di `proxy.ts`; cookie `getAll/setAll` intatto |
+| @supabase/supabase-js | `2.110.2` | esatta (ST-02)                                |
 | Node (locale)    | 22.x        | vedi CI sotto                                     |
+
+> **Nota ST-02.** «Versioni fissate» vale per l'intero stack, non solo per
+> `next`/`react`. `@supabase/ssr`, `@supabase/supabase-js`, `tailwindcss` e
+> `typescript` sono **pinnati esatti** alle versioni già risolte (nessun
+> movimento di dipendenze: il lockfile cambia solo le 4 righe dei range).
+> Motivo forte per `@supabase/ssr`: è la libreria del file che protegge tutta
+> l'applicazione (`proxy.ts`) — un `npm install` di chiunque non deve poterla
+> spostare.
 
 ## G1 · Passaggio a Next 16 / React 19.2 (2026-07-26)
 
