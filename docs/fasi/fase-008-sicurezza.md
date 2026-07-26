@@ -3,6 +3,54 @@
 Migrazione `supabase/migrazioni/008_sicurezza_tenant.sql`. **Solo SQL**: nessun
 TypeScript, nessuna tabella del portale, nessuna rotta. Additiva e idempotente.
 
+## Per chi rivede — cosa abbiamo cambiato rispetto alla consegna G2, e perché
+
+Sintesi per il revisore (che ha scritto la consegna): sotto, in un colpo
+d'occhio, gli scostamenti dalla lettera della consegna e le decisioni prese in
+confronto con Ray. Il dettaglio tecnico è nelle sezioni omonime più in basso.
+
+**A · Deviazioni tecniche necessarie (la semantica richiesta è invariata)**
+
+1. **EXCLUDE incapsulato in una funzione IMMUTABLE.** La forma letterale della
+   consegna — `tstzrange(inizio, inizio + make_interval(mins => durata_minuti))`
+   dentro l'`EXCLUDE` — **non compila**: `42P17 functions in index expression
+   must be marked IMMUTABLE`, perché l'operatore `timestamptz + interval` è
+   STABLE (dipende dal TimeZone per giorno/mese). Per una durata in soli minuti
+   su un istante assoluto il risultato è deterministico: l'ho spostato in
+   `appuntamento_intervallo(inizio, durata_minuti)` marcata `IMMUTABLE`. Vincolo
+   e comportamento identici a quelli chiesti.
+2. **Bug trovato e corretto in verifica (nel nostro codice, non nella
+   consegna).** Il trigger DB-01 dava falsi negativi: `TG_ARGV` in PL/pgSQL è
+   **0-based**, ma il loop partiva da `1`, quindi leggeva i nomi di colonna
+   sfasati e **saltava ogni controllo in silenzio** (il cross-tenant passava).
+   Emerso dal dry-run comportamentale; corretto a `i := 0` / `while i < TG_NARGS`
+   e ri-verificato. È il motivo per cui la difesa va *provata*, non solo scritta.
+
+**B · Decisioni sui punti aperti (confermate con Ray in questo giro)**
+
+3. **"Una poltrona sola" — è un limite d'agenda, non sui profili.** Chiarito:
+   NON riguarda gli account optometrista (creabili senza limiti, sono `utenti`).
+   Il vincolo DB-04 è **per negozio** (`azienda_id`): nello stesso negozio non
+   possono coesistere due appuntamenti sovrapposti, anche se assegnati a persone
+   diverse — il sistema tratta il negozio come **una postazione sola**. Corretto
+   e voluto per l'ottico indipendente. Quando servirà lavorare due postazioni in
+   parallelo si aggiungerà una **`risorsa_id`** nel vincolo (overlap per
+   postazione, non per negozio). **Non generalizzato adesso.**
+4. **`telefono` fuori dalla vetrina — scelta di funnel di Ray, non tecnica.** Il
+   dato resta su `aziende.telefono` (non perso): è solo **escluso dalla vista
+   pubblica** `negozi_pubblici`. Per esporlo domani basterà **una riga sulla
+   vista** (l'anon legge solo la vista, non la tabella) più il front che lo
+   legge. **Lasciato fuori ORA** su decisione di Ray, che sta ancora costruendo
+   il funnel: la sceglie lui quando serve.
+5. **Allineamento del codice al vocabolario `fonte` — consegna successiva.** I 5
+   punti che citano `'sito'` restano intatti (fuori ambito). Gap noto e
+   accettato fra i due merge: scegliere la fonte "Dal sito" darà un errore di
+   check dal DB (gestito come errore dall'azione, non un crash); l'app compila,
+   le altre fonti funzionano. Verifica visiva rimandata a quando il front sarà
+   su (decisione di Ray).
+6. **Seed.** I 2 clienti demo con `fonte='sito'` diventano `'banco'` (coerente
+   col backfill), così un'applicazione futura del seed non viola il nuovo check.
+
 ## Perché adesso
 
 Finora il database è stato raggiunto **solo da utenti autenticati**, e la RLS
