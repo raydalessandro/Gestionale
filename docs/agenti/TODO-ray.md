@@ -45,3 +45,28 @@ principale: Authentication → URL Configuration → **Site URL** = URL Vercel d
 produzione, e **Redirect URLs** con `<dominio>/auth/callback`. Non blocca
 nulla (l'account demo confermato a mano funziona), è solo per le registrazioni
 reali con conferma attiva.
+
+## 4 · Portale — favicon e immagine OG (TERMINE: prima del primo negozio reale)
+
+Il portale pubblico (G4) è online come pagina, ma **favicon** e **immagine OG**
+del negozio sono **scoperti**. Vanno chiusi **PRIMA che vada online il primo
+negozio reale** — non «più avanti»: senza, la prima pagina condivisa/indicizzata
+esce senza icona e con anteprima social vuota.
+
+- Il marchio è oggi reso **inline SVG** (`components/portale/Marchio.tsx`): la
+  pagina mostra il logo, ma non esistono ancora i file `public/marchio/**`.
+- La cartella `public/marchio/` (SVG/PNG del pacchetto, favicon) arriva in una
+  **consegna dedicata al riordino asset**; favicon + OG image vanno però anticipati
+  entro il termine qui sopra.
+
+## 5 · Debiti tecnici tracciati (dev, non bloccanti)
+
+- **Commento stale `schema.sql:431`.** Dice ancora che il sito pubblico scrive
+  ordini con `fonte='sito'`; dopo la migrazione 009 il valore è `sito_negozio`.
+  È **solo un commento** (nessun DDL). Da correggere quando si riordina lo schema
+  (portale on). Vedi `docs/fasi/fase-g3bis-fonte-ordini.md`.
+- **Contrasto testata del portale → pianificato per G5.** Non è una regola di
+  stile ma una **funzione deterministica**: luminanza relativa WCAG di
+  `brand.primary` → scelta automatica fra testo inchiostro e testo bianco, con la
+  stessa logica applicata a bordi (oggi `white/50`) e opacità (oggi `opacity-90`).
+  Aritmetica, nessuna decisione estetica.
