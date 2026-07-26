@@ -24,11 +24,28 @@ export default {
         ambra: { DEFAULT: "#C98A2B", soft: "#F7EEDD" },
         blu: { DEFAULT: "#5B6DA8", soft: "#E7EAF6" },
         rosso: { DEFAULT: "#B0483F", soft: "#F6E4E2" },
+        // Portale Limpidia — spazio di nomi SEPARATO dai token del gestionale.
+        // Stessi nomi concettuali (carta/inchiostro/ambra) ma VALORI Limpidia:
+        // usare `lim-*` sul portale evita di ereditare la palette del gestionale.
+        lim: {
+          inchiostro: "#171512",
+          carta: "#F2F2F0",
+          ambra: "#B4551A",
+          ambraScura: "#93430F",
+          ambraSoft: "#F6E8DE",
+          linea: "#E2E0DC",
+          soft: "#6E6A64",
+          faint: "#8B877F",
+        },
       },
       fontFamily: {
         ui: ["var(--font-ui)", "system-ui", "sans-serif"],
         serif: ["var(--font-serif)", "Georgia", "serif"],
         mono: ["var(--font-mono)", "monospace"],
+        // Portale: Gabarito (display) e Figtree (testo), caricati in
+        // app/(portale)/layout.tsx come variabili CSS proprie.
+        "lim-display": ["var(--font-lim-display)", "system-ui", "sans-serif"],
+        "lim-testo": ["var(--font-lim-testo)", "system-ui", "sans-serif"],
       },
     },
   },

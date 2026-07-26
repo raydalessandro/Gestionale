@@ -480,3 +480,41 @@ export type Database = {
     CompositeTypes: { [_ in never]: never };
   };
 }
+
+/* ────────────────────────────────────────────────────────────────────────────
+ * PORTALE — tipi della vetrina pubblica (G4).
+ * La vista `negozi_pubblici` (migrazione 008) espone SOLO le colonne di vetrina
+ * dei negozi con portale_attivo=true. Nessun dato riservato (id, p.iva, email,
+ * telefono, abbonamento) la attraversa. Questi tipi vivono qui in fondo per non
+ * disturbare il blocco `Database` generato.
+ * ──────────────────────────────────────────────────────────────────────────── */
+
+/** Chiavi del branding white-label, come da default jsonb di `aziende.brand`. */
+export const CHIAVI_BRAND = [
+  "primary",
+  "accent",
+  "accentSoft",
+  "surface",
+  "textSoft",
+  "textFaint",
+] as const;
+export type ChiaveBrand = (typeof CHIAVI_BRAND)[number];
+
+/** Brand grezzo dal DB: jsonb controllato dal tenant → ogni valore è NON fidato. */
+export type BrandGrezzo = Partial<Record<ChiaveBrand, unknown>>;
+
+/** Brand validato: ogni chiave è un colore `#rrggbb`/`#rgb` sicuro (vedi lib/portale/brand.ts). */
+export type BrandNegozio = Record<ChiaveBrand, string>;
+
+/** Riga della vista pubblica `negozi_pubblici`. */
+export type NegozioPubblicoRow = {
+  slug: string;
+  nome_pubblico: string;
+  tagline: string | null;
+  logo_url: string | null;
+  indirizzo: string | null;
+  citta: string | null;
+  cap: string | null;
+  provincia: string | null;
+  brand: BrandGrezzo | null;
+};
