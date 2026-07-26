@@ -18,6 +18,15 @@
 -- chiave, o diventano tre persone. Best-effort per numeri italiani; un prefisso
 -- internazionale diverso da +39 si lascia com'è.
 -- ----------------------------------------------------------------------------
+-- ⚠️ MODIFICARE QUESTA FUNZIONE RICHIEDE UNA MIGRAZIONE DI RICALCOLO.
+-- Alimenta la colonna GENERATA e memorizzata `persone.telefono_normalizzato`,
+-- con sopra un indice UNICO. Se la logica cambia (es. un prefisso estero), le
+-- righe già scritte conservano la vecchia normalizzazione e le nuove usano la
+-- nuova: l'indice unico non se ne accorge e la stessa persona esiste due volte.
+-- Qualsiasi modifica va accompagnata da un UPDATE che forza il ricalcolo di
+-- telefono_normalizzato su tutte le righe esistenti. La sentinella
+-- `diag_normalizza_telefono` (sotto) è la guardia di questa promessa.
+-- ----------------------------------------------------------------------------
 create or replace function public.normalizza_telefono(p text)
 returns text language sql immutable as $$
   with pulito as (select regexp_replace(coalesce(p, ''), '[^0-9+]', '', 'g') as s)
@@ -32,7 +41,25 @@ returns text language sql immutable as $$
   from pulito;
 $$;
 comment on function public.normalizza_telefono(text) is
-  'Chiave di dedup di una persona: porta un numero italiano in forma +39XXXXXXXXXX. Limite noto: un fisso di famiglia condiviso collassa due persone in una (si risolve con per_conto_di sulla prenotazione).';
+  'Chiave di dedup di una persona: porta un numero italiano in forma +39XXXXXXXXXX. Alimenta la colonna generata persone.telefono_normalizzato (indice unico): MODIFICARLA richiede una migrazione di ricalcolo su tutte le righe. Limite noto: un fisso di famiglia condiviso collassa due persone in una (si risolve con per_conto_di sulla prenotazione).';
+
+-- Sentinella (stessa famiglia di appuntamento_intervallo/diag_intervallo_immutabile):
+-- normalizza_telefono DEVE restare IMMUTABLE (una colonna generata stored la
+-- richiede) e la sua FORMA DEL CORPO non deve cambiare in silenzio — un cambio
+-- sdoppierebbe le identità già scritte senterror. Questa RPC espone i due fatti
+-- da verificare a contratto: volatilità 'i' e presenza dei marcatori del corpo
+-- (regexp_replace + prefisso +39). Se cambiano, serve la migrazione di ricalcolo.
+create or replace function public.diag_normalizza_telefono()
+returns table (volatile_immutabile boolean, corpo_ok boolean)
+language sql stable security definer set search_path = public, pg_catalog as $$
+  select p.provolatile = 'i',
+         p.prosrc ilike '%regexp_replace%' and p.prosrc ilike '%+39%'
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public' and p.proname = 'normalizza_telefono';
+$$;
+-- Diagnostica: non serve al pubblico. Il test la chiama col service role.
+revoke execute on function public.diag_normalizza_telefono() from anon, public;
 
 -- ────────────────────────────────────────────────────────────────────────────
 -- 2 · persone — di LIMPIDIA, non del negozio. Nessun azienda_id.
@@ -243,19 +270,28 @@ begin
     v_cand := v_apre_abs;
     while v_cand + v_dur <= v_chiude_abs loop
       if v_cand >= v_now + c_anticipo
+         -- appuntamenti: uso `appuntamento_intervallo` (008) così il predicato &&
+         -- combacia con l'indice GiST parziale del vincolo di non-sovrapposizione
+         -- e diventa una index-condition, non una scansione riga per riga.
          and not exists (
            select 1 from public.appuntamenti a
            where a.azienda_id = v_azienda and a.stato in ('prenotato','completato')
-             and tstzrange(a.inizio, a.inizio + (a.durata_minuti * interval '1 minute'))
-              && tstzrange(v_cand, v_cand + v_dur))
+             and public.appuntamento_intervallo(a.inizio, a.durata_minuti)
+              && public.appuntamento_intervallo(v_cand, v_durata))
+         -- prenotazioni/blocchi: nessun indice GiST sull'intervallo, ma il btree
+         -- (azienda_id, inizio) sì. I due limiti di data rendono usabile il btree
+         -- (una manciata di righe del giorno, non tutta la storia del negozio).
+         -- Il margine di 1 giorno copre una riga che inizia prima e sconfina.
          and not exists (
            select 1 from public.prenotazioni p
            where p.azienda_id = v_azienda and p.stato in ('in_attesa','accettata')
+             and p.inizio >= v_apre_abs - interval '1 day' and p.inizio < v_chiude_abs
              and tstzrange(p.inizio, p.inizio + (p.durata_minuti * interval '1 minute'))
               && tstzrange(v_cand, v_cand + v_dur))
          and not exists (
            select 1 from public.blocchi_slot b
            where b.azienda_id = v_azienda
+             and b.inizio >= v_apre_abs - interval '1 day' and b.inizio < v_chiude_abs
              and tstzrange(b.inizio, b.fine) && tstzrange(v_cand, v_cand + v_dur))
       then
         return next v_cand;
