@@ -57,8 +57,10 @@ export function generaNumero(prefisso: "BL" | "OL", progressivo: number): string
 // Tipo: l'intersezione impone TUTTE le chiavi di Fonte (se aggiungi una fonte a
 // FONTI e scordi l'etichetta, qui non compila) e insieme tollera l'accesso con
 // una string qualunque, così i consumatori in app/ che indicizzano con una
-// `fonte` grezza (pattern `ETICHETTE_FONTE[x] ?? x`) restano intatti.
-export const ETICHETTE_FONTE: Record<Fonte, string> & Record<string, string> = {
+// `fonte` grezza restano intatti. Il valore per una chiave sconosciuta è
+// `string | undefined` — a runtime è `undefined`: il tipo NON mente più, e il
+// `?? x` dei consumatori resta un fallback vivo (non codice morto).
+export const ETICHETTE_FONTE: Record<Fonte, string> & Record<string, string | undefined> = {
   banco: "Banco",
   app: "Dall'app",
   convenzione: "Convenzione",

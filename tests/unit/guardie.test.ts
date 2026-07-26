@@ -391,28 +391,30 @@ describe("L4c · guardia anti-regressione sul rename proxy (Next 16)", () => {
 });
 
 /* ══════════════════════════════════════════════════════════════════════════
- * L4d · GUARDIE VOCABOLARIO `fonte` (G3)
+ * L4d · GUARDIE VOCABOLARIO `fonte` (G3 + G3-bis)
  *
- * Il vocabolario `fonte` vive in tre posti che DEVONO combaciare:
- *   • il check SQL della migrazione 008 (la verità del DB);
+ * Il vocabolario `fonte` vive in posti che DEVONO combaciare:
+ *   • i check SQL delle migrazioni 008/009 (la verità del DB), su QUATTRO
+ *     colonne: clienti, appuntamenti, ordini_lac, ordini_occhiali;
  *   • la costante FONTI in lib/database.types.ts (la verità del codice);
  *   • le mappe derivate (etichette, tinte, form).
  * Se divergono in silenzio, il DB rifiuta un valore che l'app mostra, o l'app
  * mostra un'etichetta grezza per un valore che il DB accetta. Queste guardie
- * legano i tre posti: aggiungere una fonte senza aggiornarli tutti diventa
- * rosso. G12b/G12c non leggono file — confrontano i valori importati, così
- * scattano anche su un refuso nelle chiavi.
+ * legano i posti: aggiungere una fonte senza aggiornarli tutti diventa rosso.
+ * G12b/G12c non leggono file — confrontano i valori importati, così scattano
+ * anche su un refuso nelle chiavi. G12e è la sentinella sul CONTO delle colonne:
+ * una quinta colonna `fonte` senza guardia la fa diventare rossa.
  * ════════════════════════════════════════════════════════════════════════ */
 describe("L4d · guardie vocabolario fonte", () => {
-  /** Estrae la lista `fonte in ('a','b',…)` di un check dalla migrazione 008. */
-  function fontiDalCheck(nomeVincolo: string): string[] {
-    const sql = leggi("supabase/migrazioni/008_sicurezza_tenant.sql");
+  /** Estrae la lista `fonte in ('a','b',…)` di un check da un file di migrazione. */
+  function fontiDalCheck(nomeVincolo: string, file = "supabase/migrazioni/008_sicurezza_tenant.sql"): string[] {
+    const sql = leggi(file);
     const re = new RegExp(
       `constraint\\s+${nomeVincolo}\\s+check\\s*\\(\\s*fonte\\s+in\\s*\\(([^)]*)\\)`,
       "i"
     );
     const m = sql.match(re);
-    if (!m) throw new Error(`check ${nomeVincolo} non trovato nella migrazione 008`);
+    if (!m) throw new Error(`check ${nomeVincolo} non trovato in ${file}`);
     return m[1]
       .split(",")
       .map((s) => s.trim().replace(/^'|'$/g, ""))
@@ -452,5 +454,59 @@ describe("L4d · guardie vocabolario fonte", () => {
         `${sistema} è di sistema: non deve stare fra le fonti manuali`
       ).not.toContain(sistema);
     }
+  });
+
+  it("G12d · il check SQL degli ordini (009) è FONTI meno 'import'", () => {
+    // Gli ordini non si importano: il vocabolario è FonteOrdine = Exclude<Fonte,'import'>.
+    const attese = [...FONTI].filter((f) => f !== "import");
+    const M09 = "supabase/migrazioni/009_fonte_ordini.sql";
+    const daLac = fontiDalCheck("ordini_lac_fonte_check", M09);
+    const daOcchiali = fontiDalCheck("ordini_occhiali_fonte_check", M09);
+    expect(daLac, "ordini_lac_fonte_check ≠ FONTI∖import").toEqual(attese);
+    expect(daOcchiali, "ordini_occhiali_fonte_check ≠ FONTI∖import").toEqual(attese);
+    // 'sito' ritirato anche qui: non deve ricomparire.
+    expect(daLac).not.toContain("sito");
+    expect(daOcchiali).not.toContain("sito");
+  });
+
+  it("G12e · ogni colonna `fonte` con un check nel DB è coperta da una guardia (conto delle colonne)", () => {
+    // La lezione di G3-bis: il conto delle colonne `fonte` non deve più vivere
+    // nella memoria di qualcuno. Scandaglio schema.sql + tutte le migrazioni,
+    // trovo ogni `check (fonte in (...))` e ne ricavo la tabella (dal più vicino
+    // `create/alter table public.<tab>` che lo precede). L'insieme trovato deve
+    // combaciare ESATTAMENTE con quello asserito da G12 (clienti, appuntamenti)
+    // e G12d (ordini_lac, ordini_occhiali). Una quinta colonna senza guardia
+    // allarga l'insieme trovato → rosso: costringe ad aggiungere la guardia.
+    const GUARDATE = ["appuntamenti", "clienti", "ordini_lac", "ordini_occhiali"];
+
+    const filesSql = [
+      "supabase/schema.sql",
+      ...readdirSync(join(ROOT, "supabase/migrazioni"))
+        .filter((n) => n.endsWith(".sql"))
+        .map((n) => `supabase/migrazioni/${n}`),
+    ];
+
+    const trovate = new Set<string>();
+    const reCheck = /check\s*\(\s*fonte\s+in\s*\(/gi;
+    const reTab = /(?:create|alter)\s+table\s+(?:if\s+not\s+exists\s+)?public\.(\w+)/gi;
+    for (const f of filesSql) {
+      const src = leggi(f);
+      let m: RegExpExecArray | null;
+      while ((m = reCheck.exec(src))) {
+        const before = src.slice(0, m.index);
+        let t: RegExpExecArray | null;
+        let ultima: string | undefined;
+        reTab.lastIndex = 0;
+        while ((t = reTab.exec(before))) ultima = t[1];
+        if (ultima) trovate.add(ultima);
+      }
+    }
+
+    expect(
+      [...trovate].sort(),
+      `colonne 'fonte' con check nel DB diverse da quelle guardate: ` +
+        `trovate=[${[...trovate].sort().join(", ")}] guardate=[${GUARDATE.join(", ")}]. ` +
+        `Se ne è nata una nuova, aggiungi la sua guardia (come G12/G12d) e mettila qui.`
+    ).toEqual(GUARDATE);
   });
 });
