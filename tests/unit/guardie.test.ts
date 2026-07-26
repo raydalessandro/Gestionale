@@ -597,3 +597,50 @@ describe("L4e · guardie portale pubblico", () => {
     expect("#FAF7F2").not.toBe("#F2F2F0");
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * L4f · GUARDIE PORTALE — orari/servizi/chiusure (G5, migrazione 010)
+ *
+ * Supabase concede `select` ad anon per default su ogni tabella nuova: se la 010
+ * non revocasse esplicitamente, orari/servizi/chiusure nascerebbero leggibili da
+ * chiunque. Queste guardie leggono il file di migrazione e scattano se salta la
+ * chiusura (RLS + revoke) o se la vista delle chiusure torna a esporre il motivo.
+ * ════════════════════════════════════════════════════════════════════════ */
+describe("L4f · guardie portale orari/servizi (010)", () => {
+  const M010 = "supabase/migrazioni/010_orari_servizi.sql";
+  // Le tabelle create dalla 010: tutte con RLS attiva e select revocata ad anon.
+  const TABELLE_010 = ["servizi", "negozi_servizi", "orari_apertura", "chiusure", "blocchi_slot"];
+
+  it("G14 · ogni tabella nuova della 010 ha RLS attiva e revoke select ad anon", () => {
+    const sql = leggi(M010);
+    const compatta = sql.replace(/\s+/g, " ").toLowerCase();
+    const senzaRls: string[] = [];
+    const senzaRevoke: string[] = [];
+    for (const t of TABELLE_010) {
+      if (!compatta.includes(`alter table public.${t} enable row level security`)) senzaRls.push(t);
+      if (!compatta.includes(`revoke select on public.${t} from anon`)) senzaRevoke.push(t);
+    }
+    expect(senzaRls, `tabelle senza RLS: ${senzaRls.join(", ")}`).toEqual([]);
+    expect(senzaRevoke, `tabelle senza revoke ad anon: ${senzaRevoke.join(", ")}`).toEqual([]);
+    // blocchi_slot non deve avere una vista pubblica (i buchi non si mostrano).
+    expect(
+      /create\s+(or\s+replace\s+)?view\s+public\.\w*blocch/i.test(sql),
+      "blocchi_slot non deve avere una vista pubblica"
+    ).toBe(false);
+  });
+
+  it("G14b · la vista chiusure_pubbliche NON espone la colonna `motivo`", () => {
+    const sql = leggi(M010);
+    // isolo il corpo della vista chiusure_pubbliche (dal create al ; successivo).
+    const m = sql.match(/create\s+or\s+replace\s+view\s+public\.chiusure_pubbliche[\s\S]*?;/i);
+    expect(m, "vista chiusure_pubbliche non trovata nella 010").toBeTruthy();
+    expect(
+      /\bmotivo\b/i.test(m![0]),
+      "chiusure_pubbliche espone `motivo`: è un fatto interno del negozio, non della vetrina"
+    ).toBe(false);
+    // ma le colonne di vetrina ci sono.
+    for (const col of ["slug", "dal", "al"]) {
+      expect(m![0].toLowerCase().includes(col), `chiusure_pubbliche non espone ${col}`).toBe(true);
+    }
+  });
+});

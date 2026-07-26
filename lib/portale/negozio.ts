@@ -1,5 +1,10 @@
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
-import type { NegozioPubblicoRow } from "@/lib/database.types";
+import type {
+  NegozioPubblicoRow,
+  OrarioPubblicoRow,
+  ChiusuraPubblicaRow,
+  ServizioPubblicoRow,
+} from "@/lib/database.types";
 
 /**
  * Lettura dei dati di vetrina del portale (G4 · punto 5).
@@ -34,4 +39,35 @@ export async function negozioDaSlug(slug: string): Promise<NegozioPubblicoRow | 
 
   if (error || !data) return null;
   return data as NegozioPubblicoRow;
+}
+
+/** Orari di apertura del negozio (dalla vista pubblica), ordinati per giorno/apertura. */
+export async function orariDaSlug(slug: string): Promise<OrarioPubblicoRow[]> {
+  const { data, error } = await clientPubblico()
+    .from("orari_pubblici")
+    .select("slug, giorno, apre, chiude")
+    .eq("slug", slug);
+  if (error || !data) return [];
+  return data as OrarioPubblicoRow[];
+}
+
+/** Chiusure (ferie/festività) del negozio, dalla vista pubblica (senza motivo). */
+export async function chiusureDaSlug(slug: string): Promise<ChiusuraPubblicaRow[]> {
+  const { data, error } = await clientPubblico()
+    .from("chiusure_pubbliche")
+    .select("slug, dal, al")
+    .eq("slug", slug);
+  if (error || !data) return [];
+  return data as ChiusuraPubblicaRow[];
+}
+
+/** Servizi attivi del negozio, dalla vista pubblica, nell'ordine del catalogo. */
+export async function serviziDaSlug(slug: string): Promise<ServizioPubblicoRow[]> {
+  const { data, error } = await clientPubblico()
+    .from("servizi_pubblici")
+    .select("slug, codice, etichetta, durata_minuti, ordine")
+    .eq("slug", slug)
+    .order("ordine", { ascending: true });
+  if (error || !data) return [];
+  return data as ServizioPubblicoRow[];
 }
