@@ -2,9 +2,100 @@
 
 Aggiornato: 2026-07-26 · Fasi coperte: 1, 2, 3, 4 (v0.1–v0.5) + interfasi
 **4b/4c/4d**; portale **G3–G7** (vocabolario fonte, pagina negozio, orari/servizi,
-slot, percorso di prenotazione) e ora **G7-bis · l'agenda unica** (branch
-`portale/013-agenda-unica`, migrazione **013**, consegna SOLO SQL). La copertura
-G7-bis è descritta subito qui sotto; i giri precedenti restano più in basso.
+slot, percorso di prenotazione), **G7-bis · l'agenda unica** (migrazione **013**)
+e ora **G-014 · le sale** (branch `portale/014-sale`, migrazione **014**, consegna
+SOLO SQL). La copertura 014 è descritta subito qui sotto; i giri precedenti restano
+più in basso.
+
+## Giro 014 · le sale (branch `portale/014-sale`, migrazione 014)
+
+La 014 porta `risorsa_id` a prima classe: l'appuntamento è di una SALA, la sala è
+del negozio. Nuova tabella `risorse` (RLS + `revoke select from anon`), una
+'Sala 1' per ogni azienda + trigger `crea_sala_default` su `aziende`;
+`appuntamenti.risorsa_id` diventa NOT NULL con FK verso `risorse` e la coppia
+`('risorsa_id','risorse')` entra nel trigger di coerenza tenant (008); l'EXCLUDE
+diventa per-risorsa **senza `coalesce`** (risorsa_id è NOT NULL); `slot_liberi`
+= «libero se ALMENO UNA sala attiva è libera»; `crea_prenotazione` assegna la prima
+sala attiva libera. Con UNA sola sala il comportamento è identico alla 013. Nessun
+file dell'app toccato.
+
+### L4 · Guardia statica — `tests/unit/guardie.test.ts` (nuovo blocco L4l, +6 → G18)
+Gated con `describe.skipIf(!existsSync(014))` come per L4i/013: enforca sul branch
+`portale/014-sale` e in CI dopo il merge, salta pulito su checkpoint paralleli.
+- **G18**: la tabella `risorse` esiste con RLS attiva e `revoke select … from anon`
+  (Supabase concede select di default: senza revoke le sale sarebbero pubbliche).
+- **G18b**: la funzione `crea_sala_default` e il trigger `AFTER INSERT ON aziende`
+  che la esegue (ogni negozio nasce con la sua sala, altrimenti il NOT NULL romperebbe).
+- **G18c**: `appuntamenti.risorsa_id` diventa NOT NULL con FK verso `risorse`, e la
+  coppia `('risorsa_id','risorse')` entra nel trigger `trg_tenant` di coerenza.
+- **G18d**: l'EXCLUDE `appuntamenti_niente_sovrapposizioni` è per-risorsa
+  (`risorsa_id with =`), SENZA `coalesce(` (sparita la cucitura della 013), e vale
+  solo sugli stati occupanti.
+- **G18e**: `slot_liberi` nella 014 nomina `risorse` e NON usa più
+  `coalesce(risorsa_id, …)`. **Trade-off documentato**: la guardia non vieta ogni
+  `coalesce` — `slot_liberi` conserva un `coalesce(ns.durata_minuti, s.durata_predefinita_minuti)`
+  LEGITTIMO per la durata del servizio; l'invariante che cambia è solo il coalesce
+  PER-RISORSA della 013, ed è quello che G18e blinda (un check «zero coalesce»
+  sarebbe stato un falso positivo sulla durata).
+- **G18f**: `crea_prenotazione` (014) sceglie una sala `from public.risorse`.
+- Le 6 regex sono state verificate contro il contenuto reale della 014 (tutte PASS,
+  guardie a 42). Il blocco L4i/G17 della 013 NON è stato toccato: legge la 013, dove
+  il `coalesce` resta storia.
+
+### L2 · Contratto — nuovo `tests/contratto/sale.test.ts` (7 test, in CI)
+Scenari PER-SALA che, dopo la 014, non si possono più simulare con UUID inventati
+(c'è la FK verso `risorse` + il NOT NULL): qui si creano sale VERE col service role.
+Tre tenant (`uno` = una sala, `due` = due sale attive, `dis` = seconda sala
+disattivata), istanti da `slot_liberi` (anti-fuso). Casi §8:
+1. **una sala**: due appuntamenti sovrapposti → il secondo respinto (23P01) —
+   identico alla 013.
+2. **due sale**: due appuntamenti in parallelo sullo stesso slot → ammessi; il
+   terzo (nessuna sala libera, il trigger ripiega sulla prima) → respinto (23P01).
+3. **slot_liberi** con due sale: offre lo slot con UNA sala occupata, smette quando
+   lo sono ENTRAMBE.
+4. **sala attiva=false non conta**: occupata l'unica sala attiva, lo slot sparisce
+   (la disattivata non lo salva); un altro istante resta offerto (controprova).
+5. **azienda nata dopo la 014**: riceve la sua 'Sala 1' dal trigger su `aziende`.
+6. **sala di un altro negozio**: appuntamento nel negozio `uno` con una sala di
+   `due` → respinto dal trigger di coerenza tenant (SQLSTATE **23514**).
+7. **crea_prenotazione** (una sala): l'appuntamento collegato ha `risorsa_id` non
+   nulla; una seconda richiesta sullo stesso slot con l'unica sala → `SLOT_OCCUPATO`.
+
+### L2 · Contratto — `tests/contratto/crea-prenotazione.test.ts` (aggiornato alla 014)
+Il file resta a 14 test ma allineato al NOT NULL + trigger di assegnazione sala:
+- il caso **valida** non asserisce più `risorsa_id` nullo: con la sola 'Sala 1'
+  `crea_prenotazione` la valorizza (`toBeTruthy`);
+- il vecchio test «due appuntamenti con `risorsa_id` DIVERSA (crypto.randomUUID)
+  → ammessi» è stato **rimosso** da qui (gli UUID inventati ora violano la FK verso
+  `risorse`) e ricoperto in `sale.test.ts` con sale VERE;
+- il test «due appuntamenti con `risorsa_id` NULLA → il secondo respinto» resta
+  valido: il trigger BEFORE INSERT assegna la stessa 'Sala 1' a entrambi → 23P01;
+- i seed manuali «al banco» che NON passavano `risorsa_id` continuano a funzionare:
+  il trigger la assegna, il NOT NULL non rompe più l'insert (verificato negli scenari
+  agenda-unica/annullato).
+
+### L3 · E2E — `e2e/g7-prenota.spec.ts` (invariato, in CI)
+Firme RPC invariate (`slot_liberi`/`crea_prenotazione`); il percorso utente non
+tocca `risorsa_id`. La verifica a valle legge `prenotazioni` per codice
+(`fonte=qr_vetrina`, `stato=in_attesa`) → resta verde. Nessun nuovo E2E necessario.
+
+### Teardown 014 (contratto)
+Nuovo anello nella catena di FK: gli appuntamenti pinnano la sala
+(`risorsa_id → risorse`, senza on-delete). Ordine di pulizia in `sale.test.ts`:
+prima gli appuntamenti NON collegati a una prenotazione (così le sale si liberano),
+poi `pulisci()` che cascata azienda→risorse. Dove non ci sono prenotazioni
+(`due`/`dis`/il tenant «nuovo») l'azienda si cancella davvero e porta via le sale;
+dove c'è una prenotazione (`uno`), resta append-only come nei giri G7/013 (il
+trigger no-delete su `prenotazioni` blocca la cancellazione, che a sua volta pinna
+appuntamento→sala e persona). Residuo mitigato da slug/telefoni unici per RUN_ID.
+Gancio già richiesto (vedi *Ganci* §4): RPC di pulizia SECURITY DEFINER lato DB.
+
+### Esito auto-verifica (locale) — giro 014
+`npm test` (L1+L4) sul working tree del branch `portale/014-sale`:
+**127 passed** (8 file), guardie da 36 → **42** (L4i/013 e L4l/014 entrambi presenti
+sul branch, enforcano). `npm run test:contratto` senza le env `TEST_SUPABASE_*` →
+tutti skippati puliti: `sale.test.ts` (7) e `crea-prenotazione.test.ts` (14) caricano
+e saltano. L2/L3 restano alla CI (manca il progetto Supabase di test + i secret).
 
 ## Giro G7-bis · l'agenda unica (branch `portale/013-agenda-unica`, migrazione 013)
 

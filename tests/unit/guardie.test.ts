@@ -869,3 +869,137 @@ describe.skipIf(!existsSync(join(ROOT, M013)))("L4i · guardie agenda unica (013
     ).toBe(true);
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * L4l · GUARDIE LE SALE (G18 · migrazione 014)
+ *
+ * La 014 porta `risorsa_id` a prima classe: l'appuntamento è di una SALA, la
+ * sala è del negozio. I due pezzi che la 013 aveva appena riscritto (l'EXCLUDE
+ * di `appuntamenti` e `slot_liberi`) cambiano di nuovo, e stavolta la «cucitura»
+ * `coalesce(risorsa_id, azienda_id)` sparisce perché `risorsa_id` è ora NOT NULL.
+ * I rischi silenziosi che queste guardie blindano:
+ *   • la tabella `risorse` nasce leggibile da anon (Supabase concede select di
+ *     default): senza il `revoke`, le sale di un negozio sarebbero pubbliche;
+ *   • il trigger `crea_sala_default` salta e un negozio nasce senza sala → il
+ *     NOT NULL su `appuntamenti.risorsa_id` romperebbe ogni creazione;
+ *   • l'EXCLUDE torna per-azienda (o riappare il coalesce) riaprendo il falso
+ *     «occupato» quando un'altra sala è libera;
+ *   • `slot_liberi` smette di consultare `risorse` (torna a decidere per negozio).
+ *
+ * Gated su `existsSync(014)`: enforca sul branch/CI che porta la 014, salta
+ * pulito altrove. NON tocca il blocco L4i/G17 della 013 (che legge la 013, dove
+ * il `coalesce` è storia e resta com'è).
+ *
+ * Trade-off documentato (vedi report-test.md): `slot_liberi` continua a usare un
+ * `coalesce(ns.durata_minuti, s.durata_predefinita_minuti)` LEGITTIMO per la
+ * durata del servizio. La guardia G18e non vieta ogni `coalesce`, ma solo quello
+ * PER-RISORSA della 013 (`coalesce(risorsa_id, …)`): è quello l'invariante che
+ * cambia, non il coalesce innocuo sulla durata.
+ * ════════════════════════════════════════════════════════════════════════ */
+const M014 = "supabase/migrazioni/014_sale.sql";
+describe.skipIf(!existsSync(join(ROOT, M014)))("L4l · guardie le sale (014)", () => {
+  const sql = () => leggi(M014);
+
+  it("G18 · la tabella `risorse` esiste con RLS attiva e revoke select ad anon", () => {
+    const s = sql();
+    const compatta = s.replace(/\s+/g, " ").toLowerCase();
+    expect(
+      /create table if not exists public\.risorse/i.test(s),
+      "manca la tabella public.risorse"
+    ).toBe(true);
+    expect(
+      compatta.includes("alter table public.risorse enable row level security"),
+      "risorse senza RLS: le sale di un negozio resterebbero fuori dall'isolamento"
+    ).toBe(true);
+    expect(
+      compatta.includes("revoke select on public.risorse from anon"),
+      "risorse: manca `revoke select … from anon` (Supabase concede select di default)"
+    ).toBe(true);
+  });
+
+  it("G18b · ogni negozio nasce con la sua sala: crea_sala_default AFTER INSERT ON aziende", () => {
+    const s = sql();
+    expect(
+      /create or replace function public\.crea_sala_default/i.test(s),
+      "manca la funzione crea_sala_default"
+    ).toBe(true);
+    // isolo lo statement del trigger (dal create trigger al ;) e verifico che sia
+    // after insert on aziende ed esegua crea_sala_default.
+    const m = s.match(/create trigger\s+\w+\s+after insert on public\.aziende[\s\S]*?;/i);
+    expect(m, "manca il trigger AFTER INSERT ON aziende").toBeTruthy();
+    expect(
+      /crea_sala_default/i.test(m![0]),
+      "il trigger su aziende non esegue crea_sala_default"
+    ).toBe(true);
+  });
+
+  it("G18c · appuntamenti.risorsa_id diventa NOT NULL con FK verso risorse", () => {
+    const s = sql();
+    expect(
+      /alter table public\.appuntamenti alter column risorsa_id set not null/i.test(s),
+      "risorsa_id non diventa NOT NULL nella 014"
+    ).toBe(true);
+    expect(
+      /foreign key\s*\(\s*risorsa_id\s*\)\s*references public\.risorse/i.test(s),
+      "manca la FK appuntamenti.risorsa_id → risorse"
+    ).toBe(true);
+    // la coppia (risorsa_id, risorse) entra nel trigger di coerenza tenant (008).
+    const t = s.match(/create trigger trg_tenant[\s\S]*?assicura_coerenza_tenant\([\s\S]*?\);/i);
+    expect(t, "la 014 deve ridichiarare trg_tenant su appuntamenti").toBeTruthy();
+    expect(
+      /'risorsa_id'\s*,\s*'risorse'/i.test(t![0]),
+      "la coppia ('risorsa_id','risorse') non è nel trigger di coerenza tenant"
+    ).toBe(true);
+  });
+
+  it("G18d · l'EXCLUDE appuntamenti_niente_sovrapposizioni è per-risorsa e SENZA coalesce", () => {
+    const s = sql();
+    const m = s.match(/add constraint appuntamenti_niente_sovrapposizioni\s+exclude[\s\S]*?;/i);
+    expect(m, "vincolo appuntamenti_niente_sovrapposizioni non trovato nella 014").toBeTruthy();
+    const blocco = m![0];
+    expect(
+      /risorsa_id\s+with\s*=/i.test(blocco),
+      "l'EXCLUDE deve essere per-risorsa (risorsa_id with =)"
+    ).toBe(true);
+    // il coalesce della 013 sparisce: risorsa_id è ora NOT NULL, niente cucitura.
+    expect(
+      /coalesce\(/i.test(blocco),
+      "la 014 toglie il coalesce dall'EXCLUDE (risorsa_id è NOT NULL)"
+    ).toBe(false);
+    expect(
+      /where\s*\(\s*stato\s+in\s*\(\s*'in_attesa'\s*,\s*'prenotato'\s*,\s*'completato'\s*\)/i.test(blocco),
+      "l'EXCLUDE deve valere solo sugli stati occupanti in_attesa/prenotato/completato"
+    ).toBe(true);
+  });
+
+  it("G18e · slot_liberi (014) nomina `risorse` e non usa più `coalesce(risorsa_id, …)`", () => {
+    const s = sql();
+    const start = s.indexOf("create or replace function public.slot_liberi");
+    expect(start, "la 014 deve ridefinire slot_liberi").toBeGreaterThanOrEqual(0);
+    const rest = s.slice(start);
+    const end = rest.indexOf("$$;");
+    expect(end, "corpo di slot_liberi non terminato").toBeGreaterThan(0);
+    const corpo = rest.slice(0, end);
+    expect(
+      /\brisorse\b/i.test(corpo),
+      "slot_liberi deve consultare `risorse` (libero se ALMENO UNA sala attiva è libera)"
+    ).toBe(true);
+    // Trade-off: resta il coalesce LEGITTIMO sulla durata; sparisce solo quello
+    // per-risorsa della 013 (coalesce(risorsa_id, azienda_id)).
+    expect(
+      /coalesce\(\s*risorsa_id/i.test(corpo),
+      "slot_liberi non deve più usare coalesce(risorsa_id, azienda_id): risorsa_id è NOT NULL"
+    ).toBe(false);
+  });
+
+  it("G18f · crea_prenotazione (014) sceglie una sala attiva (`from public.risorse`)", () => {
+    const s = sql();
+    const start = s.indexOf("create or replace function public.crea_prenotazione");
+    expect(start, "la 014 deve ridefinire crea_prenotazione").toBeGreaterThanOrEqual(0);
+    const corpo = s.slice(start);
+    expect(
+      /from\s+public\.risorse/i.test(corpo),
+      "crea_prenotazione deve scegliere una sala da public.risorse (prima attiva libera)"
+    ).toBe(true);
+  });
+});

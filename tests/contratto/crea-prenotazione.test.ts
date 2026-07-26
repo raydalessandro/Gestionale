@@ -17,12 +17,20 @@ import {
  *
  * NOVITÀ 013 — un posto solo decide se uno slot è occupato: `appuntamenti` È LO
  * SLOT, `prenotazioni` è la pratica. `crea_prenotazione` ora scrive DUE righe
- * nella stessa transazione: prima l'APPUNTAMENTO (stato `in_attesa`, risorsa_id
- * nullo), poi la PRENOTAZIONE collegata (`appuntamento_id`). La difesa contro la
- * doppia sullo stesso orario vive sull'EXCLUDE di `appuntamenti`, per-risorsa
- * (coalesce(risorsa_id, azienda_id)) e per stato occupante (in_attesa/prenotato/
- * completato). Quindi: una richiesta dal portale e un appuntamento al banco NON
- * possono finire nello stesso slot — lo impedisce il database (vedi i test qui).
+ * nella stessa transazione: prima l'APPUNTAMENTO (stato `in_attesa`), poi la
+ * PRENOTAZIONE collegata (`appuntamento_id`). La difesa contro la doppia sullo
+ * stesso orario vive sull'EXCLUDE di `appuntamenti`, per-risorsa e per stato
+ * occupante (in_attesa/prenotato/completato). Quindi: una richiesta dal portale
+ * e un appuntamento al banco NON possono finire nello stesso slot — lo impedisce
+ * il database (vedi i test qui).
+ *
+ * NOVITÀ 014 — `risorsa_id` è prima classe: ogni appuntamento è di una SALA, ogni
+ * negozio nasce con almeno la sua 'Sala 1' (trigger su `aziende`). crea_prenotazione
+ * assegna la prima sala attiva libera (deterministica), e un trigger BEFORE INSERT
+ * riempie `risorsa_id` quando l'insert manuale non la passa (così il NOT NULL non
+ * rompe i seed «al banco» di questo file). Con UNA sala il comportamento è identico
+ * alla 013: gli scenari PER-SALA (due sale in parallelo, sala disattivata) vivono in
+ * `sale.test.ts`. L'EXCLUDE è ora per-risorsa SENZA coalesce (risorsa_id è NOT NULL).
  *
  * COME si esercita (stessa filosofia di slot-liberi.test.ts):
  *  • setup col SERVICE ROLE (orari/servizi/portale_attivo, appuntamenti: non
@@ -262,7 +270,10 @@ describe.skipIf(!haEnv())("012/013 · crea_prenotazione — la scrittura del por
       new Date(inizio).getTime()
     );
     expect(a.durata_minuti).toBe(30);
-    expect(a.risorsa_id, "poltrona unica: risorsa_id nullo").toBeNull();
+    // 014: `risorsa_id` è ora prima classe. crea_prenotazione assegna la PRIMA
+    // sala attiva libera (deterministica): con la sola 'Sala 1' del negozio la
+    // colonna è valorizzata (non più nulla come nella 013).
+    expect(a.risorsa_id, "014: crea_prenotazione assegna una sala attiva → risorsa_id valorizzato").toBeTruthy();
     expect(a.cliente_id, "una richiesta dal portale non ha ancora un cliente").toBeNull();
     expect(a.fonte, "la fonte del canale attraversa anche l'appuntamento").toBe("qr_vetrina");
     // il collegamento è biunivoco: la coppia condivide lo stesso codice leggibile
@@ -480,31 +491,23 @@ describe.skipIf(!haEnv())("012/013 · crea_prenotazione — la scrittura del por
     expect(r2.error!.message).toContain("SLOT_OCCUPATO");
   });
 
-  // ── due risorse diverse in parallelo: ammesse ───────────────────────────────
-  it("due appuntamenti sullo stesso slot ma con risorsa_id DIVERSA → ammessi (due salette)", async () => {
-    const inizio = await primoSlot(32);
-    const salettaA = crypto.randomUUID();
-    const salettaB = crypto.randomUUID();
+  // ── due risorse diverse in parallelo: ammesse (SPOSTATO in sale.test.ts) ─────
+  // 014: `risorsa_id` ha ora una FK verso `risorse` (e il NOT NULL), quindi non si
+  // possono più iniettare UUID inventati con `crypto.randomUUID()`. Lo scenario
+  // «due sale in parallelo sullo stesso slot → ammesse; il terzo → respinto» vive
+  // ora in `sale.test.ts`, che crea sale VERE nella tabella `risorse`.
 
-    const e1 = await seedAppto({ inizio, stato: "prenotato", risorsaId: salettaA });
-    expect(e1.error, "primo appuntamento (saletta A)").toBeFalsy();
-
-    const e2 = await seedAppto({ inizio, stato: "prenotato", risorsaId: salettaB });
-    expect(
-      e2.error,
-      "seconda saletta in parallelo sullo stesso slot: il per-risorsa lo consente"
-    ).toBeFalsy();
-  });
-
-  // ── risorsa nulla su entrambi: il secondo è respinto (poltrona unica) ───────
+  // ── risorsa nulla su entrambi: il secondo è respinto (unica sala assegnata) ─
   it("due appuntamenti sullo stesso slot con risorsa_id NULLA → il secondo è respinto", async () => {
     const inizio = await primoSlot(33);
 
+    // 014: il trigger BEFORE INSERT assegna la sala quando l'insert non la passa.
+    // Con la sola 'Sala 1' del negozio, entrambi finiscono in quella sala.
     const e1 = await seedAppto({ inizio, stato: "prenotato", risorsaId: null });
-    expect(e1.error, "primo appuntamento (poltrona unica)").toBeFalsy();
+    expect(e1.error, "primo appuntamento (sala assegnata dal trigger)").toBeFalsy();
 
     const e2 = await seedAppto({ inizio, stato: "prenotato", risorsaId: null });
-    expect(e2.error, "poltrona unica: il secondo sullo stesso slot è rifiutato").toBeTruthy();
+    expect(e2.error, "unica sala: il secondo sullo stesso slot è rifiutato").toBeTruthy();
     expect(
       e2.error!.code === "23P01" || /exclu/i.test(e2.error!.message),
       `atteso exclusion_violation, avuto ${e2.error!.code}: ${e2.error!.message}`
