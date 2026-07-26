@@ -206,109 +206,104 @@ end $$;
 
 -- Fine. Questi dati restano: sono la base del collaudo e si trattano da veri.
 
--- ============================================================================
--- NEGOZIO DIMOSTRATIVO DEL PORTALE (G4)
--- ----------------------------------------------------------------------------
--- Un'azienda dedicata alla vetrina pubblica: slug 'ottica-demo', portale_attivo,
--- con nome_pubblico, tagline, indirizzo plausibile e un `brand` dai colori
--- DIVERSI da quelli Limpidia — così la preview dimostra che il white-label
--- funziona davvero (l'intestazione prende i colori del negozio, non i nostri).
--- Idempotente: se lo slug esiste già, non fa nulla. Non serve un utente:
--- la pagina pubblica legge solo la vista `negozi_pubblici`.
--- ============================================================================
-insert into public.aziende
-  (slug, nome, email, nome_pubblico, tagline, indirizzo, citta, cap, provincia, portale_attivo, brand)
-values (
-  'ottica-demo',
-  'Ottica Aurora',
-  'demo+ottica-demo@limpidia.it',
-  'Ottica Aurora',
-  'Occhiali e lenti a contatto dal 1987, nel cuore di Bologna.',
-  'Via Indipendenza 42',
-  'Bologna',
-  '40121',
-  'BO',
-  true,
-  '{
-    "primary":   "#1F5C56",
-    "accent":    "#E08A3C",
-    "accentSoft":"#F7E9D8",
-    "surface":   "#F1F4F3",
-    "textSoft":  "#5A6B68",
-    "textFaint": "#8FA09C"
-  }'::jsonb
-)
-on conflict (slug) do nothing;
 
 -- ============================================================================
--- PORTALE G5 — orari, servizi, chiusure + secondo negozio a brand CHIARO
+-- NEGOZI DIMOSTRATIVI DEL PORTALE (G4, consolidato in G5-bis)
 -- ----------------------------------------------------------------------------
--- Dà ai due negozi demo ciò che serve a dimostrare G5 in preview:
---  • ottica-demo: orari con UNA pausa pranzo (Lun–Ven) e un giorno RIDOTTO
---    (Sab mattina), Dom chiuso → prova del raggruppamento; una chiusura futura
---    per ferie; tre servizi attivi con durate diverse.
---  • ottica-chiara: secondo negozio con `brand.primary` CHIARO → prova visiva
---    che il contrasto della testata si adatta (testo scuro su insegna chiara).
--- Richiede la migrazione 010 già applicata. Idempotente (guardie not-exists /
--- on conflict). Non serve un utente: le pagine pubbliche leggono solo le viste.
+-- Due negozi demo COMPLETI e di colore OPPOSTO, usabili da vetrina E gestionale:
+--   • Negozio A = l'azienda più vecchia (quella a cui il seed attacca clienti,
+--     ordini, agenda, cassa): qui viene PUBBLICATA sul portale, con insegna
+--     SCURA. Titolare = la registrazione con cui esiste già.
+--   • Ottica Aurora (slug 'ottica-demo') = negozio dedicato alla vetrina, insegna
+--     CHIARA (la prova del contrasto), con due clienti suoi, orari e servizi.
+--     Titolare creato a parte da scripts/crea-negozio-demo.ts (il seed non può
+--     creare utenti auth: auth.users è di GoTrue). Vedi docs/credenziali-demo.md.
+-- moduli_attivi DIVERSI di proposito: oggi lib/modules.ts NON legge quella
+-- colonna (attivo:true a mano) → nessun effetto visibile; il dato c'è già per
+-- quando accenderemo il meccanismo (limite noto, vedi PR).
+-- Richiede la migrazione 010 applicata. Idempotente.
 -- ============================================================================
+
+-- Ottica Aurora: negozio di vetrina con insegna CHIARA (→ testata a testo scuro).
 insert into public.aziende
   (slug, nome, email, nome_pubblico, tagline, indirizzo, citta, cap, provincia, portale_attivo, brand)
 values (
-  'ottica-chiara', 'Ottica Luce', 'demo+ottica-chiara@limpidia.it',
-  'Ottica Luce', 'Luce naturale e montature leggere, dal 2005.',
-  'Corso Vittorio Emanuele 10', 'Lecce', '73100', 'LE', true,
-  '{"primary":"#F0E4CE","accent":"#B4551A","accentSoft":"#F6E8DE","surface":"#FAF6EE","textSoft":"#6E6A64","textFaint":"#8B877F"}'::jsonb
+  'ottica-demo', 'Ottica Aurora', 'demo+ottica-demo@limpidia.it',
+  'Ottica Aurora', 'Occhiali e lenti a contatto dal 1987, nel cuore di Bologna.',
+  'Via Indipendenza 42', 'Bologna', '40121', 'BO', true,
+  '{"primary":"#F0E6D2","accent":"#B4551A","accentSoft":"#F6E8DE","surface":"#FBF7EF","textSoft":"#6E6A64","textFaint":"#8B877F"}'::jsonb
 )
 on conflict (slug) do nothing;
 
 do $$
 declare
-  v_demo   uuid;
-  v_chiara uuid;
+  v_a      uuid;   -- negozio A: la più vecchia
+  v_aurora uuid;   -- Ottica Aurora
+  v_default text[] := array['dashboard','clienti','prescrizioni'];
 begin
-  select id into v_demo   from public.aziende where slug = 'ottica-demo';
-  select id into v_chiara from public.aziende where slug = 'ottica-chiara';
+  select id into v_a      from public.aziende order by created_at limit 1;
+  select id into v_aurora from public.aziende where slug = 'ottica-demo';
 
-  -- ── ottica-demo · orari (pausa pranzo Lun–Ven, Sab ridotto, Dom chiuso) ──
-  if v_demo is not null and not exists (select 1 from public.orari_apertura where azienda_id = v_demo) then
-    insert into public.orari_apertura (azienda_id, giorno, apre, chiude) values
-      (v_demo, 1, '09:00', '13:00'), (v_demo, 1, '15:00', '19:30'),
-      (v_demo, 2, '09:00', '13:00'), (v_demo, 2, '15:00', '19:30'),
-      (v_demo, 3, '09:00', '13:00'), (v_demo, 3, '15:00', '19:30'),
-      (v_demo, 4, '09:00', '13:00'), (v_demo, 4, '15:00', '19:30'),
-      (v_demo, 5, '09:00', '13:00'), (v_demo, 5, '15:00', '19:30'),
-      (v_demo, 6, '09:00', '12:30');
-  end if;
+  -- ══ Negozio A · pubblicazione sul portale (insegna SCURA) ══════════════════
+  -- Valorizza i campi di vetrina SOLO se vuoti (coalesce) e il brand/moduli SOLO
+  -- se ancora al default: chi ha personalizzato non si ritrova resettato.
+  if v_a is not null and v_a <> coalesce(v_aurora, '00000000-0000-0000-0000-000000000000'::uuid) then
+    update public.aziende set
+      nome_pubblico  = coalesce(nome_pubblico, nome),
+      tagline        = coalesce(tagline, 'La tua ottica di fiducia, dal 1990.'),
+      indirizzo      = coalesce(indirizzo, 'Via Roma 12'),
+      citta          = coalesce(citta, 'Milano'),
+      cap            = coalesce(cap, '20121'),
+      provincia      = coalesce(provincia, 'MI'),
+      portale_attivo = true,
+      brand = case when brand->>'primary' = '#1C1714'
+        then '{"primary":"#243447","accent":"#C98A2B","accentSoft":"#EFE4D3","surface":"#F4F6F8","textSoft":"#5B6773","textFaint":"#93A0AC"}'::jsonb
+        else brand end,
+      moduli_attivi = case when moduli_attivi = v_default
+        then array['dashboard','clienti','prescrizioni','ordini','magazzino','agenda','richiami','cassa']
+        else moduli_attivi end
+    where id = v_a;
 
-  -- ── ottica-demo · servizi attivi (durate diverse; 'lenti' in deroga) ──
-  if v_demo is not null then
+    if not exists (select 1 from public.orari_apertura where azienda_id = v_a) then
+      insert into public.orari_apertura (azienda_id, giorno, apre, chiude) values
+        (v_a,1,'09:00','19:00'),(v_a,2,'09:00','19:00'),(v_a,3,'09:00','19:00'),
+        (v_a,4,'09:00','19:00'),(v_a,5,'09:00','19:00'),(v_a,6,'09:00','13:00');
+    end if;
     insert into public.negozi_servizi (azienda_id, servizio_codice, durata_minuti, attivo) values
-      (v_demo, 'visita',   null, true),
-      (v_demo, 'occhiale', null, true),
-      (v_demo, 'lenti',    45,   true)
+      (v_a,'visita',null,true),(v_a,'occhiale',null,true),(v_a,'controllo',null,true)
     on conflict (azienda_id, servizio_codice) do nothing;
   end if;
 
-  -- ── ottica-demo · chiusura futura per ferie ──
-  if v_demo is not null and not exists (select 1 from public.chiusure where azienda_id = v_demo) then
-    insert into public.chiusure (azienda_id, dal, al, motivo) values
-      (v_demo, current_date + 30, current_date + 44, 'Ferie estive');
-  end if;
+  -- ══ Ottica Aurora · insegna chiara, moduli ridotti, orari/servizi, 2 clienti ═
+  if v_aurora is not null then
+    -- forza l'insegna chiara e i moduli ridotti anche sulle righe già esistenti
+    -- (in G4 era scura): è il negozio demo che controlliamo interamente.
+    update public.aziende set
+      brand = '{"primary":"#F0E6D2","accent":"#B4551A","accentSoft":"#F6E8DE","surface":"#FBF7EF","textSoft":"#6E6A64","textFaint":"#8B877F"}'::jsonb,
+      moduli_attivi = array['dashboard','agenda','clienti']
+    where id = v_aurora;
 
-  -- ── ottica-chiara · orario continuato + Sab mattina ──
-  if v_chiara is not null and not exists (select 1 from public.orari_apertura where azienda_id = v_chiara) then
-    insert into public.orari_apertura (azienda_id, giorno, apre, chiude) values
-      (v_chiara, 1, '09:30', '19:00'), (v_chiara, 2, '09:30', '19:00'),
-      (v_chiara, 3, '09:30', '19:00'), (v_chiara, 4, '09:30', '19:00'),
-      (v_chiara, 5, '09:30', '19:00'), (v_chiara, 6, '10:00', '13:00');
-  end if;
-
-  -- ── ottica-chiara · servizi ──
-  if v_chiara is not null then
+    if not exists (select 1 from public.orari_apertura where azienda_id = v_aurora) then
+      insert into public.orari_apertura (azienda_id, giorno, apre, chiude) values
+        (v_aurora,1,'09:00','13:00'),(v_aurora,1,'15:00','19:30'),
+        (v_aurora,2,'09:00','13:00'),(v_aurora,2,'15:00','19:30'),
+        (v_aurora,3,'09:00','13:00'),(v_aurora,3,'15:00','19:30'),
+        (v_aurora,4,'09:00','13:00'),(v_aurora,4,'15:00','19:30'),
+        (v_aurora,5,'09:00','13:00'),(v_aurora,5,'15:00','19:30'),
+        (v_aurora,6,'09:00','12:30');
+    end if;
     insert into public.negozi_servizi (azienda_id, servizio_codice, durata_minuti, attivo) values
-      (v_chiara, 'visita',    null, true),
-      (v_chiara, 'controllo', null, true)
+      (v_aurora,'visita',null,true),(v_aurora,'occhiale',null,true),(v_aurora,'lenti',45,true)
     on conflict (azienda_id, servizio_codice) do nothing;
+    if not exists (select 1 from public.chiusure where azienda_id = v_aurora) then
+      insert into public.chiusure (azienda_id, dal, al, motivo) values
+        (v_aurora, current_date + 30, current_date + 44, 'Ferie estive');
+    end if;
+    -- due clienti SUOI, nomi palesemente diversi da quelli del negozio A.
+    if not exists (select 1 from public.clienti where azienda_id = v_aurora) then
+      insert into public.clienti (azienda_id, nome, cognome, fonte, citta) values
+        (v_aurora, 'Genoveffa', 'Sferruzzi', 'banco', 'Bologna'),
+        (v_aurora, 'Bartolomeo', 'Quaranta', 'banco', 'Bologna');
+    end if;
   end if;
 end $$;
