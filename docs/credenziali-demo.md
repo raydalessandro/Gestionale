@@ -1,8 +1,9 @@
 # Credenziali dimostrative
 
-> Solo per i test manuali sul progetto Supabase demo. Non sono segreti di
-> produzione. La **service role key** non è qui e non va **mai** messa su file
-> versionato: si passa allo script dall'ambiente.
+> Solo per i test manuali sul progetto Supabase demo. **Nessuna credenziale è
+> scritta qui**, nemmeno di prova: la **service role key** e la **password**
+> dimostrativa vivono nell'ambiente e nel gestore di password, e si passano allo
+> script come variabili d'ambiente. In questo file c'è solo l'email pubblica.
 
 Due negozi dimostrativi, **completi e di colore opposto**, entrambi visibili in
 vetrina e accessibili dal gestionale (vedi `docs/fasi/fase-g5bis-dati-dimostrativi.md`).
@@ -25,12 +26,14 @@ due clienti suoi (Genoveffa Sferruzzi, Bartolomeo Quaranta), orari e servizi.
 - **Slug / pagina pubblica:** `/ottica/ottica-demo`
 - **Titolare (gestionale):**
   - email: `titolare.aurora@example.com`
-  - password: `AuroraDemo-2026!`
+  - password: **non è nel repo** — la scegli tu e la passi in `DEMO_PASSWORD`
+    (poi la conservi nel gestore di password).
 - Il titolare **non** lo crea il seed (non può creare utenti auth): si crea con
   lo script di sviluppo, una volta:
 
   ```bash
   SUPABASE_URL=<url> SUPABASE_SERVICE_ROLE_KEY=<service key> \
+    DEMO_PASSWORD=<password scelta> \
     npx tsx scripts/crea-negozio-demo.ts
   ```
 

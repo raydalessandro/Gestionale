@@ -8,27 +8,31 @@
  * `public.utenti` con ruolo 'titolare'.
  *
  * Idempotente: se l'utente esiste già, non fa nulla e lo dice.
- * La chiave di servizio si legge dall'AMBIENTE e non viene MAI scritta su file.
- * Le credenziali dimostrative stanno in docs/credenziali-demo.md, non nel codice.
+ * Chiave di servizio E password si leggono dall'AMBIENTE e non vengono MAI
+ * scritte su file: nessuna credenziale, nemmeno di prova, è committata nel repo.
+ * L'email dimostrativa è in docs/credenziali-demo.md; la password vive
+ * nell'ambiente e nel gestore di password.
  *
  * Uso:
- *   SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… npx tsx scripts/crea-negozio-demo.ts
+ *   SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… DEMO_PASSWORD=… \
+ *     npx tsx scripts/crea-negozio-demo.ts
  */
 import { createClient } from "@supabase/supabase-js";
 
 const URL = process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const PASSWORD = process.env.DEMO_PASSWORD;
 
 const SLUG = "ottica-demo";
 const EMAIL = "titolare.aurora@example.com";
-const PASSWORD = "AuroraDemo-2026!";
 const NOME = "Aurora Bianchi";
 
 async function main(): Promise<void> {
-  if (!URL || !SERVICE) {
+  if (!URL || !SERVICE || !PASSWORD) {
     console.error(
-      "Mancano SUPABASE_URL e/o SUPABASE_SERVICE_ROLE_KEY nell'ambiente. " +
-        "Passale come variabili d'ambiente (mai su file versionato)."
+      "Mancano una o più variabili d'ambiente: SUPABASE_URL, " +
+        "SUPABASE_SERVICE_ROLE_KEY, DEMO_PASSWORD. Passale dall'ambiente " +
+        "(mai su file versionato)."
     );
     process.exit(1);
   }
