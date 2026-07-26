@@ -538,21 +538,31 @@ describe("L4d · guardie vocabolario fonte", () => {
  *            valore per valore, e lo spazio `lim` esiste separato.
  * ════════════════════════════════════════════════════════════════════════ */
 describe("L4e · guardie portale pubblico", () => {
-  it("G13 · ROTTE_PUBBLICHE in proxy.ts è esattamente [/login,/registrati,/auth,/ottica]", () => {
-    const src = leggi("proxy.ts");
-    const m = src.match(/ROTTE_PUBBLICHE\s*=\s*\[([^\]]*)\]/);
-    expect(m, "ROTTE_PUBBLICHE non trovato o non è un array letterale in proxy.ts").toBeTruthy();
-    const rotte = m![1]
+  // Estrae un array letterale `NOME = [ ... ]` da proxy.ts come lista di stringhe.
+  const arrayLetterale = (src: string, nome: string): string[] => {
+    const m = src.match(new RegExp(`${nome}\\s*=\\s*\\[([^\\]]*)\\]`));
+    expect(m, `${nome} non trovato o non è un array letterale in proxy.ts`).toBeTruthy();
+    return m![1]
       .split(",")
       .map((s) => s.trim().replace(/^["']|["']$/g, ""))
       .filter(Boolean);
-    expect(rotte, "l'elenco delle rotte pubbliche è cambiato").toEqual([
+  };
+
+  it("G13 · ROTTE_PUBBLICHE (prefissi) è esattamente [/login,/registrati,/auth,/ottica,/informativa]", () => {
+    const src = leggi("proxy.ts");
+    // Prefissi pubblici: aggiungerne uno è una scelta di sicurezza deliberata.
+    // `/informativa` è pubblica (Checkpoint): l'anonimo che prenota la deve poter aprire.
+    expect(arrayLetterale(src, "ROTTE_PUBBLICHE"), "l'elenco dei prefissi pubblici è cambiato").toEqual([
       "/login",
       "/registrati",
       "/auth",
       "/ottica",
+      "/informativa",
     ]);
-    // Difesa esplicita: la vecchia catena di || non deve tornare.
+    // La radice «/» è pubblica per corrispondenza ESATTA, non come prefisso (un
+    // prefisso «/» aprirebbe tutta l'app). Vive in un array a parte, sorvegliato.
+    expect(arrayLetterale(src, "ROTTE_PUBBLICHE_ESATTE"), "l'elenco delle rotte esatte è cambiato").toEqual(["/"]);
+    // Difesa esplicita: la vecchia catena di || scritta a mano non deve tornare.
     expect(
       /isPublic\s*=\s*\n?\s*path\.startsWith\([^)]*\)\s*\|\|/.test(src),
       "il controllo pubblico è tornato a una catena di || scritta a mano"

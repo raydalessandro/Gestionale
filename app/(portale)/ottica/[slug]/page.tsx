@@ -69,7 +69,17 @@ export async function generateMetadata({
   if (!negozio) return { title: "Negozio non trovato" };
 
   const canonico = await urlCanonico(slug);
-  const descrizione = negozio.tagline ?? `${negozio.nome_pubblico} — ottica`;
+  // Descrizione per la condivisione (WhatsApp è un canale vero): città e servizi,
+  // così l'anteprima dice dove e cosa. Ripiego sulla tagline se manca il resto.
+  // L'IMMAGINE OG resta scoperta di proposito — è nei debiti dichiarati, con
+  // scadenza «prima del primo negozio reale» (docs/agenti/TODO-ray.md §4).
+  const servizi = await serviziDaSlug(slug);
+  const luogo = negozio.citta?.trim() ? ` a ${negozio.citta.trim()}` : "";
+  const listaServizi = servizi.map((s) => s.etichetta).slice(0, 4).join(", ");
+  const descrizione =
+    listaServizi
+      ? `${negozio.nome_pubblico}${luogo} — ${listaServizi}.`
+      : negozio.tagline ?? `${negozio.nome_pubblico}${luogo} — ottica.`;
   return {
     title: negozio.nome_pubblico,
     description: descrizione,
@@ -271,14 +281,16 @@ export default async function PaginaNegozio({
         )}
 
         {/* Firma limpidia — solo in modalità aggregatore («portale»). Guest sul
-            materiale del negozio: marchio MONOCROMATICO inchiostro, mai ambra. */}
+            materiale del negozio: marchio MONOCROMATICO inchiostro, mai ambra.
+            Rimanda alla radice (limpidia.it): piccola, in nero. */}
         {modalita === "portale" && (
-          <div className="flex flex-col items-center gap-2 pb-2 pt-2">
+          <Link href="/" className="flex flex-col items-center gap-2 pb-2 pt-2">
             <span className="inline-flex items-center gap-2 text-[11.5px] uppercase tracking-[0.04em] text-lim-faint">
               <SimboloLimpidia size={13} colore="#171512" /> Prenotazioni con
             </span>
             <LogoLimpidia width={104} testo="#171512" punti="#171512" />
-          </div>
+            <span className="text-[11px] text-lim-faint">limpidia.it</span>
+          </Link>
         )}
       </main>
     </div>

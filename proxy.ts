@@ -6,9 +6,18 @@ import { NextResponse, type NextRequest } from "next/server";
  * deliberata: la guardia G13 verifica che questo array sia ESATTAMENTE quello
  * atteso, così una nuova rotta pubblica rompe un test invece di passare inosservata.
  *   • /login, /registrati, /auth — il flusso di accesso del gestionale;
- *   • /ottica — la vetrina pubblica del negozio (portale), aperta agli anonimi.
+ *   • /ottica — la vetrina pubblica del negozio (portale), aperta agli anonimi;
+ *   • /informativa — l'informativa privacy delle prenotazioni.
  */
-export const ROTTE_PUBBLICHE = ["/login", "/registrati", "/auth", "/ottica"] as const;
+export const ROTTE_PUBBLICHE = ["/login", "/registrati", "/auth", "/ottica", "/informativa"] as const;
+
+/**
+ * Rotte pubbliche a corrispondenza ESATTA (non prefisso). La radice «/» deve
+ * essere pubblica — un anonimo ci trova la landing Limpidia, non il modulo di
+ * accesso — ma «/» come prefisso combacerebbe con tutto, aprendo il gestionale.
+ * Quindi vive qui, confrontata per uguaglianza. La guardia G13 la sorveglia.
+ */
+export const ROTTE_PUBBLICHE_ESATTE = ["/"] as const;
 
 /**
  * Middleware: tiene fresca la sessione Supabase e protegge le rotte.
@@ -44,7 +53,9 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  const isPublic = ROTTE_PUBBLICHE.some((r) => path.startsWith(r));
+  const isPublic =
+    (ROTTE_PUBBLICHE_ESATTE as readonly string[]).includes(path) ||
+    ROTTE_PUBBLICHE.some((r) => path.startsWith(r));
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();
