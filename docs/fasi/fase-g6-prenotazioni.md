@@ -110,13 +110,14 @@ seed: nascono in G7, dal percorso vero.
   anticipo, **cambio ora legale**) sono esercitati come test di **contratto**
   contro il DB di test, non come unit puri.
 
-## Nota per la CI e allegato
+## Nota per la CI
 
 - La 011 va applicata anche al progetto Supabase di **test** perché contratto/E2E
   girino (vedi `docs/agenti/TODO-ray.md`).
-- L'**allegato ID-01** non era nel messaggio della consegna:
-  `docs/decisioni/ID-01-identita.md` è una sintesi dal testo, da sostituire con
-  l'originale quando arriva.
+- Il modello di identità è deciso in `docs/decisioni/ID-01-identita.md` (documento
+  canonico, committato invariato): la 011 lo rispetta — `persone` di Limpidia,
+  `clienti` del negozio, `prenotazioni.cliente_id` vuoto fino all'accettazione,
+  nessuna tabella ponte, registro append-only, il negozio non legge mai `persone`.
 
 ## Criterio di accettazione
 
