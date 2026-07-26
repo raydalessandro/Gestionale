@@ -48,7 +48,23 @@ export type UtenteRow = {
   updated_at: string;
 }
 
-export type Fonte = "banco" | "sito" | "app" | "convenzione" | "import";
+/** Vocabolario `fonte` — deve restare allineato al check SQL della migrazione 008
+ *  (`clienti.fonte`). L'ordine è quello del check, così il confronto è a occhio.
+ *  Unica fonte di verità: tipo, etichette, tinte e form derivano tutti da qui. */
+export const FONTI = [
+  "banco",
+  "app",
+  "convenzione",
+  "import",
+  "qr_vetrina",
+  "sito_negozio",
+  "portale",
+] as const;
+
+export type Fonte = (typeof FONTI)[number];
+
+/** Le sole fonti che un umano può scegliere a mano. Le altre le assegna il sistema. */
+export const FONTI_MANUALI = ["banco", "convenzione", "import"] as const;
 
 export type ClienteRow = {
   id: string;

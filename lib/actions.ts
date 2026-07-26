@@ -12,6 +12,7 @@ import type {
   MovimentoMagazzinoRow,
   RigaVendita,
   PagamentoVendita,
+  Fonte,
 } from "@/lib/database.types";
 import { ivaScorporo } from "@/components/CassaUI";
 import {
@@ -101,8 +102,7 @@ function clienteDaForm(fd: FormData) {
     provincia: str(fd, "provincia")?.toUpperCase() ?? null,
     nazione: str(fd, "nazione"),
     lingua: str(fd, "lingua"),
-    fonte: (str(fd, "fonte") ?? "banco") as
-      | "banco" | "sito" | "app" | "convenzione" | "import",
+    fonte: (str(fd, "fonte") ?? "banco") as Fonte,
     consenso_marketing: consenso,
     data_consenso: consenso ? new Date().toISOString() : null,
     note: str(fd, "note"),

@@ -3,8 +3,9 @@
 import { useActionState } from "react";
 import { creaCliente, aggiornaCliente } from "@/lib/actions";
 import type { ClienteRow } from "@/lib/database.types";
+import { FONTI_MANUALI } from "@/lib/database.types";
 import { Card, Field, inputCls, Errore } from "@/components/ui";
-import { ETICHETTE_CANALE_PREFERITO } from "@/lib/utils";
+import { ETICHETTE_CANALE_PREFERITO, ETICHETTE_FONTE } from "@/lib/utils";
 
 export default function ClienteForm({ cliente }: { cliente?: ClienteRow }) {
   const azioneBound = cliente
@@ -129,13 +130,25 @@ export default function ClienteForm({ cliente }: { cliente?: ClienteRow }) {
         </p>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Fonte" hint="Da dove arriva il cliente — alimenta il ROI.">
-            <select name="fonte" className={inputCls} defaultValue={cliente?.fonte ?? "banco"} aria-label="fonte">
-              <option value="banco">Banco</option>
-              <option value="sito">Dal sito</option>
-              <option value="app">Dall&apos;app</option>
-              <option value="convenzione">Convenzione</option>
-              <option value="import">Import</option>
-            </select>
+            {cliente && !(FONTI_MANUALI as readonly string[]).includes(cliente.fonte) ? (
+              // Fonte assegnata dal sistema (es. portale, QR): non deve poter
+              // retrocedere a "banco". La mostro in sola lettura e la rimando
+              // invariata con un campo nascosto.
+              <>
+                <p className={`${inputCls} bg-carta text-soft`} aria-label="fonte">
+                  {ETICHETTE_FONTE[cliente.fonte]}
+                </p>
+                <input type="hidden" name="fonte" value={cliente.fonte} />
+              </>
+            ) : (
+              <select name="fonte" className={inputCls} defaultValue={cliente?.fonte ?? "banco"} aria-label="fonte">
+                {FONTI_MANUALI.map((f) => (
+                  <option key={f} value={f}>
+                    {ETICHETTE_FONTE[f]}
+                  </option>
+                ))}
+              </select>
+            )}
           </Field>
           <Field label="Lingua" hint="Vuoto = italiano.">
             <input name="lingua" className={inputCls} defaultValue={cliente?.lingua ?? ""} placeholder="Italiano" />

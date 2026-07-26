@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
+import { FONTI, FONTI_MANUALI } from "@/lib/database.types";
+import { ETICHETTE_FONTE } from "@/lib/utils";
 
 /**
  * L4 · Guardie statiche — leggono il sorgente dell'app e falliscono se
@@ -384,6 +386,71 @@ describe("L4c · guardia anti-regressione sul rename proxy (Next 16)", () => {
         src.includes(`"${rotta}"`),
         `rotta pubblica ${rotta} non più elencata in proxy.ts`
       ).toBe(true);
+    }
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * L4d · GUARDIE VOCABOLARIO `fonte` (G3)
+ *
+ * Il vocabolario `fonte` vive in tre posti che DEVONO combaciare:
+ *   • il check SQL della migrazione 008 (la verità del DB);
+ *   • la costante FONTI in lib/database.types.ts (la verità del codice);
+ *   • le mappe derivate (etichette, tinte, form).
+ * Se divergono in silenzio, il DB rifiuta un valore che l'app mostra, o l'app
+ * mostra un'etichetta grezza per un valore che il DB accetta. Queste guardie
+ * legano i tre posti: aggiungere una fonte senza aggiornarli tutti diventa
+ * rosso. G12b/G12c non leggono file — confrontano i valori importati, così
+ * scattano anche su un refuso nelle chiavi.
+ * ════════════════════════════════════════════════════════════════════════ */
+describe("L4d · guardie vocabolario fonte", () => {
+  /** Estrae la lista `fonte in ('a','b',…)` di un check dalla migrazione 008. */
+  function fontiDalCheck(nomeVincolo: string): string[] {
+    const sql = leggi("supabase/migrazioni/008_sicurezza_tenant.sql");
+    const re = new RegExp(
+      `constraint\\s+${nomeVincolo}\\s+check\\s*\\(\\s*fonte\\s+in\\s*\\(([^)]*)\\)`,
+      "i"
+    );
+    const m = sql.match(re);
+    if (!m) throw new Error(`check ${nomeVincolo} non trovato nella migrazione 008`);
+    return m[1]
+      .split(",")
+      .map((s) => s.trim().replace(/^'|'$/g, ""))
+      .filter(Boolean);
+  }
+
+  it("G12 · FONTI (codice) combacia col check SQL di clienti e appuntamenti (008)", () => {
+    // Ordine compreso: il commento in database.types.ts promette «stesso ordine
+    // del check», così il confronto a occhio in review è affidabile.
+    const daClienti = fontiDalCheck("clienti_fonte_check");
+    const daAppuntamenti = fontiDalCheck("appuntamenti_fonte_check");
+    expect(daClienti, "clienti_fonte_check ≠ FONTI").toEqual([...FONTI]);
+    expect(daAppuntamenti, "appuntamenti_fonte_check ≠ FONTI").toEqual([...FONTI]);
+    // 'sito' è stato ritirato: non deve ricomparire nel vocabolario.
+    expect(FONTI as readonly string[]).not.toContain("sito");
+  });
+
+  it("G12b · ETICHETTE_FONTE ha esattamente le chiavi di FONTI (nessuna in più, nessuna in meno)", () => {
+    const chiavi = Object.keys(ETICHETTE_FONTE).sort();
+    expect(chiavi, "le chiavi di ETICHETTE_FONTE non combaciano con FONTI").toEqual(
+      [...FONTI].sort()
+    );
+    // Nessuna etichetta vuota: ogni fonte ha un nome «da banco».
+    for (const f of FONTI) {
+      expect(ETICHETTE_FONTE[f]?.length, `etichetta vuota per ${f}`).toBeGreaterThan(0);
+    }
+  });
+
+  it("G12c · FONTI_MANUALI è un sottoinsieme di FONTI e non include le fonti di sistema", () => {
+    for (const f of FONTI_MANUALI) {
+      expect(FONTI as readonly string[], `${f} manuale non è in FONTI`).toContain(f);
+    }
+    // Le fonti assegnate dal sistema non devono essere scegliibili a mano.
+    for (const sistema of ["qr_vetrina", "sito_negozio", "portale", "app"]) {
+      expect(
+        FONTI_MANUALI as readonly string[],
+        `${sistema} è di sistema: non deve stare fra le fonti manuali`
+      ).not.toContain(sistema);
     }
   });
 });
