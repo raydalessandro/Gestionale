@@ -63,6 +63,10 @@ export const FONTI = [
 
 export type Fonte = (typeof FONTI)[number];
 
+/** Vocabolario `fonte` degli ordini: come quello dei clienti, meno `import`
+ *  (un ordine non si importa). Allineato al check SQL della migrazione 009. */
+export type FonteOrdine = Exclude<Fonte, "import">;
+
 /** Le sole fonti che un umano può scegliere a mano. Le altre le assegna il sistema. */
 export const FONTI_MANUALI = ["banco", "convenzione", "import"] as const;
 
@@ -262,7 +266,7 @@ export type OrdineLacRow = {
   cliente_id: string | null;
   prescrizione_id: string | null;
   numero: string;
-  fonte: Exclude<Fonte, "import">;
+  fonte: FonteOrdine;
   stato: "da_ordinare" | "ordinato" | "arrivato" | "consegnato" | "annullato";
   righe: Json;
   totale: number;
@@ -281,7 +285,7 @@ export type OrdineOcchialiRow = {
   cliente_id: string | null;
   prescrizione_id: string | null;
   numero: string;
-  fonte: Exclude<Fonte, "import">;
+  fonte: FonteOrdine;
   stato: "preventivo" | "lavorazione" | "arrivata" | "pronta" | "consegnata" | "annullata";
   tipo_lavoro: "occhiale_completo" | "solo_lenti" | "solo_montatura" | "montatura_cliente";
   montatura_marca: string | null;

@@ -136,7 +136,7 @@ export default function ClienteForm({ cliente }: { cliente?: ClienteRow }) {
               // invariata con un campo nascosto.
               <>
                 <p className={`${inputCls} bg-carta text-soft`} aria-label="fonte">
-                  {ETICHETTE_FONTE[cliente.fonte]}
+                  {ETICHETTE_FONTE[cliente.fonte] ?? cliente.fonte}
                 </p>
                 <input type="hidden" name="fonte" value={cliente.fonte} />
               </>
