@@ -68,6 +68,14 @@ esce senza icona e con anteprima social vuota.
 - **Contrasto testata del portale → FATTO in G5.** Funzione deterministica
   `testoSuFondo` (luminanza WCAG di `brand.primary` → inchiostro o bianco, stessa
   logica su bordo e sfumature). Voce chiusa.
+- **Residuo dei test di prenotazione sul DB di test (G7).** Le prenotazioni sono
+  **non cancellabili** (trigger no-delete, §ID-01) e **pinnano la persona** (FK
+  restrict): il contratto `crea-prenotazione` lascia quindi righe residue che una
+  delete a cascata dell'azienda di test non riesce a rimuovere. Mitigato oggi con
+  slug/telefoni unici per `RUN_ID`, ma sul progetto `gestionale-test` serve una
+  **RPC `SECURITY DEFINER` di pulizia** (o un reset periodico) per non accumulare.
+  Da fare **insieme al setup del progetto di test (punto 1)**, prima che la CI
+  giri il contratto in continuo. Vedi `docs/agenti/report-test.md`.
 
 ## 6 · Fuso orario preesistente in `lib/utils.ts` (TERMINE: prima di stampare date)
 
