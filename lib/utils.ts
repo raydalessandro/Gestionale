@@ -1,5 +1,7 @@
 /** Utility di dominio — formattazioni "da banco". */
 
+import type { Fonte } from "@/lib/database.types";
+
 /** Diottrie: segno sempre esplicito, due decimali, meno tipografico. */
 export function fmtDiottria(v: number | null | undefined): string {
   if (v === null || v === undefined || Number.isNaN(v)) return "—";
@@ -52,12 +54,18 @@ export function generaNumero(prefisso: "BL" | "OL", progressivo: number): string
   return `${prefisso}-${anno}-${String(progressivo).padStart(4, "0")}`;
 }
 
-export const ETICHETTE_FONTE: Record<string, string> = {
+// Tipo: l'intersezione impone TUTTE le chiavi di Fonte (se aggiungi una fonte a
+// FONTI e scordi l'etichetta, qui non compila) e insieme tollera l'accesso con
+// una string qualunque, così i consumatori in app/ che indicizzano con una
+// `fonte` grezza (pattern `ETICHETTE_FONTE[x] ?? x`) restano intatti.
+export const ETICHETTE_FONTE: Record<Fonte, string> & Record<string, string> = {
   banco: "Banco",
-  sito: "Dal sito",
   app: "Dall'app",
   convenzione: "Convenzione",
   import: "Import",
+  qr_vetrina: "QR in vetrina",
+  sito_negozio: "Sito del negozio",
+  portale: "Portale",
 };
 
 /* ── Stati pipeline (colori demo + estensioni fase 1) ─────────────── */

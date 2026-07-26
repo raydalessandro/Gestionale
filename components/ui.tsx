@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import type { Fonte } from "@/lib/database.types";
 
 /* ── Superfici ─────────────────────────────────────────────────────── */
 
@@ -158,17 +159,21 @@ export function Badge({
   );
 }
 
+/** Tinta del badge per ogni fonte. Deriva dal vocabolario unico: se aggiungi
+ *  una fonte a FONTI e scordi la tinta, TypeScript qui non compila. L'input è
+ *  tollerante (una fonte sconosciuta a runtime cade su "neutro"). */
+const TINTE_FONTE: Record<Fonte, keyof typeof badgeTinte> = {
+  banco: "neutro",
+  app: "verde",
+  convenzione: "ottone",
+  import: "neutro",
+  qr_vetrina: "ambra",
+  sito_negozio: "blu",
+  portale: "ambra",
+};
+
 export function tintaFonte(fonte: string): keyof typeof badgeTinte {
-  switch (fonte) {
-    case "sito":
-      return "blu";
-    case "app":
-      return "verde";
-    case "convenzione":
-      return "ottone";
-    default:
-      return "neutro";
-  }
+  return TINTE_FONTE[fonte as Fonte] ?? "neutro";
 }
 
 /* ── Vuoti ─────────────────────────────────────────────────────────── */
