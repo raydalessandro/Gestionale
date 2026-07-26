@@ -5,7 +5,7 @@ import { NextResponse, type NextRequest } from "next/server";
  * Middleware: tiene fresca la sessione Supabase e protegge le rotte.
  * Pubbliche: /login, /registrati, /auth/*. Tutto il resto richiede login.
  */
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(

@@ -6,7 +6,7 @@ Repo separato dalla demo, per scelta: qui vive il dato vero. Ciò che mette in
 comunicazione tutte le app dell'ottico (gestionale, sito pubblico LAC, app
 white-label, demo, tool agente) **è il database**: questo repo ne è il custode.
 
-- Stack: **Next.js 15 (App Router) · React 19 · TypeScript · Tailwind · Supabase**
+- Stack: **Next.js 16 (App Router) · React 19.2 · TypeScript · Tailwind · Supabase** — versioni fissate e storia dei salti in [`docs/stack.md`](docs/stack.md).
 - Supabase è open source: stesso schema in cloud o self-hosted, online o offline.
 - Multi-tenant con RLS: ogni riga vive dentro la sua `azienda`. Punto.
 
