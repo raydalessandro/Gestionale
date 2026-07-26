@@ -162,4 +162,20 @@ describe.skipIf(!haEnv())("011 · Prenotazioni — sicurezza e accessi", () => {
     expect(Array.isArray(data)).toBe(true);
     expect((data as string[]).length, "spento = niente slot, pur avendo orari").toBe(0);
   });
+
+  // ── Sentinella IMMUTABLE (gemella di diag_intervallo_immutabile) ───────────
+  // Perché conta: `persone.telefono_normalizzato` è una colonna GENERATA da
+  // `normalizza_telefono`, con INDICE UNICO sopra. Se qualcuno riscrive la
+  // funzione (es. per un prefisso estero) senza una migrazione di ricalcolo, le
+  // righe vecchie tengono la vecchia normalizzazione: la STESSA persona si
+  // sdoppia sotto l'unique, e nessun altro test diventa rosso. Questa sentinella
+  // lo grida: la funzione deve restare IMMUTABLE (provolatile 'i', requisito
+  // della colonna generata/indice) e conservare la forma del corpo.
+  it("normalizza_telefono resta IMMUTABLE e con il corpo atteso (+39)", async () => {
+    const { data, error } = await svc.rpc("diag_normalizza_telefono");
+    expect(error).toBeFalsy();
+    const row = Array.isArray(data) ? data[0] : data;
+    expect(row?.volatile_immutabile, "provolatile deve essere 'i' (IMMUTABLE)").toBe(true);
+    expect(row?.corpo_ok, "il corpo deve restare regexp_replace + prefisso +39").toBe(true);
+  });
 });
