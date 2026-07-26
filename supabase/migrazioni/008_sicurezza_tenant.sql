@@ -194,6 +194,25 @@ $$;
 comment on function public.appuntamento_intervallo(timestamptz, int) is
   'DB-04: intervallo [inizio, inizio+durata) di un appuntamento come tstzrange IMMUTABLE (durata in minuti, sicura sul timestamptz assoluto). Serve al vincolo di non-sovrapposizione.';
 
+-- Sentinella (chiesta in review, stessa famiglia della guardia G11 sul proxy):
+-- appuntamento_intervallo è IMMUTABLE SOLO perché la durata è in minuti. Se un
+-- domani la si riscrivesse con giorni o mesi resterebbe marcata IMMUTABLE ma
+-- l'indice GIST già costruito diventerebbe silenziosamente sbagliato → doppie
+-- prenotazioni, nessun errore. Questa RPC espone i due fatti da verificare a
+-- contratto: volatilità 'i' e corpo che usa ancora `interval '1 minute'`.
+create or replace function public.diag_intervallo_immutabile()
+returns table (volatile_immutabile boolean, corpo_minuti boolean)
+language sql stable security definer set search_path = public, pg_catalog as $$
+  select p.provolatile = 'i',
+         p.prosrc ilike '%interval ''1 minute''%'
+  from pg_proc p
+  join pg_namespace n on n.oid = p.pronamespace
+  where n.nspname = 'public' and p.proname = 'appuntamento_intervallo';
+$$;
+-- Supabase concede execute ad anon di default sulle funzioni nuove: qui la
+-- togliamo (la diagnostica non serve al pubblico; il test usa il service role).
+revoke execute on function public.diag_intervallo_immutabile() from anon, public;
+
 alter table public.appuntamenti
   drop constraint if exists appuntamenti_niente_sovrapposizioni;
 alter table public.appuntamenti

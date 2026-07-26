@@ -168,3 +168,21 @@ TS non conosce il check del DB). Da allineare subito dopo.
 - **Applicazione al DB.** La migrazione è **verificata ma NON applicata** ad
   alcun database (dry-run con rollback): si applica al progetto di test / demo
   dopo la revisione.
+
+## Dalla review (008 approvata)
+
+- **Sentinella IMMUTABLE aggiunta (richiesta in review).** `appuntamento_intervallo`
+  è IMMUTABLE solo perché la durata è in minuti; riscriverla con giorni/mesi la
+  renderebbe finto-immutabile e l'indice GIST diventerebbe silenziosamente
+  sbagliato (doppie prenotazioni, nessun errore). RPC `diag_intervallo_immutabile()`
+  (execute revocato ad anon) + test di contratto verificano `provolatile = 'i'`
+  e il corpo che usa ancora `interval '1 minute'`. Controprova fatta: con
+  `interval '1 day'` + `stable` la sentinella dà false/false (scatta davvero).
+- **Condizione sul gap `'sito'` (punto B.5).** L'errore di check su "Dal sito"
+  fra questo merge e il prossimo è accettato **solo se G3 è il merge
+  immediatamente successivo**. Se in mezzo entra altro, va chiuso subito
+  **rimettendo temporaneamente `'sito'` nel check** di `clienti.fonte`.
+- **Nota per le tabelle del portale (futuro).** La revoca `select` da `anon` qui
+  è esplicita su `aziende`, ma Supabase concede `select` ad `anon` di default su
+  **ogni tabella nuova**: le tabelle del portale dovranno ricevere lo stesso
+  trattamento **nella loro migrazione**, non dopo.

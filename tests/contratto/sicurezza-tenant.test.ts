@@ -132,6 +132,17 @@ describe.skipIf(!haEnv())("008 · Sicurezza e isolamento tenant", () => {
     expect(r.error).toBeFalsy();
   });
 
+  // ── Sentinella IMMUTABLE (richiesta in review) ─────────────────────────
+  it("appuntamento_intervallo resta IMMUTABLE e in minuti", async () => {
+    // Se qualcuno la riscrive con giorni/mesi, resta marcata IMMUTABLE ma
+    // l'indice GIST diventa silenziosamente sbagliato: questa sentinella lo grida.
+    const { data, error } = await svc.rpc("diag_intervallo_immutabile");
+    expect(error).toBeFalsy();
+    const row = Array.isArray(data) ? data[0] : data;
+    expect(row?.volatile_immutabile, "provolatile deve essere 'i' (IMMUTABLE)").toBe(true);
+    expect(row?.corpo_minuti, "il corpo deve ancora usare interval '1 minute'").toBe(true);
+  });
+
   it("un appuntamento ANNULLATO non blocca lo slot", async () => {
     // annullato sovrapposto a base in A (dove base è già occupato da 'prenotato')
     const rAnn = await appuntamento(svc, A.aziendaId, A.userId, { inizio: base10, stato: "annullato" });
