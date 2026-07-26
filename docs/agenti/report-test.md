@@ -1,8 +1,12 @@
 # Report — Agente Test & CI
 
-Aggiornato: 2026-07-16 · Fasi coperte: 1, 2, 3, 4 (v0.1–v0.5) +
+Aggiornato: 2026-07-26 · Fasi coperte: 1, 2, 3, 4 (v0.1–v0.5) +
 interfasi **4b anagrafiche (006)**, **4c caparra in cassa (007)**,
-**4d consensi (007)**.
+**4d consensi (007)**. Branch `gest/next-16`: upgrade framework
+**Next 15.5.20 → 16.2.12 · React 19.0 → 19.2.8** (solo codemod, zero cambi di
+comportamento). Il codemod ha rinominato `middleware.ts → proxy.ts` (Next 16
+cerca l'export `proxy`); logica byte-identica tranne la firma. Rete di sicurezza
+irrobustita con la guardia **G11** su questo rename (vedi L4c).
 
 La rete di sicurezza segue l'ordine di lavoro (`docs/agenti/agente-test.md`):
 pochi test UI d'oro (i collaudi), tanto contratto vero, unit solo sulla logica
@@ -13,10 +17,12 @@ pura, guardie statiche. Nessun file dell'app è stato toccato dall'agente.
 `npm test` (= L1 unit + L4 guardie, gli unici eseguibili senza rete/DB):
 
     Test Files  4 passed (4)
-         Tests  57 passed (57)   ← 46 unit + 6 guardie base + 5 guardie di coerenza
+         Tests  60 passed (60)   ← 46 unit + 6 guardie base + 5 coerenza + 3 rename-proxy
 
 Dettaglio: `utils` 24 · `cassa-calcoli` 17 · `anagrafiche-utils` 5 ·
-`guardie` 11 (G1–G4b base, G5–G10 coerenza).
+`guardie` 14 (G1–G4b base, G5–G10 coerenza, G11/G11b/G11c rename-proxy Next 16).
+Verde su Next 16.2.12; `tsc --noEmit` exit 0, build Turbopack ok (non rieseguiti
+qui, riferiti dall'orchestratore).
 
 `npm run test:contratto` senza le env `TEST_SUPABASE_*` → tutti i test skippati
 (come da progetto: il contratto non gira senza il suo DB; i due file nuovi
@@ -142,6 +148,26 @@ Coerenza (codice morto / bottoni mancati / fantasmi) — **tutte verdi oggi**:
   domani la homepage o la chiusura ricalcolassero la cassa in proprio, G10
   scatta: è la difesa a monte del "verify che coincidono" richiesto per L1.
 
+Rename-proxy (anti-regressione Next 16) — **L4c, le più importanti di questo giro**:
+- **G11**: `proxy.ts` esiste alla radice e `middleware.ts`/`middleware.js` NON
+  esiste. È la sentinella sul rischio catastrofico e SILENZIOSO di Next 16: se
+  ricompare `middleware.ts`, Next 16 (che cerca l'export `proxy`) smette di
+  proteggere le rotte senza alcun errore, l'app resta aperta e nessun test di
+  prodotto diventa rosso. Questa guardia scatta al posto loro.
+- **G11b**: `proxy.ts` esporta ancora `function proxy(` (l'export atteso da
+  Next 16) e NON è tornato a `function middleware(` (export legacy ignorato).
+- **G11c**: `proxy.ts` mantiene il `matcher` e le tre rotte pubbliche `/login`,
+  `/registrati`, `/auth` — protezione invariata rispetto a Next 15.
+- Non-falsa-positiva verificata: simulando in dir isolata il ritorno di
+  `middleware.ts` con export `middleware`, G11 e G11b diventano entrambe false
+  (la guardia scatta davvero). Nessun file dell'app toccato dalla prova.
+
+G1–G10 restano verdi col rename e coi file Next 16: nessuna guardia scandiva
+`middleware.ts` per path (G1–G4b guardano `lib/actions.ts`/`lib/`/`app/`; G5–G10
+`components/`, `app/(app)/`, `lib/`, `docs/manuale-utente/`), quindi nessun
+aggiornamento di path necessario. Gli E2E (`e2e/**`) non citano `middleware.ts`
+né assumono Next 15: nessun allineamento richiesto.
+
 Le guardie esistenti restano verdi coi file nuovi 4b/4c/4d: `cassa-calcoli.ts`
 è un file `lib/` con export usati (cassa/chiusura/actions), `registraConsensi`
 è agganciata a `ConsensiCliente.tsx` (G8), il banner `BannerConsensi` è
@@ -215,6 +241,19 @@ fuso del runner (l'action ancora a `T12:00:00`, margine ampio).
 ## Cosa resta a Ray / CI
 Vedi `docs/agenti/TODO-ray.md`: creare `gestionale-test`, impostare i 3 secret,
 primo `workflow_dispatch` per far girare L2+L3 e rifinire i selettori E2E.
+
+## File creati / aggiornati (giro Next 16 · branch `gest/next-16`)
+Aggiornati:
+- `tests/unit/guardie.test.ts` — aggiunte G11/G11b/G11c (L4c, anti-regressione
+  sul rename `middleware.ts → proxy.ts`); import `existsSync`. +3 test → 60 totali.
+- `docs/agenti/report-test.md`.
+
+Nessun altro file toccato: `package.json` (devDeps/script invariati, bastano
+`vitest` + `@playwright/test`), `.github/workflows/ci.yml` (Node resta a 20 come
+già deciso: GHA node 20 soddisfa il `>=20.9.0` di Next 16), `proxy.ts`,
+`next.config.mjs`, `tsconfig.json` e l'intero codice app **non toccati**.
+Esito L1+L4: `npm test` → 60/60 verde. L2/L3 restano alla CI (invariati). Nessun
+gancio nuovo richiesto al codice app per l'upgrade.
 
 ## File creati / aggiornati (giro 4b/4c/4d)
 Creati:

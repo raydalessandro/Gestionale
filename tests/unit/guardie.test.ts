@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { readFileSync, readdirSync, statSync } from "node:fs";
+import { readFileSync, readdirSync, statSync, existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { join } from "node:path";
 
@@ -330,5 +330,60 @@ describe("L4b · guardie di coerenza (codice morto, orfani, fantasmi)", () => {
       reimplementano,
       `consumatori che reimplementano l'esclusione 'Caparra' a mano: ${reimplementano.join(", ")}`
     ).toEqual([]);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * L4c · GUARDIA ANTI-REGRESSIONE NEXT 16 (rename middleware → proxy)
+ *
+ * Rischio catastrofico e SILENZIOSO di Next 16: se qualcuno reintroduce
+ * `middleware.ts` o rinomina l'export, Next 16 (che cerca l'export `proxy`)
+ * smette di eseguire la protezione delle rotte SENZA alcun errore: nessun test
+ * di prodotto diventa rosso, ma l'app resta aperta a chiunque. Questa guardia è
+ * l'unica sentinella su quel rename: legge i file alla radice e scatta se la
+ * forma corretta (proxy.ts + export proxy + matcher + 3 rotte pubbliche) viene
+ * meno. È deliberatamente severa sui path.
+ * ════════════════════════════════════════════════════════════════════════ */
+describe("L4c · guardia anti-regressione sul rename proxy (Next 16)", () => {
+  it("G11 · proxy.ts esiste alla radice e middleware.ts NON esiste (Next 16)", () => {
+    const haProxy = existsSync(join(ROOT, "proxy.ts"));
+    // Copre sia .ts sia .js: entrambi verrebbero raccolti da Next come
+    // middleware, quindi entrambi sono vietati dopo il codemod.
+    const haMiddleware =
+      existsSync(join(ROOT, "middleware.ts")) || existsSync(join(ROOT, "middleware.js"));
+    expect(haProxy, "manca proxy.ts alla radice: Next 16 non protegge più le rotte").toBe(true);
+    expect(
+      haMiddleware,
+      "è ricomparso middleware.ts/js: Next 16 lo ignora e la protezione rotte salta in silenzio"
+    ).toBe(false);
+  });
+
+  it("G11b · proxy.ts esporta la funzione `proxy` (l'export che Next 16 cerca)", () => {
+    const src = leggi("proxy.ts");
+    // `export [default] [async] function proxy(` — la firma richiesta da Next 16.
+    expect(
+      /export\s+(?:default\s+)?(?:async\s+)?function\s+proxy\s*\(/.test(src),
+      "proxy.ts non esporta più `function proxy(`: Next 16 non aggancia il middleware"
+    ).toBe(true);
+    // Difesa esplicita contro il ritorno all'export legacy `middleware`.
+    expect(
+      /export\s+(?:default\s+)?(?:async\s+)?function\s+middleware\s*\(/.test(src),
+      "proxy.ts esporta ancora `function middleware(`: export legacy, Next 16 lo ignora"
+    ).toBe(false);
+  });
+
+  it("G11c · proxy.ts mantiene il matcher e le tre rotte pubbliche (protezione invariata)", () => {
+    const src = leggi("proxy.ts");
+    // Il matcher deve restare: senza, il middleware non gira su nessuna rotta.
+    expect(/\bmatcher\b/.test(src), "manca il `matcher` in proxy.ts").toBe(true);
+    // Le tre e SOLE rotte pubbliche restano tali: se una sparisse, verrebbe
+    // protetta (utenti bloccati fuori); il rischio inverso — renderne pubblica
+    // una nuova — non è oggetto di questa guardia.
+    for (const rotta of ["/login", "/registrati", "/auth"]) {
+      expect(
+        src.includes(`"${rotta}"`),
+        `rotta pubblica ${rotta} non più elencata in proxy.ts`
+      ).toBe(true);
+    }
   });
 });
