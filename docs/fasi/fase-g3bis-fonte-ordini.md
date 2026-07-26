@@ -85,6 +85,26 @@ Le quattro colonne `fonte` del DB parlano la stessa lingua dei tipi
 (clienti/appuntamenti = `FONTI`; ordini = `FONTI` ∖ `import`), e G12e si accorge
 da sola se domani ne nasce una quinta.
 
+## TODO (non bloccante, dalla review)
+
+- **Commento stale in `schema.sql:431`.** Il promemoria di architettura dice
+  ancora che «Sito pubblico e app scrivono ordini con `fonte='sito'|'app'`». È
+  solo un commento (nessun DDL), ma dopo la 009 il valore giusto è
+  `sito_negozio`. Non toccato qui perché G3-bis ha nell'ambito il divieto di
+  modificare `schema.sql`; da correggere in un passaggio dedicato, così fra sei
+  mesi nessuno lo legge e ci crede.
+
+## Verifica pre-allineamento DB (dalla review)
+
+Prima di applicare le migrazioni al DB vero, il revisore ha chiesto di lanciare
+la query di rilevamento sovrapposizioni: l'unico passo che può fallire sui dati
+è l'`EXCLUDE` della 008, se esistono due appuntamenti sovrapposti nella stessa
+azienda. Esito sul database reale (`uijfhhctrgirglmkrgoo`): **0 sovrapposizioni**.
+Stato migrazioni al momento del check: **008 già applicata** (il vincolo `EXCLUDE`
+è presente → 0 sovrapposizioni per costruzione), **009 non ancora applicata** (il
+check `fonte` degli ordini è ancora al vecchio vocabolario). L'ordine di
+applicazione resta **008 poi 009**.
+
 ## Nota di sequenza
 
 Consegna **stacked** su G3 (PR #12), non ancora mergiata: `FonteOrdine` e il tipo
