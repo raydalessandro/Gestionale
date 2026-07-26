@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@supabase/supabase-js";
 import type { ServizioPubblicoRow } from "@/lib/database.types";
@@ -245,13 +245,13 @@ export default function WizardPrenota({
         <Schermata titolo="Chi sei?">
           <div className="space-y-4">
             <Campo etichetta="Nome e cognome" obbligatorio>
-              <input value={nome} onChange={(e) => setNome(e.target.value)} autoComplete="name" className={inputCls} />
+              {(id) => <input id={id} value={nome} onChange={(e) => setNome(e.target.value)} autoComplete="name" className={inputCls} />}
             </Campo>
             <Campo etichetta="Telefono" obbligatorio>
-              <input value={telefono} onChange={(e) => setTelefono(e.target.value)} inputMode="tel" autoComplete="tel" className={inputCls} />
+              {(id) => <input id={id} value={telefono} onChange={(e) => setTelefono(e.target.value)} inputMode="tel" autoComplete="tel" className={inputCls} />}
             </Campo>
             <Campo etichetta="Email (facoltativa)">
-              <input value={email} onChange={(e) => setEmail(e.target.value)} inputMode="email" autoComplete="email" className={inputCls} />
+              {(id) => <input id={id} value={email} onChange={(e) => setEmail(e.target.value)} inputMode="email" autoComplete="email" className={inputCls} />}
             </Campo>
             <label className="flex items-start gap-3 rounded-xl border border-lim-linea bg-white px-3.5 py-3">
               <input type="checkbox" checked={perAltro} onChange={(e) => setPerAltro(e.target.checked)} className="mt-0.5 h-4 w-4" />
@@ -259,7 +259,7 @@ export default function WizardPrenota({
             </label>
             {perAltro && (
               <Campo etichetta="Chi è il paziente?">
-                <input value={perContoDi} onChange={(e) => setPerContoDi(e.target.value)} className={inputCls} />
+                {(id) => <input id={id} value={perContoDi} onChange={(e) => setPerContoDi(e.target.value)} className={inputCls} />}
               </Campo>
             )}
             <Btn full tinta="dark" disabled={!puoAvanzare3} onClick={() => vai(4)}>
@@ -373,14 +373,25 @@ function Schermata({ titolo, sotto, children }: { titolo: string; sotto?: string
   );
 }
 
-function Campo({ etichetta, obbligatorio, children }: { etichetta: string; obbligatorio?: boolean; children: React.ReactNode }) {
+function Campo({
+  etichetta,
+  obbligatorio,
+  children,
+}: {
+  etichetta: string;
+  obbligatorio?: boolean;
+  /** Render-prop: riceve l'id da mettere sull'input, così label e campo sono
+   *  associati (accessibilità + test che cercano il campo dalla sua etichetta). */
+  children: (id: string) => React.ReactNode;
+}) {
+  const id = useId();
   return (
     <div>
-      <label className="mb-1.5 block text-[14px] font-semibold text-lim-inchiostro">
+      <label htmlFor={id} className="mb-1.5 block text-[14px] font-semibold text-lim-inchiostro">
         {etichetta}
         {obbligatorio && <span className="text-lim-ambra"> *</span>}
       </label>
-      {children}
+      {children(id)}
     </div>
   );
 }
