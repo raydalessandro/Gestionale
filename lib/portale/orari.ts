@@ -129,3 +129,42 @@ export function dataItaliana(iso: string): string {
   const d = new Date(`${iso}T12:00:00Z`);
   return new Intl.DateTimeFormat("it-IT", { timeZone: TZ, day: "numeric", month: "long" }).format(d);
 }
+
+/** ISO timestamptz → "HH:MM" in ora italiana (per gli slot). */
+export function oraDaISO(iso: string): string {
+  return new Intl.DateTimeFormat("it-IT", {
+    timeZone: TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23",
+  }).format(new Date(iso));
+}
+
+/** Data ISO di «oggi» in ora italiana. */
+export function oggiISO(adesso: Date): string {
+  return oraDiRoma(adesso).dataISO;
+}
+
+/** "2026-08-12" + delta giorni → "2026-08-14". Ancorato a mezzogiorno per non
+ *  scivolare di giorno sul cambio d'ora. */
+export function giornoRelativo(iso: string, delta: number): string {
+  const d = new Date(`${iso}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + delta);
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "UTC",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
+}
+
+/** "2026-08-12" → "mercoledì 12 agosto" (in italiano). */
+export function etichettaGiorno(iso: string): string {
+  const d = new Date(`${iso}T12:00:00Z`);
+  return new Intl.DateTimeFormat("it-IT", {
+    timeZone: TZ,
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  }).format(d);
+}

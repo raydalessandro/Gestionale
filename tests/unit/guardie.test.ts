@@ -469,15 +469,27 @@ describe("L4d · guardie vocabolario fonte", () => {
     expect(daOcchiali).not.toContain("sito");
   });
 
+  it("G12f · il check `fonte` delle prenotazioni (011) è l'intero vocabolario FONTI", () => {
+    // La prenotazione può entrare da qualunque porta: vocabolario pieno.
+    const sql = leggi("supabase/migrazioni/011_prenotazioni.sql");
+    const m = sql.match(/check\s*\(\s*fonte\s+in\s*\(([^)]*)\)/i);
+    expect(m, "check fonte delle prenotazioni non trovato in 011").toBeTruthy();
+    const valori = m![1]
+      .split(",")
+      .map((s) => s.trim().replace(/^'|'$/g, ""))
+      .filter(Boolean);
+    expect(valori, "prenotazioni.fonte ≠ FONTI").toEqual([...FONTI]);
+  });
+
   it("G12e · ogni colonna `fonte` con un check nel DB è coperta da una guardia (conto delle colonne)", () => {
     // La lezione di G3-bis: il conto delle colonne `fonte` non deve più vivere
     // nella memoria di qualcuno. Scandaglio schema.sql + tutte le migrazioni,
     // trovo ogni `check (fonte in (...))` e ne ricavo la tabella (dal più vicino
     // `create/alter table public.<tab>` che lo precede). L'insieme trovato deve
-    // combaciare ESATTAMENTE con quello asserito da G12 (clienti, appuntamenti)
-    // e G12d (ordini_lac, ordini_occhiali). Una quinta colonna senza guardia
+    // combaciare ESATTAMENTE con quello asserito da G12 (clienti, appuntamenti),
+    // G12d (ordini) e G12f (prenotazioni). Una colonna nuova senza guardia
     // allarga l'insieme trovato → rosso: costringe ad aggiungere la guardia.
-    const GUARDATE = ["appuntamenti", "clienti", "ordini_lac", "ordini_occhiali"];
+    const GUARDATE = ["appuntamenti", "clienti", "ordini_lac", "ordini_occhiali", "prenotazioni"];
 
     const filesSql = [
       "supabase/schema.sql",
@@ -642,5 +654,71 @@ describe("L4f · guardie portale orari/servizi (010)", () => {
     for (const col of ["slug", "dal", "al"]) {
       expect(m![0].toLowerCase().includes(col), `chiusure_pubbliche non espone ${col}`).toBe(true);
     }
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * L4g · GUARDIE PORTALE — prenotazioni e persone (G6, migrazione 011)
+ *
+ * La parte più delicata del portale: `persone` è di Limpidia e NESSUNO la legge
+ * (nemmeno l'ottico), il registro dei riferimenti è append-only, e slot_liberi
+ * è l'unico modo per cui l'anon calcola gli slot senza leggere le tabelle. Se
+ * una di queste regole salta in silenzio, si apre un buco su dati di identità.
+ * ════════════════════════════════════════════════════════════════════════ */
+describe("L4g · guardie portale prenotazioni/persone (011)", () => {
+  const M011 = "supabase/migrazioni/011_prenotazioni.sql";
+  const TABELLE = ["persone", "prenotazioni", "persone_riferimento_registro", "lista_attesa"];
+
+  it("G15 · le 4 tabelle nuove hanno RLS attiva e revoke select ad anon", () => {
+    const sql = leggi(M011).replace(/\s+/g, " ").toLowerCase();
+    const senzaRls: string[] = [];
+    const senzaRevoke: string[] = [];
+    for (const t of TABELLE) {
+      if (!sql.includes(`alter table public.${t} enable row level security`)) senzaRls.push(t);
+      if (!sql.includes(`revoke select on public.${t} from anon`)) senzaRevoke.push(t);
+    }
+    expect(senzaRls, `senza RLS: ${senzaRls.join(", ")}`).toEqual([]);
+    expect(senzaRevoke, `senza revoke anon: ${senzaRevoke.join(", ")}`).toEqual([]);
+  });
+
+  it("G15b · persone e il registro NON hanno policy di lettura (nessuno legge, solo security definer)", () => {
+    const sql = leggi(M011);
+    // `create policy ... on public.persone` con confine di parola (non _registro)
+    expect(
+      /create\s+policy[\s\S]*?on\s+public\.persone(?![_\w])/i.test(sql),
+      "persone ha una policy: DEVE restare senza policy (ci arrivano solo le funzioni security definer)"
+    ).toBe(false);
+    expect(
+      /create\s+policy[\s\S]*?on\s+public\.persone_riferimento_registro/i.test(sql),
+      "il registro ha una policy: DEVE restare senza policy"
+    ).toBe(false);
+    // prenotazioni e lista_attesa invece la policy ce l'hanno.
+    expect(/create\s+policy[\s\S]*?on\s+public\.prenotazioni/i.test(sql)).toBe(true);
+    expect(/create\s+policy[\s\S]*?on\s+public\.lista_attesa/i.test(sql)).toBe(true);
+  });
+
+  it("G15c · slot_liberi è security definer ed eseguibile da anon (l'unico ponte)", () => {
+    const sql = leggi(M011).toLowerCase();
+    expect(/create\s+or\s+replace\s+function\s+public\.slot_liberi[\s\S]*?security\s+definer/i.test(leggi(M011)))
+      .toBe(true);
+    expect(
+      sql.includes("grant execute on function public.slot_liberi"),
+      "manca il grant execute di slot_liberi ad anon"
+    ).toBe(true);
+    expect(/grant\s+execute\s+on\s+function\s+public\.slot_liberi[^;]*\banon\b/i.test(leggi(M011))).toBe(true);
+  });
+
+  it("G15d · niente cancellazione fisica: prenotazioni no-delete, registro append-only", () => {
+    const sql = leggi(M011);
+    // trigger before delete su prenotazioni
+    expect(
+      /before\s+delete\s+on\s+public\.prenotazioni/i.test(sql),
+      "manca il trigger che vieta la delete su prenotazioni"
+    ).toBe(true);
+    // trigger before update OR delete sul registro
+    expect(
+      /before\s+update\s+or\s+delete\s+on\s+public\.persone_riferimento_registro/i.test(sql),
+      "il registro non è protetto append-only (before update or delete)"
+    ).toBe(true);
   });
 });
