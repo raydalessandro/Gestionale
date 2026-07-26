@@ -207,7 +207,12 @@ export type AppuntamentoRow = {
     | "altro";
   inizio: string;
   durata_minuti: number;
-  stato: "prenotato" | "completato" | "mancato" | "annullato";
+  // `in_attesa` (013): lo slot è impegnato da una richiesta del portale non
+  // ancora confermata dall'ottico. Occupa l'agenda ma è graficamente distinto.
+  stato: "in_attesa" | "prenotato" | "completato" | "mancato" | "annullato";
+  // `risorsa_id` (013): la saletta/poltrona. Nullo = poltrona unica (comportamento
+  // storico). Nessuna FK per ora: la tabella delle risorse arriva con la sua consegna.
+  risorsa_id: string | null;
   riferimento: string | null;
   note: string | null;
   created_at: string;

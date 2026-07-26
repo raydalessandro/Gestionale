@@ -11,8 +11,18 @@ import {
 } from "./_helpers";
 
 /**
- * L2 · Contratto — Migrazione 012 (G7 · crea_prenotazione): la PRIMA scrittura
- * del portale, esposta ad `anon` ma difesa in ultima istanza dalla funzione.
+ * L2 · Contratto — Migrazioni 012 + 013 (G7 · crea_prenotazione / G7-bis ·
+ * l'agenda unica): la PRIMA scrittura del portale, esposta ad `anon` ma difesa
+ * in ultima istanza dalla funzione e dal vincolo di esclusione su `appuntamenti`.
+ *
+ * NOVITÀ 013 — un posto solo decide se uno slot è occupato: `appuntamenti` È LO
+ * SLOT, `prenotazioni` è la pratica. `crea_prenotazione` ora scrive DUE righe
+ * nella stessa transazione: prima l'APPUNTAMENTO (stato `in_attesa`, risorsa_id
+ * nullo), poi la PRENOTAZIONE collegata (`appuntamento_id`). La difesa contro la
+ * doppia sullo stesso orario vive sull'EXCLUDE di `appuntamenti`, per-risorsa
+ * (coalesce(risorsa_id, azienda_id)) e per stato occupante (in_attesa/prenotato/
+ * completato). Quindi: una richiesta dal portale e un appuntamento al banco NON
+ * possono finire nello stesso slot — lo impedisce il database (vedi i test qui).
  *
  * COME si esercita (stessa filosofia di slot-liberi.test.ts):
  *  • setup col SERVICE ROLE (orari/servizi/portale_attivo, appuntamenti: non
@@ -20,21 +30,26 @@ import {
  *  • la RPC `crea_prenotazione` si chiama da un client ANON non autenticato —
  *    è così che la tocca il browser tramite l'azione server (SECURITY DEFINER,
  *    grant ad anon). Nessun service role nella scrittura;
- *  • la LETTURA di verifica (stato/codice/contatto) passa dal SERVICE ROLE:
- *    `prenotazioni` e `persone` sono revocate all'anon (011).
+ *  • la LETTURA di verifica (stato/codice/contatto + l'appuntamento collegato)
+ *    passa dal SERVICE ROLE: `prenotazioni` e `persone` sono revocate all'anon (011).
  *
  * Anti-fuso: NON si costruiscono timestamp a mano. Si chiede prima a slot_liberi
  * la lista dei candidati liberi (istanti ASSOLUTI già corretti) e si prenota su
  * quegli istanti. Gli slot usati sono distanziati (≥4 passi da 15' = 60') così una
- * prenotazione da 30' non svuota lo slot del test successivo.
+ * prenotazione da 30' non svuota lo slot del test successivo; per gli scenari
+ * isolati (manuale-respinto, annullato/in_attesa, risorse) si usano GIORNI diversi
+ * (slot tutti freschi) per non esaurire i candidati del giorno principale.
  *
  * ⚠️ RESIDUO APPEND-ONLY (documentato nel report): una volta creata, la
  * prenotazione NON è cancellabile (trigger before-delete 011 §7), pinna la
  * `persona` (FK on delete restrict) e blocca in cascata la delete dell'azienda.
- * Perciò il teardown è best-effort e i dati di prenotazione restano nel progetto
- * di test. Mitigazione: slug e TELEFONI unici per RUN_ID → nessuna collisione
- * sull'indice unico di `persone` fra run. Serve un gancio di pulizia lato DB
- * (RPC SECURITY DEFINER) per una bonifica vera.
+ * Con la 013 pinna ANCHE il suo appuntamento: `prenotazioni.appuntamento_id` è
+ * NOT NULL con `on delete set null`, quindi cancellare l'appuntamento collegato
+ * fallirebbe (violazione NOT NULL). Perciò il teardown pulisce solo gli
+ * appuntamenti NON collegati (seed manuali, annullati, prove risorse) ed è
+ * best-effort sul resto: i dati di prenotazione + i loro appuntamenti restano nel
+ * progetto di test. Mitigazione: slug e TELEFONI unici per RUN_ID → nessuna
+ * collisione fra run. Serve un gancio di pulizia lato DB (RPC SECURITY DEFINER).
  */
 
 const TZ = "Europe/Rome";
@@ -74,7 +89,7 @@ function telefonoUnico(): { grezzo: string; normalizzato: string } {
   return { grezzo: nazionale, normalizzato: `+39${nazionale}` };
 }
 
-describe.skipIf(!haEnv())("012 · crea_prenotazione — la scrittura del portale", () => {
+describe.skipIf(!haEnv())("012/013 · crea_prenotazione — la scrittura del portale (agenda unica)", () => {
   let svc: SupabaseClient;
   let anon: SupabaseClient;
   let neg: Tenant; // negozio pubblicato, orari tutti i giorni 09–17, servizio visita 30'
@@ -122,6 +137,31 @@ describe.skipIf(!haEnv())("012 · crea_prenotazione — la scrittura del portale
     return data;
   }
 
+  /** Legge un appuntamento dal SERVICE ROLE (per id). */
+  async function leggiAppto(id: string) {
+    const { data, error } = await svc.from("appuntamenti").select("*").eq("id", id).single();
+    if (error) throw new Error(`leggiAppto: ${error.message}`);
+    return data;
+  }
+
+  /** Semina un appuntamento «al banco» col service role. Ritorna {error}. */
+  async function seedAppto(o: {
+    inizio: string;
+    stato: string;
+    risorsaId?: string | null;
+    durata?: number;
+  }) {
+    return svc.from("appuntamenti").insert({
+      azienda_id: neg.aziendaId,
+      utente_id: neg.userId,
+      tipo: "controllo_vista",
+      inizio: o.inizio,
+      durata_minuti: o.durata ?? 30,
+      stato: o.stato,
+      risorsa_id: o.risorsaId ?? null,
+    });
+  }
+
   async function slot(servizio: string, g: string): Promise<string[]> {
     const { data, error } = await anon.rpc("slot_liberi", {
       p_slug: neg.slug,
@@ -162,17 +202,31 @@ describe.skipIf(!haEnv())("012 · crea_prenotazione — la scrittura del portale
 
   afterAll(async () => {
     if (!haEnv()) return;
-    // Best-effort: ripulisco ciò che È cancellabile (lista_attesa, appuntamenti).
-    // I builder PostgREST risolvono con {error}, non lanciano: si awaita e basta.
-    // prenotazioni/persone/azienda restano per progettazione (append-only + FK
-    // restrict): vedi nota in testa e report-test.md.
+    // Best-effort: ripulisco ciò che È cancellabile. I builder PostgREST risolvono
+    // con {error}, non lanciano: si awaita e basta.
     await svc.from("lista_attesa").delete().eq("azienda_id", neg.aziendaId);
-    await svc.from("appuntamenti").delete().eq("azienda_id", neg.aziendaId);
+    // 013: gli appuntamenti COLLEGATI a una prenotazione NON si cancellano
+    // (appuntamento_id è NOT NULL con on delete set null → la SET NULL fallirebbe,
+    // e un unico DELETE su tutta l'azienda salterebbe anche i non-collegati). Perciò
+    // elimino solo gli appuntamenti NON referenziati (seed manuali, annullati, prove
+    // risorse). Quelli in_attesa nati dalle prenotazioni restano, come le prenotazioni.
+    const { data: prens } = await svc
+      .from("prenotazioni")
+      .select("appuntamento_id")
+      .eq("azienda_id", neg.aziendaId);
+    const collegati = (prens ?? [])
+      .map((p) => p.appuntamento_id as string | null)
+      .filter((x): x is string => Boolean(x));
+    let q = svc.from("appuntamenti").delete().eq("azienda_id", neg.aziendaId);
+    if (collegati.length) q = q.not("id", "in", `(${collegati.join(",")})`);
+    await q;
+    // prenotazioni/persone/azienda + i loro appuntamenti restano per progettazione
+    // (append-only + FK restrict/not-null): vedi nota in testa e report-test.md.
     await pulisci().catch(() => undefined); // tenta la delete azienda; fallisce se ha prenotazioni
   });
 
-  // ── prenotazione valida → riga in_attesa, codice, contatto, informativa ─────
-  it("crea una prenotazione valida: 1 riga in_attesa, fonte, codice LMP-XXXX, contatto copiato", async () => {
+  // ── prenotazione valida → DUE righe (appuntamento in_attesa + prenotazione) ──
+  it("crea una prenotazione valida: DUE righe collegate — appuntamento in_attesa + prenotazione", async () => {
     const inizio = candidati[0];
     const tel = telefonoUnico();
     const { data, error } = await crea({
@@ -189,6 +243,7 @@ describe.skipIf(!haEnv())("012 · crea_prenotazione — la scrittura del portale
     expect(new Date(riga.inizio).getTime()).toBe(new Date(inizio).getTime());
     expect(riga.durata_minuti).toBe(30);
 
+    // 1) la PRENOTAZIONE (la pratica)
     const p = await leggiPren(riga.id);
     expect(p.stato, "una RICHIESTA nasce in_attesa (non confermata)").toBe("in_attesa");
     expect(p.fonte).toBe("qr_vetrina");
@@ -197,6 +252,21 @@ describe.skipIf(!haEnv())("012 · crea_prenotazione — la scrittura del portale
     expect(p.contatto_telefono).toBe(tel.grezzo);
     expect(p.contatto_email).toBe("anna@example.com");
     expect(p.informativa_accettata_at, "informativa_accettata_at valorizzato").toBeTruthy();
+
+    // 2) l'APPUNTAMENTO (lo slot), COLLEGATO alla prenotazione (013)
+    expect(p.appuntamento_id, "la prenotazione punta a un appuntamento").toBeTruthy();
+    const a = await leggiAppto(p.appuntamento_id);
+    expect(a.stato, "lo slot nasce in_attesa (nessuno l'ha confermato)").toBe("in_attesa");
+    expect(a.azienda_id).toBe(neg.aziendaId);
+    expect(new Date(a.inizio).getTime(), "stesso istante della richiesta").toBe(
+      new Date(inizio).getTime()
+    );
+    expect(a.durata_minuti).toBe(30);
+    expect(a.risorsa_id, "poltrona unica: risorsa_id nullo").toBeNull();
+    expect(a.cliente_id, "una richiesta dal portale non ha ancora un cliente").toBeNull();
+    expect(a.fonte, "la fonte del canale attraversa anche l'appuntamento").toBe("qr_vetrina");
+    // il collegamento è biunivoco: la coppia condivide lo stesso codice leggibile
+    expect(a.riferimento, "l'appuntamento porta il codice della pratica").toBe(p.codice);
   });
 
   // ── idempotenza: stessa chiave → una sola riga, stesso codice ───────────────
@@ -218,10 +288,24 @@ describe.skipIf(!haEnv())("012 · crea_prenotazione — la scrittura del portale
 
     const { data: righe, error } = await svc
       .from("prenotazioni")
-      .select("id")
+      .select("id, appuntamento_id")
       .eq("chiave_richiesta", chiave);
     expect(error).toBeFalsy();
     expect(righe?.length, "una sola riga per la chiave di idempotenza").toBe(1);
+
+    // 013: il secondo invio esce PRIMA di scrivere → nessun appuntamento orfano.
+    // Su quell'istante/azienda deve esserci ESATTAMENTE un appuntamento, ed è
+    // quello collegato all'unica prenotazione.
+    const { data: appti, error: eA } = await svc
+      .from("appuntamenti")
+      .select("id")
+      .eq("azienda_id", neg.aziendaId)
+      .eq("inizio", inizio);
+    expect(eA).toBeFalsy();
+    expect(appti?.length, "nessun appuntamento orfano dal doppio invio").toBe(1);
+    expect(appti?.[0]?.id, "l'unico appuntamento è quello collegato").toBe(
+      righe?.[0]?.appuntamento_id
+    );
   });
 
   // ── doppio slot (chiavi diverse) → la seconda è SLOT_OCCUPATO ────────────────
@@ -337,5 +421,93 @@ describe.skipIf(!haEnv())("012 · crea_prenotazione — la scrittura del portale
 
     const dopo = await slot("visita", giorno);
     expect(dopo, "lo slot prenotato non è più fra i liberi").not.toContain(inizio);
+  });
+
+  /* ══════════════════════════════════════════════════════════════════════════
+   * 013 · L'AGENDA UNICA — un posto solo decide se uno slot è occupato.
+   * Scenari isolati su GIORNI diversi (slot tutti freschi): non tolgono candidati
+   * al giorno principale. Prima slot del giorno = index 0.
+   * ══════════════════════════════════════════════════════════════════════════ */
+
+  /** Primo slot libero di un giorno dedicato (fresco). */
+  async function primoSlot(offsetGiorni: number): Promise<string> {
+    const g = piuGiorni(oggiRomaISO(), offsetGiorni);
+    const s = await slot("visita", g);
+    expect(s.length, `il giorno +${offsetGiorni} ha slot liberi`).toBeGreaterThan(0);
+    return s[0];
+  }
+
+  // ── IL CASO CHE HA MOTIVATO LA CONSEGNA ─────────────────────────────────────
+  // Richiesta dal portale su uno slot → un appuntamento MANUALE (banco) sullo
+  // stesso slot/azienda è respinto DAL DATABASE (l'EXCLUDE di appuntamenti), non
+  // dalla funzione. È la garanzia dell'agenda unica: non si presentano in due.
+  it("richiesta dal portale + appuntamento manuale sullo stesso slot → RESPINTO dal database", async () => {
+    const inizio = await primoSlot(30);
+
+    // 1) la richiesta dal portale crea il suo appuntamento in_attesa
+    const r = await crea({ inizio, chiave: K("agenda-unica-portale") });
+    expect(r.error, r.error?.message).toBeFalsy();
+
+    // 2) l'ottico prova a mettere un cliente al banco sullo STESSO slot: stato
+    //    'prenotato', risorsa_id null (poltrona unica) → violazione di esclusione.
+    const eManuale = await seedAppto({ inizio, stato: "prenotato", risorsaId: null });
+    expect(
+      eManuale.error,
+      "l'appuntamento manuale sullo slot già impegnato deve essere rifiutato"
+    ).toBeTruthy();
+    // 23P01 = exclusion_violation (il vincolo appuntamenti_niente_sovrapposizioni).
+    expect(
+      eManuale.error!.code === "23P01" || /exclu/i.test(eManuale.error!.message),
+      `atteso exclusion_violation, avuto ${eManuale.error!.code}: ${eManuale.error!.message}`
+    ).toBe(true);
+  });
+
+  // ── annullato non blocca; in_attesa sì ──────────────────────────────────────
+  it("un appuntamento 'annullato' sullo slot NON blocca; l'in_attesa nato dalla richiesta sì", async () => {
+    const inizio = await primoSlot(31);
+
+    // un appuntamento ANNULLATO sullo slot: NON occupa (fuori dal WHERE dell'EXCLUDE)
+    const eAnn = await seedAppto({ inizio, stato: "annullato", risorsaId: null });
+    expect(eAnn.error, "un annullato può stare sullo slot").toBeFalsy();
+
+    // la richiesta passa (l'annullato non la blocca) e nasce il suo in_attesa
+    const r1 = await crea({ inizio, chiave: K("annullato-non-blocca") });
+    expect(r1.error, "l'annullato non impedisce la richiesta").toBeFalsy();
+
+    // ora sullo slot c'è un in_attesa: una seconda richiesta è SLOT_OCCUPATO
+    const r2 = await crea({ inizio, chiave: K("in-attesa-blocca") });
+    expect(r2.error, "l'in_attesa occupa lo slot").toBeTruthy();
+    expect(r2.error!.message).toContain("SLOT_OCCUPATO");
+  });
+
+  // ── due risorse diverse in parallelo: ammesse ───────────────────────────────
+  it("due appuntamenti sullo stesso slot ma con risorsa_id DIVERSA → ammessi (due salette)", async () => {
+    const inizio = await primoSlot(32);
+    const salettaA = crypto.randomUUID();
+    const salettaB = crypto.randomUUID();
+
+    const e1 = await seedAppto({ inizio, stato: "prenotato", risorsaId: salettaA });
+    expect(e1.error, "primo appuntamento (saletta A)").toBeFalsy();
+
+    const e2 = await seedAppto({ inizio, stato: "prenotato", risorsaId: salettaB });
+    expect(
+      e2.error,
+      "seconda saletta in parallelo sullo stesso slot: il per-risorsa lo consente"
+    ).toBeFalsy();
+  });
+
+  // ── risorsa nulla su entrambi: il secondo è respinto (poltrona unica) ───────
+  it("due appuntamenti sullo stesso slot con risorsa_id NULLA → il secondo è respinto", async () => {
+    const inizio = await primoSlot(33);
+
+    const e1 = await seedAppto({ inizio, stato: "prenotato", risorsaId: null });
+    expect(e1.error, "primo appuntamento (poltrona unica)").toBeFalsy();
+
+    const e2 = await seedAppto({ inizio, stato: "prenotato", risorsaId: null });
+    expect(e2.error, "poltrona unica: il secondo sullo stesso slot è rifiutato").toBeTruthy();
+    expect(
+      e2.error!.code === "23P01" || /exclu/i.test(e2.error!.message),
+      `atteso exclusion_violation, avuto ${e2.error!.code}: ${e2.error!.message}`
+    ).toBe(true);
   });
 });

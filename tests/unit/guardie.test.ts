@@ -775,3 +775,87 @@ describe("L4h · guardia scrittura prenotazione (012)", () => {
     expect(RE_INVOCA.test(slot), "lib/portale/slot.ts invoca la RPC di scrittura: è di sola lettura").toBe(false);
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * L4i · GUARDIE AGENDA UNICA (G17 · migrazione 013)
+ *
+ * La 013 accentra la decisione «lo slot è occupato?» su UN posto solo:
+ * `appuntamenti` È LO SLOT, `prenotazioni` è la pratica. Il rischio silenzioso è
+ * la RECIDIVA: se `slot_liberi` tornasse a interrogare `prenotazioni`, o se
+ * l'EXCLUDE di appuntamenti perdesse lo stato `in_attesa` o il per-risorsa, si
+ * riaprirebbe la doppia-agenda (portale e banco che si calpestano) senza che un
+ * test di prodotto diventi rosso. Queste guardie leggono la 013 e la blindano.
+ * ════════════════════════════════════════════════════════════════════════ */
+// Enforce dove la 013 è nel working tree (il suo branch e la CI dopo il merge).
+// Su un checkpoint parallelo che non la porta ancora, si salta pulito (npm test
+// resta verde): l'enforcement rientra da solo appena il file è presente.
+const M013 = "supabase/migrazioni/013_agenda_unica.sql";
+describe.skipIf(!existsSync(join(ROOT, M013)))("L4i · guardie agenda unica (013)", () => {
+
+  /** Corpo della funzione slot_liberi definita nella 013 (dal create al $$;). */
+  function corpoSlotLiberi013(): string {
+    const sql = leggi(M013);
+    const start = sql.indexOf("create or replace function public.slot_liberi");
+    expect(start, "la 013 deve ridefinire slot_liberi").toBeGreaterThanOrEqual(0);
+    const rest = sql.slice(start);
+    const end = rest.indexOf("$$;");
+    expect(end, "corpo di slot_liberi non terminato").toBeGreaterThan(0);
+    return rest.slice(0, end);
+  }
+
+  it("G17 · la nuova slot_liberi (013) NON nomina più `prenotazioni` (un posto solo)", () => {
+    const corpo = corpoSlotLiberi013();
+    expect(
+      /\bprenotazioni\b/i.test(corpo),
+      "slot_liberi torna a interrogare prenotazioni: la doppia-agenda è di nuovo aperta"
+    ).toBe(false);
+    // ma continua a guardare gli appuntamenti occupanti (in_attesa incluso).
+    expect(/\bappuntamenti\b/i.test(corpo), "slot_liberi deve guardare appuntamenti").toBe(true);
+    expect(
+      /in_attesa[^)]*prenotato[^)]*completato/i.test(corpo),
+      "gli stati occupanti in slot_liberi devono includere in_attesa/prenotato/completato"
+    ).toBe(true);
+  });
+
+  it("G17b · la 013 dichiara `appuntamenti.risorsa_id uuid` e lo stato `in_attesa`", () => {
+    const sql = leggi(M013);
+    expect(
+      /add column if not exists risorsa_id uuid/i.test(sql),
+      "manca l'aggiunta di appuntamenti.risorsa_id uuid"
+    ).toBe(true);
+    // il check di stato deve elencare in_attesa fra i valori ammessi.
+    const m = sql.match(/appuntamenti_stato_check\s+check\s*\(\s*stato\s+in\s*\(([^)]*)\)/i);
+    expect(m, "check di stato appuntamenti non trovato nella 013").toBeTruthy();
+    const stati = m![1].split(",").map((s) => s.trim().replace(/^'|'$/g, ""));
+    expect(stati, "in_attesa deve entrare fra gli stati di appuntamenti").toContain("in_attesa");
+  });
+
+  it("G17c · l'EXCLUDE di appuntamenti è per-risorsa (coalesce) e sugli stati occupanti", () => {
+    const sql = leggi(M013);
+    // Isolo l'INTERO statement `add constraint … exclude … ;` (fino al primo `;`):
+    // nel corpo dell'EXCLUDE non ci sono punti e virgola, così la cattura è netta.
+    const m = sql.match(/add constraint appuntamenti_niente_sovrapposizioni\s+exclude[\s\S]*?;/i);
+    expect(m, "vincolo appuntamenti_niente_sovrapposizioni non trovato nella 013").toBeTruthy();
+    const blocco = m![0];
+    expect(
+      /coalesce\(\s*risorsa_id\s*,\s*azienda_id\s*\)/i.test(blocco),
+      "l'EXCLUDE deve essere per-risorsa (coalesce(risorsa_id, azienda_id))"
+    ).toBe(true);
+    expect(
+      /where\s*\(\s*stato\s+in\s*\(\s*'in_attesa'\s*,\s*'prenotato'\s*,\s*'completato'\s*\)/i.test(blocco),
+      "l'EXCLUDE deve valere solo sugli stati occupanti in_attesa/prenotato/completato"
+    ).toBe(true);
+  });
+
+  it("G17d · `prenotazioni` smette di governare gli slot: EXCLUDE rimosso, appuntamento_id NOT NULL", () => {
+    const sql = leggi(M013);
+    expect(
+      /drop constraint if exists prenotazioni_niente_sovrapposizioni/i.test(sql),
+      "la 013 deve rimuovere l'EXCLUDE di prenotazioni (non governa più lo slot)"
+    ).toBe(true);
+    expect(
+      /alter column appuntamento_id set not null/i.test(sql),
+      "prenotazioni.appuntamento_id deve diventare NOT NULL (ogni pratica ha il suo slot)"
+    ).toBe(true);
+  });
+});

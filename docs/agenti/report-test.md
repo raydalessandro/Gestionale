@@ -1,10 +1,97 @@
 # Report — Agente Test & CI
 
 Aggiornato: 2026-07-26 · Fasi coperte: 1, 2, 3, 4 (v0.1–v0.5) + interfasi
-**4b/4c/4d**; portale **G3–G6** (vocabolario fonte, pagina negozio, orari/servizi,
-slot) e ora **G7 · percorso di prenotazione** (branch `portale/prenota`,
-migrazione **012 · crea_prenotazione**). La copertura G7 è descritta in fondo
-(«giro G7»); questo cappello resta al giro Next 16.
+**4b/4c/4d**; portale **G3–G7** (vocabolario fonte, pagina negozio, orari/servizi,
+slot, percorso di prenotazione) e ora **G7-bis · l'agenda unica** (branch
+`portale/013-agenda-unica`, migrazione **013**, consegna SOLO SQL). La copertura
+G7-bis è descritta subito qui sotto; i giri precedenti restano più in basso.
+
+## Giro G7-bis · l'agenda unica (branch `portale/013-agenda-unica`, migrazione 013)
+
+La 013 accentra la decisione «lo slot è occupato?» su un posto solo:
+**`appuntamenti` È LO SLOT**, `prenotazioni` è la pratica. `crea_prenotazione`
+scrive ora DUE righe nella stessa transazione (appuntamento `in_attesa` +
+prenotazione collegata via `appuntamento_id`), e la difesa contro la doppia sullo
+stesso orario vive sull'EXCLUDE di `appuntamenti`, per-risorsa
+(`coalesce(risorsa_id, azienda_id)`) e sugli stati occupanti
+(`in_attesa`/`prenotato`/`completato`). Nessun file dell'app toccato.
+
+### L2 · Contratto — `tests/contratto/crea-prenotazione.test.ts` (11 → 15 test, in CI)
+Aggiornata alla nuova logica e allargata:
+- **valida** → ora asserisce DUE righe collegate: la prenotazione `in_attesa` E
+  il suo appuntamento (`stato=in_attesa`, `risorsa_id` nullo, `cliente_id` nullo,
+  `fonte` propagata, `riferimento`=codice), con `prenotazioni.appuntamento_id`
+  che punta a quell'appuntamento;
+- **il caso che ha motivato la consegna** (nuovo, il più importante): creata una
+  richiesta dal portale su uno slot, un **appuntamento manuale** (`stato='prenotato'`,
+  `risorsa_id` null) sullo stesso slot/azienda è **respinto dal database**
+  (exclusion_violation, code 23P01) — non dalla funzione;
+- **annullato non blocca / in_attesa sì** (nuovo): un appuntamento `annullato`
+  sullo slot non impedisce la richiesta; l'`in_attesa` nato dalla richiesta rende
+  `SLOT_OCCUPATO` una seconda richiesta sullo stesso slot;
+- **per-risorsa** (nuovo): due appuntamenti sullo stesso slot con `risorsa_id`
+  DIVERSA sono ammessi (due salette); con `risorsa_id` NULLA su entrambi il
+  secondo è respinto (23P01, poltrona unica);
+- **idempotenza** rafforzata: due invii con la stessa `chiave_richiesta` → una
+  sola prenotazione E un solo appuntamento (verifica esplicita: nessun
+  appuntamento orfano sull'istante/azienda);
+- restano invariati: `SLOT_OCCUPATO` (overlap con appuntamento del gestionale +
+  doppio slot), `FUORI_ORARIO`/`FUORI_ORIZZONTE`/`TROPPO_TARDI`/`SERVIZIO_NON_ATTIVO`/
+  `NEGOZIO_NON_TROVATO`, dedup persona, consumo slot.
+- Gli scenari isolati (manuale-respinto, annullato/in_attesa, risorse) usano
+  GIORNI diversi (slot tutti freschi) per non esaurire i candidati del giorno
+  principale; `risorsa_id` di prova = `crypto.randomUUID()`.
+
+### L4 · Guardia statica — `tests/unit/guardie.test.ts` (nuovo blocco L4i, +4 → G17)
+- **G17**: la definizione di `slot_liberi` **nella 013** NON nomina più
+  `prenotazioni` (un posto solo); continua a guardare `appuntamenti` e gli stati
+  occupanti includono `in_attesa`. È la sentinella contro la recidiva della
+  doppia-agenda (portale e banco che si calpestano).
+- **G17b**: la 013 dichiara `appuntamenti.risorsa_id uuid` e lo stato `in_attesa`
+  fra i valori ammessi dal check.
+- **G17c**: l'EXCLUDE `appuntamenti_niente_sovrapposizioni` è per-risorsa
+  (`coalesce(risorsa_id, azienda_id)`) e vale solo sugli stati
+  `in_attesa`/`prenotato`/`completato`.
+- **G17d**: `prenotazioni` smette di governare gli slot — l'EXCLUDE
+  `prenotazioni_niente_sovrapposizioni` è rimosso e `appuntamento_id` è NOT NULL.
+- Trade-off documentato: il blocco L4i è gated con `skipIf(!existsSync(013))`.
+  Sul branch della consegna (e in CI dopo il merge) il file c'è → le guardie
+  ENFORCANO; su un checkpoint parallelo che non porta ancora la 013 saltano
+  pulite (npm test resta verde) e l'enforcement rientra da solo. Le 4 regex sono
+  state verificate contro il contenuto reale della 013 (tutte PASS).
+- `G12e` (conto colonne `fonte`) resta a 5: la 013 non aggiunge alcun
+  `check (fonte …)`. Nessun'altra guardia dava per scontata la vecchia logica
+  (G15/G15c leggono la 011, la sua `slot_liberi` è comunque security definer).
+
+### L3 · E2E — `e2e/g7-prenota.spec.ts` (invariato, in CI)
+Il percorso utente e la firma delle RPC non cambiano: nulla dipendeva dal fatto
+che il portale creasse UNA sola riga (la verifica a valle legge `prenotazioni`
+per codice → `fonte=qr_vetrina`, `stato=in_attesa`, che restano veri). Nessuna
+modifica necessaria. Nota residuo aggiornata: ora la prenotazione pinna ANCHE il
+suo appuntamento (`appuntamento_id` NOT NULL + `on delete set null`), quindi il
+teardown best-effort degli appuntamenti non tocca più i collegati.
+
+### Teardown 013 (contratto)
+Ogni prenotazione crea ora un appuntamento collegato NON cancellabile
+(`appuntamento_id` NOT NULL con `on delete set null`: la SET NULL fallirebbe, e un
+unico DELETE sull'azienda salterebbe anche i non-collegati). Il teardown di
+`crea-prenotazione.test.ts` ora elimina solo gli appuntamenti **non referenziati**
+(seed manuali, annullati, prove risorse), filtrando via `.not("id","in",…)` gli id
+collegati; il resto (prenotazioni + persone + azienda + appuntamenti in_attesa)
+resta per progettazione. Mitigazione invariata: slug/telefoni unici per RUN_ID.
+
+### Esito auto-verifica (locale) — giro 013
+`npm test` (L1+L4) sul working tree del checkpoint: **116 passed, 4 skipped**
+(il blocco L4i è gated: la 013 non è in QUESTO working tree, è sul suo branch) e
+**1 failed su G13** — quest'ultimo è un artefatto CROSS-BRANCH, NON della mia
+consegna: il checkpoint parallelo ha aggiunto la rotta pubblica `/informativa` a
+`ROTTE_PUBBLICHE` (proxy.ts, altra consegna «portale routes»), che sul branch
+`portale/013-agenda-unica` non esiste. G13 non è mio da aggiornare (aggiungervi
+`/informativa` romperebbe G13 sul branch della 013). Sul branch della consegna
+`npm test` è verde: L4i esegue e passa (regex verificate), G13 vede le 4 rotte
+storiche. `crea-prenotazione.test.ts` carica e skippa pulito (15/15 senza env).
+
+
 
 Branch `gest/next-16`: upgrade framework
 **Next 15.5.20 → 16.2.12 · React 19.0 → 19.2.8** (solo codemod, zero cambi di
