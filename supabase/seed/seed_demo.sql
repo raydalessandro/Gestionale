@@ -205,3 +205,37 @@ begin
 end $$;
 
 -- Fine. Questi dati restano: sono la base del collaudo e si trattano da veri.
+
+-- ============================================================================
+-- NEGOZIO DIMOSTRATIVO DEL PORTALE (G4)
+-- ----------------------------------------------------------------------------
+-- Un'azienda dedicata alla vetrina pubblica: slug 'ottica-demo', portale_attivo,
+-- con nome_pubblico, tagline, indirizzo plausibile e un `brand` dai colori
+-- DIVERSI da quelli Limpidia — così la preview dimostra che il white-label
+-- funziona davvero (l'intestazione prende i colori del negozio, non i nostri).
+-- Idempotente: se lo slug esiste già, non fa nulla. Non serve un utente:
+-- la pagina pubblica legge solo la vista `negozi_pubblici`.
+-- ============================================================================
+insert into public.aziende
+  (slug, nome, email, nome_pubblico, tagline, indirizzo, citta, cap, provincia, portale_attivo, brand)
+values (
+  'ottica-demo',
+  'Ottica Aurora',
+  'demo+ottica-demo@limpidia.it',
+  'Ottica Aurora',
+  'Occhiali e lenti a contatto dal 1987, nel cuore di Bologna.',
+  'Via Indipendenza 42',
+  'Bologna',
+  '40121',
+  'BO',
+  true,
+  '{
+    "primary":   "#1F5C56",
+    "accent":    "#E08A3C",
+    "accentSoft":"#F7E9D8",
+    "surface":   "#F1F4F3",
+    "textSoft":  "#5A6B68",
+    "textFaint": "#8FA09C"
+  }'::jsonb
+)
+on conflict (slug) do nothing;

@@ -2,8 +2,17 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 /**
+ * Elenco unico delle rotte pubbliche (prefissi). Aggiungerne una è una scelta
+ * deliberata: la guardia G13 verifica che questo array sia ESATTAMENTE quello
+ * atteso, così una nuova rotta pubblica rompe un test invece di passare inosservata.
+ *   • /login, /registrati, /auth — il flusso di accesso del gestionale;
+ *   • /ottica — la vetrina pubblica del negozio (portale), aperta agli anonimi.
+ */
+export const ROTTE_PUBBLICHE = ["/login", "/registrati", "/auth", "/ottica"] as const;
+
+/**
  * Middleware: tiene fresca la sessione Supabase e protegge le rotte.
- * Pubbliche: /login, /registrati, /auth/*. Tutto il resto richiede login.
+ * Pubbliche: vedi ROTTE_PUBBLICHE. Tutto il resto richiede login.
  */
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request });
@@ -35,10 +44,7 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  const isPublic =
-    path.startsWith("/login") ||
-    path.startsWith("/registrati") ||
-    path.startsWith("/auth");
+  const isPublic = ROTTE_PUBBLICHE.some((r) => path.startsWith(r));
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();

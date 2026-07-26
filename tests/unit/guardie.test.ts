@@ -510,3 +510,90 @@ describe("L4d · guardie vocabolario fonte", () => {
     ).toEqual(GUARDATE);
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * L4e · GUARDIE PORTALE PUBBLICO (G4)
+ *
+ * Il portale apre al pubblico la prima pagina del progetto. Tre invarianti che,
+ * se si rompono in silenzio, fanno danni opposti e gravi:
+ *   • G13  — l'elenco delle rotte pubbliche è ESATTAMENTE quello atteso: una
+ *            rotta pubblica in più (o in meno) è una scelta di sicurezza, non
+ *            un `||` che nessuno nota;
+ *   • G13b — il portale dichiara `index: true` mentre il resto dell'app resta
+ *            `index: false`: senza, la vetrina nasce invisibile (o, al contrario,
+ *            si aprirebbe l'intera app all'indicizzazione);
+ *   • G13c — i token Tailwind del gestionale hanno ANCORA i valori di prima,
+ *            valore per valore, e lo spazio `lim` esiste separato.
+ * ════════════════════════════════════════════════════════════════════════ */
+describe("L4e · guardie portale pubblico", () => {
+  it("G13 · ROTTE_PUBBLICHE in proxy.ts è esattamente [/login,/registrati,/auth,/ottica]", () => {
+    const src = leggi("proxy.ts");
+    const m = src.match(/ROTTE_PUBBLICHE\s*=\s*\[([^\]]*)\]/);
+    expect(m, "ROTTE_PUBBLICHE non trovato o non è un array letterale in proxy.ts").toBeTruthy();
+    const rotte = m![1]
+      .split(",")
+      .map((s) => s.trim().replace(/^["']|["']$/g, ""))
+      .filter(Boolean);
+    expect(rotte, "l'elenco delle rotte pubbliche è cambiato").toEqual([
+      "/login",
+      "/registrati",
+      "/auth",
+      "/ottica",
+    ]);
+    // Difesa esplicita: la vecchia catena di || non deve tornare.
+    expect(
+      /isPublic\s*=\s*\n?\s*path\.startsWith\([^)]*\)\s*\|\|/.test(src),
+      "il controllo pubblico è tornato a una catena di || scritta a mano"
+    ).toBe(false);
+  });
+
+  it("G13b · il portale dichiara index:true, la radice resta index:false", () => {
+    const portale = leggi("app/(portale)/layout.tsx");
+    const radice = leggi("app/layout.tsx");
+    // normalizzo gli spazi per non dipendere dalla formattazione.
+    const compatta = (s: string) => s.replace(/\s+/g, "");
+    expect(
+      compatta(portale).includes("robots:{index:true,follow:true}"),
+      "il layout del portale non sovrascrive più robots a index:true"
+    ).toBe(true);
+    expect(
+      compatta(radice).includes("robots:{index:false,follow:false}"),
+      "il layout radice non è più index:false: rischio di indicizzare tutta l'app"
+    ).toBe(true);
+  });
+
+  it("G13c · i token Tailwind preesistenti sono invariati e lo spazio `lim` esiste", () => {
+    const src = leggi("tailwind.config.ts");
+    const compatta = src.replace(/\s+/g, "");
+    // Ogni token del gestionale, valore per valore: se qualcuno ne cambia uno,
+    // rompe qui (la consegna vieta di toccarli «nemmeno una virgola»).
+    const attesi: [string, string][] = [
+      ["carta", "#FAF7F2"],
+      ["inchiostro", "#1C1714"],
+      ["linea", "#E7DFD2"],
+      ["soft", "#6B5D50"],
+      ["faint", "#B9AA97"],
+    ];
+    for (const [nome, val] of attesi) {
+      expect(compatta.includes(`${nome}:"${val}"`), `token ${nome} cambiato o mancante`).toBe(true);
+    }
+    // ottone e gli stati (oggetti con DEFAULT/soft/scuro)
+    for (const frag of [
+      'ottone:{DEFAULT:"#A67C42"',
+      'soft:"#EFE4D3"',
+      'scuro:"#8A6533"',
+      'verde:{DEFAULT:"#127E7A",soft:"#E2F0EE"}',
+      'ambra:{DEFAULT:"#C98A2B",soft:"#F7EEDD"}',
+      'blu:{DEFAULT:"#5B6DA8",soft:"#E7EAF6"}',
+      'rosso:{DEFAULT:"#B0483F",soft:"#F6E4E2"}',
+    ]) {
+      expect(compatta.includes(frag), `frammento token cambiato o mancante: ${frag}`).toBe(true);
+    }
+    // Lo spazio di nomi separato del portale esiste e ha valori Limpidia (diversi).
+    expect(compatta.includes('lim:{'), "manca lo spazio colori `lim` del portale").toBe(true);
+    expect(compatta.includes('carta:"#F2F2F0"'), "lim.carta (Limpidia) mancante").toBe(true);
+    expect(compatta.includes('inchiostro:"#171512"'), "lim.inchiostro (Limpidia) mancante").toBe(true);
+    // Prova che i due spazi NON collidono: carta gestionale ≠ carta Limpidia.
+    expect("#FAF7F2").not.toBe("#F2F2F0");
+  });
+});
