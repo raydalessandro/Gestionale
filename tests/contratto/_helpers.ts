@@ -21,6 +21,19 @@ export function haEnv(): boolean {
   return Boolean(URL && ANON && SERVICE);
 }
 
+// In CI un ambiente senza segreti è un ERRORE, non uno skip. Le suite usano
+// `describe.skipIf(!haEnv())`: comodo in locale, ma in CI vorrebbe dire che una
+// misconfigurazione dei segreti passa come "tutto verde" (ogni suite skippata).
+// Questo throw a import-time chiude l'intera classe di test per sempre: se manca
+// anche solo un segreto in CI, il job fallisce subito e a voce alta.
+if (process.env.CI && !haEnv()) {
+  throw new Error(
+    "CI senza segreti del progetto di test: le suite di contratto NON possono " +
+      "girare. Configura TEST_SUPABASE_URL / TEST_SUPABASE_ANON_KEY / " +
+      "TEST_SUPABASE_SERVICE_ROLE_KEY nei GitHub Actions Secrets."
+  );
+}
+
 /** Id di run: isola e permette la pulizia per prefisso. */
 export const RUN_ID = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
 
@@ -144,13 +157,19 @@ export async function creaCliente(t: Tenant, extra: Record<string, unknown> = {}
 }
 
 /**
- * Teardown globale: cancella per prefisso. Cancellare le aziende porta via in
- * cascata clienti/ordini/prodotti/movimenti; poi si rimuovono gli auth users.
+ * Teardown globale: cancella SOLO i tenant creati da QUESTO modulo (slugCreati),
+ * non per prefisso `test-%`. Vitest esegue i file in parallelo: una delete per
+ * prefisso largo porterebbe via, a metà corsa, i tenant di un'altra suite (e le
+ * sue asserzioni cadrebbero a caso). `slugCreati` traccia esattamente i propri.
+ * Cancellare le aziende porta via in cascata clienti/ordini/prodotti/movimenti;
+ * poi si rimuovono gli auth users creati qui.
  */
 export async function pulisci(): Promise<void> {
   if (!haEnv()) return;
   const svc = serviceClient();
-  await svc.from("aziende").delete().like("slug", `${PREFISSO_SLUG}%`);
+  if (slugCreati.length) {
+    await svc.from("aziende").delete().in("slug", slugCreati);
+  }
   for (const id of utentiCreati) {
     await svc.auth.admin.deleteUser(id).catch(() => undefined);
   }

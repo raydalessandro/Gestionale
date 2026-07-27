@@ -95,6 +95,26 @@ qualunque `prenotazione_id` valorizzato, il confronto fallisce con `23514`:
   verifica di coerenza dedicata al registro. Finché il registro resta vuoto non
   rompe nulla, ma **non va abilitata la scrittura del registro senza averlo chiuso**.
 
+## 8 · Decisione (scritta) — il trigger di coerenza tenant inghiotte la superficie d'errore delle FK
+
+Su **tutte le 11 tabelle con `trg_tenant`** (coerenza tenant DB-01, migrazione **008**),
+il trigger è `BEFORE INSERT/UPDATE` e controlla ogni FK verso una tabella con
+`azienda_id` (es. `resi.busta_id → ordini_occhiali`, `appuntamenti.cliente_id →
+clienti`, …). Per un valore **non valido** — id inesistente *oppure* di un altro
+tenant — la lookup dà `azienda NULL`, `NULL is distinct from mia_azienda` è vero e
+il trigger alza **`23514`** (check_violation) *prima* che la FK venga raggiunta.
+
+Conseguenze pratiche, da tenere a mente:
+- **Quelle FK restano** come rete di sicurezza a livello di **storage**, ma sono
+  **irraggiungibili dall'applicazione**: un riferimento non valido dà sempre
+  `23514`, **mai `23503`** (foreign_key_violation). Vale anche per il **service
+  role** — i trigger non si bypassano come la RLS.
+- **Il front-end non deve mai mappare `23503`** per queste tabelle: non arriverà
+  mai. Il codice utile da intercettare è `23514`.
+- Verificato: nella suite di contratto `23503` compariva una volta sola
+  (`caparra-incasso`), ora corretta a `23514` e rinominata «coerenza tenant».
+  Nessun altro test da toccare.
+
 ## 6 · Fuso orario preesistente in `lib/utils.ts` (TERMINE: prima di stampare date)
 
 Difetto **preesistente**, scoperto in G5. `lib/utils.ts` formatta le date con
