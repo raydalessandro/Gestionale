@@ -69,9 +69,14 @@ const slugCreati: string[] = [];
 
 export type Utente = { cli: SupabaseClient; userId: string; email: string; password: string };
 
-/** Slug di test valido (minuscole/numeri/trattini, max 40) per un'etichetta. */
+/**
+ * Slug di test valido (minuscole/numeri/trattini, max 40) per un'etichetta.
+ * DEVE essere minuscolo: `crea_azienda_con_titolare` salva `lower(p_slug)`
+ * (schema.sql), quindi un'etichetta con maiuscole (es. "secA") verrebbe persa —
+ * lo slug ritornato divergerebbe da quello nella vista `negozi_pubblici`.
+ */
 export function slugDiTest(etichetta: string): string {
-  return `${PREFISSO_SLUG}${etichetta}`.slice(0, 40).replace(/-$/, "");
+  return `${PREFISSO_SLUG}${etichetta}`.slice(0, 40).replace(/-$/, "").toLowerCase();
 }
 
 /**
