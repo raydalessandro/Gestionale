@@ -72,10 +72,28 @@ esce senza icona e con anteprima social vuota.
   **non cancellabili** (trigger no-delete, §ID-01) e **pinnano la persona** (FK
   restrict): il contratto `crea-prenotazione` lascia quindi righe residue che una
   delete a cascata dell'azienda di test non riesce a rimuovere. Mitigato oggi con
-  slug/telefoni unici per `RUN_ID`, ma sul progetto `gestionale-test` serve una
-  **RPC `SECURITY DEFINER` di pulizia** (o un reset periodico) per non accumulare.
-  Da fare **insieme al setup del progetto di test (punto 1)**, prima che la CI
-  giri il contratto in continuo. Vedi `docs/agenti/report-test.md`.
+  slug/telefoni unici per `RUN_ID`. **→ CHIUSO** dalla consegna «Progetto di test»:
+  `svuota_dati_di_test()` (migrazione 015) fa la pulizia, chiamata dalla CI prima
+  del contratto. Vedi `docs/ambienti.md`.
+
+## 7 · Difetto preesistente — coerenza tenant del REGISTRO (scoperto nella consegna «Progetto di test»)
+
+Il trigger `trg_coerenza_registro` (migrazione **011**) su
+`persone_riferimento_registro` chiama `assicura_coerenza_tenant('prenotazione_id',
+'prenotazioni')`. Quella funzione confronta la riga riferita con `NEW.azienda_id`
+della riga che si scrive — ma **il registro non ha una colonna `azienda_id`** (ha
+`da_azienda_id` / `a_azienda_id`). Quindi `mia_azienda` è sempre `NULL` e, per
+qualunque `prenotazione_id` valorizzato, il confronto fallisce con `23514`:
+**ogni inserimento nel registro con una prenotazione collegata verrebbe respinto.**
+
+- **Dormiente oggi:** nessuno scrive ancora nel registro — quel flusso
+  (accettazione di una richiesta che àncora la persona a un negozio) è **G8**.
+  Emerso solo perché un dry-run della pulizia provava a seminare una riga registro.
+- **Da correggere in G8, dove il registro si scrive:** o passare al trigger la
+  coppia giusta usando `a_azienda_id` come tenant della riga (serve una variante
+  della funzione che legga un nome-colonna diverso da `azienda_id`), oppure una
+  verifica di coerenza dedicata al registro. Finché il registro resta vuoto non
+  rompe nulla, ma **non va abilitata la scrittura del registro senza averlo chiuso**.
 
 ## 6 · Fuso orario preesistente in `lib/utils.ts` (TERMINE: prima di stampare date)
 
