@@ -16,18 +16,22 @@ import { createClient } from "@supabase/supabase-js";
 const URL = process.env.TEST_SUPABASE_URL;
 const SERVICE = process.env.TEST_SUPABASE_SERVICE_ROLE_KEY;
 
-if (!URL || !SERVICE) {
-  console.error("Mancano TEST_SUPABASE_URL / TEST_SUPABASE_SERVICE_ROLE_KEY.");
-  process.exit(1);
+async function main(): Promise<void> {
+  if (!URL || !SERVICE) {
+    console.error("Mancano TEST_SUPABASE_URL / TEST_SUPABASE_SERVICE_ROLE_KEY.");
+    process.exit(1);
+  }
+
+  const svc = createClient(URL, SERVICE, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+
+  const { error } = await svc.rpc("svuota_dati_di_test");
+  if (error) {
+    console.error(`svuota_dati_di_test fallita: ${error.message}`);
+    process.exit(1);
+  }
+  console.log("Residuo delle prove ripulito (svuota_dati_di_test).");
 }
 
-const svc = createClient(URL, SERVICE, {
-  auth: { autoRefreshToken: false, persistSession: false },
-});
-
-const { error } = await svc.rpc("svuota_dati_di_test");
-if (error) {
-  console.error(`svuota_dati_di_test fallita: ${error.message}`);
-  process.exit(1);
-}
-console.log("Residuo delle prove ripulito (svuota_dati_di_test).");
+void main();
