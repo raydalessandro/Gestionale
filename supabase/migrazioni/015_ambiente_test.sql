@@ -60,10 +60,14 @@ begin
   alter table public.persone_riferimento_registro disable trigger trg_registro_append_only;
   alter table public.prenotazioni                 disable trigger trg_prenotazioni_no_delete;
 
-  delete from public.persone_riferimento_registro;
-  delete from public.lista_attesa;
-  delete from public.prenotazioni;   -- tutte: sono dati di prova
-  delete from public.persone;        -- tutte: le crea solo crea_prenotazione
+  -- `where true` esplicito: Supabase tiene acceso sql_safe_updates, che rifiuta
+  -- una DELETE senza WHERE ("DELETE requires a WHERE clause"). Qui svuotare
+  -- l'intera tabella è voluto — sono tutte righe di prova — ma il predicato deve
+  -- comunque esserci.
+  delete from public.persone_riferimento_registro where true;
+  delete from public.lista_attesa                 where true;
+  delete from public.prenotazioni where true;   -- tutte: sono dati di prova
+  delete from public.persone     where true;    -- tutte: le crea solo crea_prenotazione
 
   delete from public.appuntamenti
   where id = any(v_appti)
