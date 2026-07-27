@@ -121,7 +121,9 @@ export async function creaProdotto(
 ): Promise<string> {
   const { data, error } = await t.cli
     .from("prodotti")
-    .insert({ tipo: "lac", nome: `Prod ${RUN_ID}`, prezzo: 10, ...extra })
+    // azienda_id esplicito: non c'è default in DB (scelta di isolamento tenant),
+    // l'app lo passa sempre. `extra` può comunque sovrascriverlo.
+    .insert({ azienda_id: t.aziendaId, tipo: "lac", nome: `Prod ${RUN_ID}`, prezzo: 10, ...extra })
     .select("id")
     .single();
   if (error) throw new Error(`creaProdotto: ${error.message}`);
@@ -132,7 +134,9 @@ export async function creaProdotto(
 export async function creaCliente(t: Tenant, extra: Record<string, unknown> = {}): Promise<string> {
   const { data, error } = await t.cli
     .from("clienti")
-    .insert({ nome: "Mario", cognome: `Rossi ${RUN_ID}`, ...extra })
+    // azienda_id esplicito: non c'è default in DB (scelta di isolamento tenant),
+    // l'app lo passa sempre. `extra` può comunque sovrascriverlo.
+    .insert({ azienda_id: t.aziendaId, nome: "Mario", cognome: `Rossi ${RUN_ID}`, ...extra })
     .select("id")
     .single();
   if (error) throw new Error(`creaCliente: ${error.message}`);
