@@ -40,24 +40,24 @@ Un tenant pubblicato, orari 09–17 tutti i giorni, `visita` (appuntamento) + `s
 8. **servizi_pubblici espone `tipo`** (anon): `visita`=appuntamento con durata,
    `sole`=richiesta con durata NULL.
 
-### L3 · E2E — nuovo `e2e/g8-servizi-richiesta.spec.ts` (Scenario A, in `test.fixme`)
-Scenario A: dal negozio, un servizio RICHIESTA → percorso a 3 passi (Servizio → Dettagli
-→ Invia), viewport MOBILE → esito «Richiesta inviata … entro 24 ore», con l'INVARIANTE
-017 che NON compaia nessuna griglia di slot (né il passo «Quando»), più la verifica a
-valle nel DB (richiesta senza appuntamento/inizio/durata). Il setup del tenant (negozio
-pubblicato con `visita` + `sole`) e la logica del flusso + le asserzioni DB sono
-DEFINITIVI; **i selettori di heading/bottoni sono PROVVISORI** (marcati `TODO(UI)`) perché
-la UI del percorso a 3 passi è in costruzione in parallelo sullo stesso branch. Il test è
-`test.fixme` → NON gira, CI resta verde. **Da finalizzare dopo l'ok sulla UI pushata**:
-togliere il `fixme` e allineare i selettori al markup reale.
+### L3 · E2E — nuovo `e2e/g8-servizi-richiesta.spec.ts` (Scenario A, ATTIVO in CI)
+Scenario A (viewport MOBILE): dalla pagina negozio, la sezione «Serve altro? Ti
+rispondiamo entro 24 ore» ospita le richieste (link con badge «Su richiesta ›»); si
+apre il percorso guidato → passo 1 «Che cosa ti serve?» (scelgo la voce richiesta) →
+passo 2 «Raccontaci in breve» (textarea «Che cosa cerchi?» + contatti) → passo 3 «Ci
+siamo» (informativa obbligatoria) → «Invia la richiesta». Esito «Richiesta inviata …
+entro 24 ore» + codice. Asserzioni-cardine della 017: l'indicatore dice «Passo X di 3»
+(non 5); in NESSUN momento compare una griglia di slot orari né il passo «Quando»; il
+riepilogo non ha riga «Durata». Verifica a valle nel DB: prenotazione su `sole`,
+`in_attesa`, `appuntamento_id`/`inizio`/`durata_minuti` NULL, il testo della textarea
+finito in `note`. Selettori finalizzati sul markup reale (`WizardPrenota.tsx` +
+`ottica/[slug]/page.tsx`), solo ruolo/etichetta/testo — la UI è pushata (commit 4fa238b).
 
 Scenario B (regressione, il più importante): il percorso a 5 passi del servizio
 appuntamento resta coperto da `e2e/g7-prenota.spec.ts`, **non toccato** — la 017 non lo
-cambia. Deve restare verde.
+cambia (l'indicatore resta «Passo X di 5», passo 4 «Quando ti va bene?»). Deve restare verde.
 
-**Dipende ancora dalla UI (da finalizzare dopo conferma):** i selettori dello Scenario A
-in `g8-servizi-richiesta.spec.ts` (heading passi 1/2/3, etichette bottoni «Continua/Invia»,
-CTA d'ingresso al wizard dalla pagina negozio).
+Nessuna dipendenza residua dalla UI: selettori finalizzati.
 
 ## Giro 014 · le sale (branch `portale/014-sale`, migrazione 014)
 
