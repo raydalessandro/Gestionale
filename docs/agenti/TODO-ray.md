@@ -185,6 +185,26 @@ verificare che la modifica regga sia per un negozio gestionale sia per un tenant
 creato dal flusso portale, e che i test di contratto sull'onboarding restino
 verdi.
 
+## 12 · Catalogo servizi del PORTALE ↔ tassonomia visite del GESTIONALE (decisione aperta — stesso innesco delle LAC/prescrizioni)
+
+Sono **la stessa questione**: il catalogo dei servizi del portale (017: 13 voci —
+`Visita optometrica`, `Occhiale da vista`, `Controllo miopia bambini`, …) e la
+**tassonomia delle visite + prescrizioni del gestionale** devono finire per
+parlarsi. **Finché il secondo non è fermo, il primo non si può chiudere.** Vanno
+affrontati **insieme**, o si fa il lavoro due volte.
+
+- **`controllo` (Controllo della vista).** Introdotto prima del portale, **non è
+  nel prototipo** (la 017 carica i 13, `controllo` resta come 14° legacy). È
+  lasciato **in catalogo ma NON attivato sui negozi dimostrativi** (`seed_demo.sql`):
+  a un cliente che prenota sarebbe un doppione di «Visita optometrica» — stessa
+  cosa. Da decidere se **ritirarlo** o **mapparlo** a un tipo-visita del gestionale.
+- **Innesco (lo stesso della §10):** la consegna che **rifà il wizard ordini + il
+  modulo prescrizioni** del gestionale (convertitore monofocale/progressiva/LAC).
+  Lì si definiscono i tipi di visita/prescrizione: è il momento in cui il catalogo
+  del portale va riconciliato con quella tassonomia (e si chiude `controllo`).
+- Nota: la 017 **non** rompe nulla nel frattempo — i due mondi convivono; è solo
+  la *chiusura* del catalogo che dipende dalla tassonomia del gestionale.
+
 ## 6 · Fuso orario preesistente in `lib/utils.ts` (TERMINE: prima di stampare date)
 
 Difetto **preesistente**, scoperto in G5. `lib/utils.ts` formatta le date con

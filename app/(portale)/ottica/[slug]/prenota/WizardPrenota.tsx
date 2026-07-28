@@ -68,9 +68,20 @@ export default function WizardPrenota({
   const [caricando, setCaricando] = useState(false);
   const [informativa, setInformativa] = useState(false);
   const [listaAttesa, setListaAttesa] = useState(false);
+  const [richiestaTesto, setRichiestaTesto] = useState(""); // ramo richiesta: che cosa cerchi
   const [inviando, setInviando] = useState(false);
   const [errore, setErrore] = useState<string | null>(null);
-  const [esito, setEsito] = useState<{ codice: string; inizioISO: string; durata: number } | null>(null);
+  const [esito, setEsito] = useState<{
+    codice: string;
+    inizioISO: string | null;
+    durata: number | null;
+    richiesta: boolean;
+  } | null>(null);
+
+  // Il servizio di tipo `richiesta` non ha slot: percorso a 3 passi invece di 5
+  // (Servizio → Dettagli → Invia). Il ramo lungo (appuntamento) resta identico.
+  const isRichiesta = servizio?.tipo === "richiesta";
+  const totPassi = isRichiesta ? 3 : 5;
 
   const oggi = oggiISO(new Date());
   const urlPasso = useCallback(
@@ -114,25 +125,27 @@ export default function WizardPrenota({
   }, [passo, servizio, giorno, slug, sb]);
 
   async function invia() {
-    if (!servizio || !inizioISO || inviando) return;
+    if (!servizio || inviando) return;
+    if (!isRichiesta && !inizioISO) return; // l'appuntamento ha bisogno dello slot
     setInviando(true);
     setErrore(null);
     const res: RisultatoPrenota = await inviaPrenotazione({
       slug,
       servizio: servizio.codice,
-      inizioISO,
+      tipo: servizio.tipo,
+      inizioISO: isRichiesta ? null : inizioISO,
       nome,
       telefono,
       email,
       perContoDi: perAltro ? perContoDi : "",
-      note: "",
+      note: isRichiesta ? richiestaTesto.trim() : "",
       fonte,
       chiaveRichiesta: chiave.current,
       informativa,
-      listaAttesa,
+      listaAttesa: isRichiesta ? false : listaAttesa,
     });
     if (res.ok) {
-      setEsito({ codice: res.codice, inizioISO: res.inizioISO, durata: res.durata });
+      setEsito({ codice: res.codice, inizioISO: res.inizioISO, durata: res.durata, richiesta: isRichiesta });
     } else {
       setErrore(res.errore);
       setInviando(false); // ritentabile: la stessa chiave rende il retry idempotente
@@ -153,15 +166,31 @@ export default function WizardPrenota({
 
         <div className="mt-8 rounded-2xl border border-lim-linea bg-white p-[18px] text-left text-[14.5px] text-lim-inchiostro">
           <Riga etichetta="Negozio" valore={nomeNegozio} />
-          <Riga etichetta="Servizio" valore={servizio?.etichetta ?? ""} />
-          <Riga etichetta="Quando" valore={`${etichettaGiorno(giorno)}, ${oraDaISO(esito.inizioISO)}`} />
-          <Riga etichetta="Durata" valore={`${esito.durata} min`} ultima />
+          {esito.richiesta ? (
+            <Riga etichetta="Servizio" valore={servizio?.etichetta ?? ""} ultima />
+          ) : (
+            <>
+              <Riga etichetta="Servizio" valore={servizio?.etichetta ?? ""} />
+              <Riga etichetta="Quando" valore={`${etichettaGiorno(giorno)}, ${esito.inizioISO ? oraDaISO(esito.inizioISO) : ""}`} />
+              <Riga etichetta="Durata" valore={esito.durata != null ? `${esito.durata} min` : "—"} ultima />
+            </>
+          )}
         </div>
 
         <p className="mt-6 text-[14.5px] leading-relaxed text-lim-inchiostro">
-          La tua richiesta è arrivata al negozio. Non è ancora confermata:{" "}
-          <strong>{nomeNegozio} la conferma</strong> e riceverai un avviso quando
-          l'ha fatto.
+          {esito.richiesta ? (
+            <>
+              La tua richiesta è arrivata a <strong>{nomeNegozio}</strong>. Ti
+              rispondono <strong>entro 24 ore</strong>: disponibile, ordinabile o
+              un'alternativa.
+            </>
+          ) : (
+            <>
+              La tua richiesta è arrivata al negozio. Non è ancora confermata:{" "}
+              <strong>{nomeNegozio} la conferma</strong> e riceverai un avviso
+              quando l'ha fatto.
+            </>
+          )}
         </p>
 
         <p className="mt-8 text-[13px] text-lim-faint">
@@ -188,7 +217,7 @@ export default function WizardPrenota({
             ‹ {nomeNegozio}
           </Link>
         )}
-        <span className="tabular-nums text-lim-faint">Passo {passo} di 5</span>
+        <span className="tabular-nums text-lim-faint">Passo {passo} di {totPassi}</span>
       </div>
 
       <h1 className="mb-1 font-lim-display text-[15px] font-semibold text-lim-faint">{nomeNegozio}</h1>
@@ -209,7 +238,9 @@ export default function WizardPrenota({
                 } bg-white`}
               >
                 <span className="text-[15.5px] font-semibold text-lim-inchiostro">{s.etichetta}</span>
-                <span className="shrink-0 text-[13px] text-lim-soft">{s.durata_minuti} min</span>
+                <span className="shrink-0 text-[13px] text-lim-soft">
+                  {s.tipo === "appuntamento" ? `${s.durata_minuti} min` : "Su richiesta"}
+                </span>
               </button>
             ))}
             {servizi.length === 0 && (
@@ -219,7 +250,7 @@ export default function WizardPrenota({
         </Schermata>
       )}
 
-      {passo === 2 && (
+      {passo === 2 && !isRichiesta && (
         <Schermata titolo="Hai una copertura sanitaria?" sotto="Serve solo al negozio per prepararsi. Nessuna assicurazione da scegliere.">
           <div className="space-y-2.5">
             {(["si", "no", "nsp"] as Copertura[]).map((c) => (
@@ -241,7 +272,7 @@ export default function WizardPrenota({
         </Schermata>
       )}
 
-      {passo === 3 && (
+      {passo === 3 && !isRichiesta && (
         <Schermata titolo="Chi sei?">
           <div className="space-y-4">
             <Campo etichetta="Nome e cognome" obbligatorio>
@@ -269,7 +300,7 @@ export default function WizardPrenota({
         </Schermata>
       )}
 
-      {passo === 4 && (
+      {passo === 4 && !isRichiesta && (
         <Schermata titolo="Quando ti va bene?">
           <div className="mb-4 flex items-center justify-between gap-2">
             {giorno > oggi ? (
@@ -351,6 +382,76 @@ export default function WizardPrenota({
           </div>
           <p className="mt-2.5 text-center text-[12.5px] text-lim-faint">
             È una richiesta: il negozio conferma.
+          </p>
+        </Schermata>
+      )}
+
+      {/* ───── Ramo RICHIESTA · passo 2 · Dettagli (niente slot) ───── */}
+      {passo === 2 && isRichiesta && (
+        <Schermata titolo="Raccontaci in breve" sotto={servizio?.etichetta}>
+          <div className="space-y-4">
+            <Campo etichetta="Che cosa cerchi?" obbligatorio>
+              {(id) => (
+                <textarea
+                  id={id}
+                  value={richiestaTesto}
+                  onChange={(e) => setRichiestaTesto(e.target.value)}
+                  rows={4}
+                  placeholder="Modello, marca, gradazione — o qual è il problema."
+                  className={`${inputCls} resize-none`}
+                />
+              )}
+            </Campo>
+            <Campo etichetta="Nome e cognome" obbligatorio>
+              {(id) => <input id={id} value={nome} onChange={(e) => setNome(e.target.value)} autoComplete="name" className={inputCls} />}
+            </Campo>
+            <Campo etichetta="Telefono" obbligatorio>
+              {(id) => <input id={id} value={telefono} onChange={(e) => setTelefono(e.target.value)} inputMode="tel" autoComplete="tel" className={inputCls} />}
+            </Campo>
+            <Campo etichetta="Email (facoltativa)">
+              {(id) => <input id={id} value={email} onChange={(e) => setEmail(e.target.value)} inputMode="email" autoComplete="email" className={inputCls} />}
+            </Campo>
+            <Btn
+              full
+              tinta="dark"
+              disabled={!(richiestaTesto.trim() && nome.trim() && telefono.trim())}
+              onClick={() => vai(3)}
+            >
+              Continua
+            </Btn>
+          </div>
+        </Schermata>
+      )}
+
+      {/* ───── Ramo RICHIESTA · passo 3 · Invia ───── */}
+      {passo === 3 && isRichiesta && (
+        <Schermata titolo="Ci siamo">
+          <div className="rounded-2xl border border-lim-linea bg-white p-[18px] text-[14.5px] text-lim-inchiostro">
+            <Riga etichetta="Negozio" valore={nomeNegozio} />
+            <Riga etichetta="Servizio" valore={servizio?.etichetta ?? ""} />
+            <Riga etichetta="A nome di" valore={perAltro && perContoDi ? perContoDi : nome} ultima />
+          </div>
+
+          <label className="mt-4 flex items-start gap-3">
+            <input type="checkbox" checked={informativa} onChange={(e) => setInformativa(e.target.checked)} className="mt-0.5 h-4 w-4" />
+            <span className="text-[13.5px] leading-relaxed text-lim-inchiostro">
+              Ho letto l'
+              <Link href="/informativa" className="font-semibold text-lim-ambra underline">
+                informativa privacy
+              </Link>
+              : i dati servono a gestire la richiesta, il negozio scelto li vedrà, e questo non è un consenso commerciale.
+            </span>
+          </label>
+
+          {errore && <p className="mt-4 text-[14px] font-semibold text-rosso">{errore}</p>}
+
+          <div className="mt-5">
+            <Btn full disabled={!informativa || inviando} onClick={invia}>
+              {inviando ? "Invio…" : "Invia la richiesta"}
+            </Btn>
+          </div>
+          <p className="mt-2.5 text-center text-[12.5px] text-lim-faint">
+            Niente orario da scegliere: il negozio ti risponde entro 24 ore.
           </p>
         </Schermata>
       )}

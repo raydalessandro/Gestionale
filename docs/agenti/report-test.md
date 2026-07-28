@@ -1,11 +1,63 @@
 # Report — Agente Test & CI
 
-Aggiornato: 2026-07-26 · Fasi coperte: 1, 2, 3, 4 (v0.1–v0.5) + interfasi
+Aggiornato: 2026-07-28 · Fasi coperte: 1, 2, 3, 4 (v0.1–v0.5) + interfasi
 **4b/4c/4d**; portale **G3–G7** (vocabolario fonte, pagina negozio, orari/servizi,
-slot, percorso di prenotazione), **G7-bis · l'agenda unica** (migrazione **013**)
-e ora **G-014 · le sale** (branch `portale/014-sale`, migrazione **014**, consegna
-SOLO SQL). La copertura 014 è descritta subito qui sotto; i giri precedenti restano
-più in basso.
+slot, percorso di prenotazione), **G7-bis · l'agenda unica** (migrazione **013**),
+**G-014 · le sale** (migrazione **014**) e ora **017 · i servizi di tipo richiesta**
+(branch `portale/017-servizi-richiesta`, migrazione **017**). La copertura 017 è
+descritta subito qui sotto; i giri precedenti restano più in basso.
+
+## Giro 017 · i servizi di tipo «richiesta» (branch `portale/017-servizi-richiesta`)
+
+La 017 insegna al catalogo che un servizio ha DUE forme: `appuntamento` (durata +
+slot + appuntamento in agenda, comportamento pre-017) e `richiesta` (niente durata,
+niente slot: «Occhiali da sole», «Le mie lenti a contatto», «Riparazione» — il negozio
+risponde entro 24h). `crea_prenotazione` si biforca; `slot_liberi` per una richiesta
+torna vuoto; nuovi trigger di coerenza su `servizi`, `negozi_servizi`, `prenotazioni`;
+la vista `servizi_pubblici` espone anche `tipo`. Migrazione GIÀ applicata al progetto
+di TEST. Nessun file dell'app toccato.
+
+### L2 · Contratto — nuovo `tests/contratto/servizi-richiesta.test.ts` (8 test, in CI)
+Un tenant pubblicato, orari 09–17 tutti i giorni, `visita` (appuntamento) + `sole`
+(richiesta) attivi. Copre la §7:
+1. **slot_liberi su richiesta → vuoto** (anon), con controprova che `visita` offre slot
+   (il vuoto è per il TIPO, non per cattiva semina).
+2. **crea_prenotazione su richiesta** → `appuntamento_id`/`inizio`/`durata_minuti` NULL,
+   `note` valorizzate, stato `in_attesa`, e conteggio appuntamenti INVARIATO (nessun
+   appuntamento creato).
+3. **due richieste dello stesso servizio, telefoni diversi** → entrambe passano (nessuno
+   slot da contendere), due righe distinte.
+4. **insert diretta su APPUNTAMENTO senza appuntamento_id** (service role) → respinta dal
+   trigger `trg_coerenza_prenotazione_tipo` (**P0001**, `PRENOTAZIONE_APPUNTAMENTO_INCOMPLETA`).
+5. **insert diretta su RICHIESTA con appuntamento_id** (appuntamento VERO dello stesso
+   tenant, così l'unico a obiettare è il trigger tipo) → respinta (**P0001**,
+   `PRENOTAZIONE_RICHIESTA_CON_SLOT`).
+6. **servizi: richiesta + durata** → check `servizi_durata_per_tipo` (**23514**), sia in
+   insert (codice usa-e-getta) sia in update su `sole`; controprova che `sole` resta
+   richiesta senza durata (l'update non è passato: nessuna mutazione del catalogo globale).
+7. **negozi_servizi: richiesta (`riparazione`) + durata_minuti** → trigger
+   `trg_coerenza_negozio_servizio` (**P0001**, `SERVIZIO_RICHIESTA_SENZA_DURATA`).
+8. **servizi_pubblici espone `tipo`** (anon): `visita`=appuntamento con durata,
+   `sole`=richiesta con durata NULL.
+
+### L3 · E2E — nuovo `e2e/g8-servizi-richiesta.spec.ts` (Scenario A, ATTIVO in CI)
+Scenario A (viewport MOBILE): dalla pagina negozio, la sezione «Serve altro? Ti
+rispondiamo entro 24 ore» ospita le richieste (link con badge «Su richiesta ›»); si
+apre il percorso guidato → passo 1 «Che cosa ti serve?» (scelgo la voce richiesta) →
+passo 2 «Raccontaci in breve» (textarea «Che cosa cerchi?» + contatti) → passo 3 «Ci
+siamo» (informativa obbligatoria) → «Invia la richiesta». Esito «Richiesta inviata …
+entro 24 ore» + codice. Asserzioni-cardine della 017: l'indicatore dice «Passo X di 3»
+(non 5); in NESSUN momento compare una griglia di slot orari né il passo «Quando»; il
+riepilogo non ha riga «Durata». Verifica a valle nel DB: prenotazione su `sole`,
+`in_attesa`, `appuntamento_id`/`inizio`/`durata_minuti` NULL, il testo della textarea
+finito in `note`. Selettori finalizzati sul markup reale (`WizardPrenota.tsx` +
+`ottica/[slug]/page.tsx`), solo ruolo/etichetta/testo — la UI è pushata (commit 4fa238b).
+
+Scenario B (regressione, il più importante): il percorso a 5 passi del servizio
+appuntamento resta coperto da `e2e/g7-prenota.spec.ts`, **non toccato** — la 017 non lo
+cambia (l'indicatore resta «Passo X di 5», passo 4 «Quando ti va bene?»). Deve restare verde.
+
+Nessuna dipendenza residua dalla UI: selettori finalizzati.
 
 ## Giro 014 · le sale (branch `portale/014-sale`, migrazione 014)
 

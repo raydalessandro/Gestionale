@@ -65,7 +65,7 @@ export async function chiusureDaSlug(slug: string): Promise<ChiusuraPubblicaRow[
 export async function serviziDaSlug(slug: string): Promise<ServizioPubblicoRow[]> {
   const { data, error } = await clientPubblico()
     .from("servizi_pubblici")
-    .select("slug, codice, etichetta, durata_minuti, ordine")
+    .select("slug, codice, etichetta, durata_minuti, ordine, tipo")
     .eq("slug", slug)
     .order("ordine", { ascending: true });
   if (error || !data) return [];

@@ -553,11 +553,15 @@ export type ChiusuraPubblicaRow = {
   al: string;
 };
 
-/** Riga di `servizi_pubblici`. `durata_minuti` = deroga del negozio o predefinita. */
+/**
+ * Riga di `servizi_pubblici`. `durata_minuti` = deroga del negozio o predefinita
+ * per i servizi su appuntamento; **null** per i servizi di tipo `richiesta` (017).
+ */
 export type ServizioPubblicoRow = {
   slug: string;
   codice: string;
   etichetta: string;
-  durata_minuti: number;
+  durata_minuti: number | null;
   ordine: number;
+  tipo: "appuntamento" | "richiesta";
 };
