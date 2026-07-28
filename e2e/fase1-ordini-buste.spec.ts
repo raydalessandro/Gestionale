@@ -71,9 +71,15 @@ test.describe("Fase 1 · Ordini & Buste", () => {
     await page.getByRole("button", { name: "Ispeziona e segna pronta" }).click();
     await expect(page.getByText("Pronta", { exact: false })).toBeVisible();
 
-    // Consegna: apre il riepilogo saldo, poi conferma.
-    await page.getByRole("button", { name: "Consegna" }).click();
-    await page.getByRole("button", { name: "Conferma consegna" }).click();
-    await expect(page.getByText("Consegnata", { exact: false })).toBeVisible();
+    // Consegna: col modulo cassa la busta pronta si consegna INCASSANDO. Il
+    // controllo qui è l'aggancio busta→cassa: un link "Consegna e incassa" che
+    // porta alla vendita con ?busta=. Il completamento dell'incasso (metodi,
+    // IVA, saldo) vive negli scenari fase4 e dipende dal modulo cassa non ancora
+    // finalizzato — quindi qui ci si ferma alla presenza e correttezza del link,
+    // non si guida l'incasso. La parte DECISA di S2 (niente pronta senza
+    // ispezione) è già verificata sopra.
+    const consegnaIncassa = page.getByRole("link", { name: "Consegna e incassa" });
+    await expect(consegnaIncassa).toBeVisible();
+    await expect(consegnaIncassa).toHaveAttribute("href", /\/cassa\/vendita\/nuova\?busta=/);
   });
 });
