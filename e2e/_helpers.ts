@@ -162,6 +162,34 @@ export async function seedBustaProntaConAcconto(
   return { id: data.id as string, numero };
 }
 
+/**
+ * Semina i metodi di pagamento di base per un tenant (via service role).
+ *
+ * PERCHÉ nel setup e non dalla UI: il flusso di *provisioning* dei metodi non è
+ * ancora deciso (l'onboarding non ne crea; `/cassa/impostazioni` li semina a
+ * mano; la pagina vendita ha un auto-seed di ripiego a render-time, fragile).
+ * È una fase del modulo cassa ancora da definire (tutte le tipologie: contanti,
+ * POS, voucher, assicurazioni, bonifico… + IVA/fatturazione). Qui li mettiamo
+ * noi così gli scenari cassa esercitano la parte DECISA — la matematica della
+ * vendita/resto/caparra/chiusura — senza pretendere un provisioning che non
+ * esiste ancora. DA RIMUOVERE quando il modulo cassa sarà finalizzato.
+ */
+export async function seedMetodiCassa(aziendaId: string): Promise<void> {
+  const svc = service();
+  const metodi = [
+    { nome: "Contanti", tipo: "contanti", tracciabile: false, ordine: 1 },
+    { nome: "Bancomat", tipo: "elettronico", tracciabile: true, ordine: 2 },
+    { nome: "Mastercard", tipo: "elettronico", tracciabile: true, ordine: 3 },
+    { nome: "Visa", tipo: "elettronico", tracciabile: true, ordine: 4 },
+    { nome: "Bonifico", tipo: "bonifico", tracciabile: true, ordine: 5 },
+    { nome: "Gift Card", tipo: "buono", tracciabile: true, ordine: 6 },
+    { nome: "Assicurazione", tipo: "assicurazione", tracciabile: true, ordine: 7 },
+    { nome: "Caparra", tipo: "caparra", tracciabile: true, ordine: 8 },
+  ].map((m) => ({ ...m, azienda_id: aziendaId }));
+  const { error } = await svc.from("metodi_pagamento").insert(metodi);
+  if (error) throw new Error(`seedMetodiCassa: ${error.message}`);
+}
+
 /** Attesa "morbida" su un valore che il server rivaluta (evita sleep fissi). */
 export async function attendi(page: Page, cond: () => Promise<boolean>, tent = 20): Promise<void> {
   for (let i = 0; i < tent; i++) {

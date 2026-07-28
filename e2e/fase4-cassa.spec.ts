@@ -4,6 +4,7 @@ import {
   creaCliente,
   aziendaIdDaSlug,
   seedBustaProntaConAcconto,
+  seedMetodiCassa,
 } from "./_helpers";
 
 /**
@@ -43,7 +44,8 @@ async function venditaVeloce(
 
 test.describe("Fase 4 · Cassa & Vendite", () => {
   test("S1 · Vendita veloce anonima, contanti col resto a video", async ({ page }) => {
-    await registraTenant(page);
+    const { slug } = await registraTenant(page);
+    await seedMetodiCassa(await aziendaIdDaSlug(slug));
 
     await page.goto("/cassa/vendita/nuova");
     await page.getByPlaceholder("Descrizione").fill("Occhiale da sole");
@@ -70,6 +72,7 @@ test.describe("Fase 4 · Cassa & Vendite", () => {
     );
     const { slug } = await registraTenant(page);
     const aziendaId = await aziendaIdDaSlug(slug);
+    await seedMetodiCassa(aziendaId);
     const clienteId = await creaCliente(page, { nome: "Elsa", cognome: "Neri", telefono: "3331112222" });
     const { id: bustaId, numero } = await seedBustaProntaConAcconto(aziendaId, clienteId, {
       totale: 965,
@@ -105,7 +108,8 @@ test.describe("Fase 4 · Cassa & Vendite", () => {
   });
 
   test("S6 · Reso con causale sulla vendita veloce", async ({ page }) => {
-    await registraTenant(page);
+    const { slug } = await registraTenant(page);
+    await seedMetodiCassa(await aziendaIdDaSlug(slug));
     await venditaVeloce(page, { descrizione: "Occhiale da sole", prezzo: "158", metodo: "Contanti" });
 
     // Dal dettaglio vendita: registra un reso denaro con causale.
@@ -121,7 +125,8 @@ test.describe("Fase 4 · Cassa & Vendite", () => {
   });
 
   test("S8 · Chiusura serale: eccedenza contanti oltre 0,05 pretende la causale", async ({ page }) => {
-    await registraTenant(page);
+    const { slug } = await registraTenant(page);
+    await seedMetodiCassa(await aziendaIdDaSlug(slug));
     // Una vendita contanti da 100 → sistema contanti del giorno = 100.
     await venditaVeloce(page, { descrizione: "Servizio", prezzo: "100", metodo: "Contanti" });
 

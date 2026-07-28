@@ -35,7 +35,9 @@ test.describe("Fase 2 · Catalogo & Magazzino", () => {
     await page.getByRole("button", { name: "Registra carico" }).click();
 
     await expect(page.getByTestId("numero-Giacenza")).toContainText("9");
-    await expect(page.getByText(/carico/i)).toBeVisible();
+    // La voce-movimento è esattamente "Carico" (etichettaMovimento): exact per
+    // non riprendere bottone "Carico da bolla"/titolo/"Registra carico".
+    await expect(page.getByText("Carico", { exact: true }).first()).toBeVisible();
     await expect(page.getByText(/Differenza da bolla 123/)).toBeVisible();
   });
 

@@ -19,6 +19,9 @@ test.describe("Fase 1 · Ordini & Buste", () => {
     // Prescrizione LAC del cliente (serve a "Da prescrizione").
     await page.goto(`/clienti/${clienteId}/prescrizioni/nuova`);
     await page.getByLabel(/Tipo/).first().selectOption("lac");
+    // Gate GDPR (4d): la prescrizione contiene dati sanitari → consenso
+    // OBBLIGATORIO (checkbox required), altrimenti il form non si invia.
+    await page.getByRole("checkbox", { name: /acconsente al trattamento dei dati sanitari/i }).check();
     await page.getByRole("button", { name: "Salva prescrizione" }).click();
     await page.waitForURL(new RegExp(`/clienti/${clienteId}$`));
 
