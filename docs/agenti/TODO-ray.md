@@ -1,7 +1,13 @@
-# TODO per Ray — setup CI & Supabase
+# TODO per Ray — setup CI & Supabase + incognite aperte
 
-Cose che deve fare **una persona** (non l'agente): riguardano segreti e
-account esterni. Aggiornato al completamento della Fase 3.
+Cose che deve fare **una persona** (non l'agente), più i **debiti/incognite
+tracciati**: segreti, account esterni, difetti noti e punti dove i moduli si
+toccano.
+
+> **Abitudine:** leggere questo file **prima di aprire una consegna**. Diverse
+> voci qui sotto vanno chiuse «al momento giusto» — cioè quando si mette mano
+> proprio a quel pezzo (cassa, wizard ordini, onboarding). Guardarle prima evita
+> di ricostruire un problema a memoria o di ricrearne uno già noto.
 
 ## 1 · Secret del progetto Supabase di test (per la CI GitHub) — DA FARE
 
@@ -140,6 +146,44 @@ Quando cassa e prescrizioni/ordini sono finalizzati: togliere i `test.fixme`,
 riscrivere gli scenari sul comportamento deciso, e rimuovere l'auto-seed dei
 metodi a render-time (`app/(app)/cassa/vendita/nuova/page.tsx`) spostandolo
 all'onboarding o a un'azione.
+
+## 10 · INCOGNITA APERTA — `fase2 S4`: "Crea ordine" (wizard LAC «Da catalogo») in timeout, MAI diagnosticato
+
+**Non è "modulo da finire": è un possibile difetto vero, mai guardato, oggi
+dietro un `test.fixme` con la CI verde sopra.** Va tenuto separato dagli altri
+quattro sospesi (quelli sanno cosa aspettano; questo no).
+
+- **Sintomo:** nel run E2E, nel wizard ordine LAC con «Da catalogo», dopo aver
+  scelto il prodotto e premuto «Avanti», il bottone **«Crea ordine» va in timeout**
+  (passo 3 mai raggiunto). Dal codice *dovrebbe* funzionare (`daCatalogo` popola la
+  riga → `righeValide` vero → «Avanti» abilitato), quindi delle due l'una:
+  **selettore/timing del test**, oppure **regressione vera** nel wizard.
+- **Perché è finito in `fixme`:** la sua coda (consegna→scarico) sbatte comunque
+  sulla cassa non finita, quindi lo scenario non poteva chiudersi ora. Ma la causa
+  del timeout su «Crea ordine» **precede** la cassa e resta irrisolta.
+- **Chi lo chiude:** la **consegna di rifacimento del wizard ordini + modulo
+  prescrizioni** (il convertitore Rx monofocale/progressiva/LAC che hai in mente).
+  **All'inizio di quella consegna, PRIMA di rifattorizzare:** riprodurre il timeout
+  col trace Playwright e stabilire se è test o codice. Se è codice, è una
+  regressione da correggere, non solo un test da riscrivere.
+- Riferimento: commento su `e2e/fase2-magazzino.spec.ts` (S4) e §9 qui sopra.
+
+## 11 · Intersezione gestionale↔portale — seminare i metodi di pagamento tocca la NASCITA di ogni negozio
+
+Il buco del provisioning dei metodi di pagamento (§ TODO storico riga ~127: oggi
+l'onboarding non semina nulla, la pagina vendita fa un auto-seed fragile a
+render-time, ed è il motivo per cui i test chiamano `seedMetodiCassa` a mano) si
+chiude in modo naturale **seminando i metodi all'onboarding**, cioè dentro
+`crea_azienda_con_titolare`.
+
+**Attenzione: è la STESSA funzione che crea OGNI tenant — anche i negozi del
+portale Limpidia** — e che con la 014 ha già accumulato il trigger della «Sala 1».
+Quindi quando ci metterai mano per la cassa **starai modificando il percorso di
+nascita di tutti i negozi**, portale compreso. Non è un problema: è il punto in
+cui i due mondi si toccano davvero. Da sapere **prima e non durante** —
+verificare che la modifica regga sia per un negozio gestionale sia per un tenant
+creato dal flusso portale, e che i test di contratto sull'onboarding restino
+verdi.
 
 ## 6 · Fuso orario preesistente in `lib/utils.ts` (TERMINE: prima di stampare date)
 
