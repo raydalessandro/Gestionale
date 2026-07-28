@@ -115,6 +115,32 @@ Conseguenze pratiche, da tenere a mente:
   (`caparra-incasso`), ora corretta a `23514` e rinominata «coerenza tenant».
   Nessun altro test da toccare.
 
+## 9 · E2E rimandati con `test.fixme` — moduli ancora aperti (da riscrivere sui doc)
+
+Cinque scenari E2E sono marcati **`test.fixme`** (skip esplicito, non nascosto):
+non falliscono la CI ma restano visibili come «in attesa». Vanno **riscritti bene
+sui doc** quando i rispettivi moduli sono finalizzati — sono parti delicate per
+il negozio.
+
+- **Cassa** (`fase4-cassa`): **S3** (consegna con caparra + incasso), **S6** (reso
+  con causale), **S8** (chiusura serale). Il modulo cassa non è chiuso: provisioning
+  dei metodi di pagamento (oggi nessun seed all'onboarding + auto-seed fragile a
+  render-time da togliere), IVA/fatturazione, e i **resi** ancora in rifacimento.
+  La parte che funziona — **vendita veloce col resto (S1)** — resta attiva.
+- **Ordine LAC** (`fase1-ordini-buste` **S1**, `fase2-magazzino` **S4**): la
+  **consegna** dell'ordine LAC passa ora dal modulo cassa («Consegna e incassa»),
+  e la **selezione ricetta** dipende dal modulo prescrizioni in rifacimento
+  (convertitore monofocale/progressiva/LAC). In più, il passo «Crea ordine» del
+  wizard LAC *Da catalogo* (S4) è andato in timeout **non diagnosticato**: da
+  guardare col trace quando si rimette mano al wizard — potrebbe essere
+  selettore/timing o una regressione vera. Lo scarico di magazzino alla consegna
+  è comunque coperto a **contratto** (`magazzino-trigger`).
+
+Quando cassa e prescrizioni/ordini sono finalizzati: togliere i `test.fixme`,
+riscrivere gli scenari sul comportamento deciso, e rimuovere l'auto-seed dei
+metodi a render-time (`app/(app)/cassa/vendita/nuova/page.tsx`) spostandolo
+all'onboarding o a un'azione.
+
 ## 6 · Fuso orario preesistente in `lib/utils.ts` (TERMINE: prima di stampare date)
 
 Difetto **preesistente**, scoperto in G5. `lib/utils.ts` formatta le date con

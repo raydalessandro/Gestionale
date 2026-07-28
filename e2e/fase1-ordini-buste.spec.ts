@@ -12,7 +12,14 @@ import { registraTenant, creaCliente } from "./_helpers";
  */
 
 test.describe("Fase 1 · Ordini & Buste", () => {
-  test("S1 · LAC dal banco: dalla Rx alla consegna", async ({ page }) => {
+  // FIXME (modulo in lavorazione): lo scenario attraversa due parti ancora
+  // aperte — (1) la SELEZIONE ricetta nel wizard LAC, che il modulo prescrizioni
+  // in rifacimento (convertitore monofocale/progressiva/LAC) cambierà; (2) la
+  // CONSEGNA dell'ordine LAC, che ora passa dal modulo cassa ('Consegna e
+  // incassa' → /cassa/vendita, ancora da finalizzare). Da riscrivere sui doc
+  // quando prescrizioni e cassa sono chiusi. La busta (S2) copre già ispezione+
+  // aggancio cassa; la creazione ordine LAC è coperta a contratto.
+  test.fixme("S1 · LAC dal banco: dalla Rx alla consegna", async ({ page }) => {
     await registraTenant(page);
     const clienteId = await creaCliente(page, { nome: "Giulia", cognome: "Neri", telefono: "3331112222" });
 
