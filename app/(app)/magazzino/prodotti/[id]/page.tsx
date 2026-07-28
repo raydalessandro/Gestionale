@@ -204,7 +204,7 @@ export default async function ProdottoPage({
 
 function NumeroGrande({ valore, label, rosso }: { valore: number; label: string; rosso?: boolean }) {
   return (
-    <div className="rounded-2xl border border-linea bg-white p-4 text-center shadow-[0_1px_2px_rgba(28,23,20,0.04)]">
+    <div data-testid={`numero-${label}`} className="rounded-2xl border border-linea bg-white p-4 text-center shadow-[0_1px_2px_rgba(28,23,20,0.04)]">
       <p className={`f-mono text-3xl font-semibold tabular-nums ${rosso ? "text-rosso" : "text-inchiostro"}`}>
         {valore}
       </p>

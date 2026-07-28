@@ -88,8 +88,12 @@ test.describe("Fase 4 · Cassa & Vendite", () => {
 
     await page.getByRole("button", { name: "Consegna e incassa" }).click();
     await page.waitForURL(/\/cassa\/vendite\/[0-9a-f-]{36}$/);
-    // La vendita è per l'INTERO valore (965), non per il solo saldo.
-    await expect(page.getByText("965", { exact: false })).toBeVisible();
+    // La vendita è per l'INTERO valore (965), non per il solo saldo. "965"
+    // compare in più celle (riga + totale) → per evitare lo strict mode ancoro
+    // al totale: la riga che porta "di cui IVA" contiene anche il totale.
+    await expect(
+      page.getByText(/di cui IVA/i).locator("..")
+    ).toContainText("965");
 
     // Riprovare l'incasso dello stesso ordine → rifiutato dall'indice unico.
     await page.goto(`/cassa/vendita/nuova?busta=${bustaId}`);

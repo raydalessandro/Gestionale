@@ -58,7 +58,10 @@ export async function creaCliente(
   // "Cognome" contiene "nome": ancorare con regex esatte.
   await page.getByLabel(/^Nome \*$/).fill(opts.nome);
   await page.getByLabel(/^Cognome \*$/).fill(opts.cognome);
-  if (opts.telefono) await page.getByLabel("Telefono").fill(opts.telefono);
+  // Il campo si chiama "Cellulare" (ClienteForm, blocco Recapiti della 006);
+  // gli altri due recapiti sono "Tel. casa"/"Tel. lavoro". exact per non
+  // riprendere quei "Tel.".
+  if (opts.telefono) await page.getByLabel("Cellulare", { exact: true }).fill(opts.telefono);
   if (opts.consensoMarketing) await page.getByLabel(/Consenso marketing/).check();
   await page.getByRole("button", { name: "Crea cliente" }).click();
 

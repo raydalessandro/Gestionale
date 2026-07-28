@@ -27,6 +27,10 @@ export default defineConfig({
   expect: { timeout: 10_000 },
   use: {
     baseURL,
+    // Cap per ogni singola azione (fill/click/selectOption): senza, un locatore
+    // che non aggancia consuma l'INTERO timeout del test (60s) — e con retries:1
+    // diventano 120s per fallimento. Con questo, un selettore rotto muore in 15s.
+    actionTimeout: 15_000,
     trace: "on-first-retry",
     // La UI è in italiano: coerenza per i formattatori Intl nei test.
     locale: "it-IT",

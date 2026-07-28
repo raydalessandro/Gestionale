@@ -44,12 +44,16 @@ test.describe("Fase 1 · Ordini & Buste", () => {
     await registraTenant(page);
     const clienteId = await creaCliente(page, { nome: "Marco", cognome: "Verdi" });
 
-    // Wizard busta (6 passi): con ?cliente parte dal passo 2.
+    // Wizard busta (6 passi): con ?cliente parte dal passo 2 (Montatura). I campi
+    // lente stanno al passo 3, e `step()` li tiene `hidden` finché non ci si arriva
+    // (non li smonta): riempirli prima farebbe scadere il timeout su un elemento
+    // invisibile. Quindi: 1 "Avanti" → passo 3, i due campi, 3 "Avanti" → passo 6.
     await page.goto(`/ordini/buste/nuova?cliente=${clienteId}`);
-    await page.getByLabel("Tipo lente").selectOption("progressiva").catch(() => undefined);
+    await page.getByRole("button", { name: "Avanti" }).click(); // passo 2 → 3 (Lenti)
+    await page.getByLabel("Tipo lente").selectOption("progressiva");
     await page.getByLabel("Prezzo lenti (€)").fill("300");
-    // Avanza fino al passo 6 (riepilogo) e crea in lavorazione.
-    for (let i = 0; i < 4; i++) await page.getByRole("button", { name: "Avanti" }).click();
+    // Avanza dal 3 al 6 (Riepilogo) e crea in lavorazione. Totale click: 4.
+    for (let i = 0; i < 3; i++) await page.getByRole("button", { name: "Avanti" }).click();
     await page.getByRole("button", { name: "Crea busta" }).click();
 
     await page.waitForURL(/\/ordini\/buste\/[0-9a-f-]{36}$/);
