@@ -172,7 +172,10 @@ async function pulisciAzienda(aziendaId: string): Promise<void> {
       await voce.click();
       await expect(page).toHaveURL(new RegExp(`data=${s.giorno}`));
       await expect(page.getByText("In attesa", { exact: true })).toBeVisible();
-      await expect(page.getByText("Carla Sospesa")).toBeVisible();
+      // `exact`: sullo stesso giorno il nome compare DUE volte — nella riga
+      // («Carla Sospesa») e nella striscia dei sospesi («· Carla Sospesa», che
+      // guarda da oggi in avanti). Esatto aggancia solo la riga, non la striscia.
+      await expect(page.getByText("Carla Sospesa", { exact: true })).toBeVisible();
       await expect(page.getByRole("button", { name: "Accetta" })).toBeVisible();
     } finally {
       await pulisciAzienda(s.aziendaId);
