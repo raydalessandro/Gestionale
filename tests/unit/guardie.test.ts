@@ -1003,3 +1003,76 @@ describe.skipIf(!existsSync(join(ROOT, M014)))("L4l · guardie le sale (014)", (
     ).toBe(true);
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * L4m · GUARDIE «PRENDI COME CLIENTE» (G19 · migrazione 018)
+ *
+ * La 018 apre l'UNICO percorso di scrittura verso `persone` e
+ * `persone_riferimento_registro` — due tabelle con RLS attiva SENZA policy
+ * (ID-01 della 011: «ci arrivano solo le funzioni security definer»). Il rischio
+ * silenzioso: se `prendi_persona_come_cliente` (che gira coi privilegi
+ * dell'owner e BYPASSA quella RLS) finisse invocabile dal browser — direttamente
+ * o via un grant ad `anon` — chiunque potrebbe scrivere nel registro dei
+ * passaggi e reintestarsi persone altrui, aggirando le guardie che vivono DENTRO
+ * la funzione. Queste guardie tengono il percorso di scrittura dietro l'azione
+ * server e la funzione revocata ad anon.
+ *
+ * Gated su `existsSync(018)`: enforca dove la 018 è nel working tree (il suo
+ * branch e la CI dopo il merge), salta pulito altrove.
+ * ════════════════════════════════════════════════════════════════════════ */
+const M018 = "supabase/migrazioni/018_prendi_come_cliente.sql";
+describe.skipIf(!existsSync(join(ROOT, M018)))("L4m · guardie prendi come cliente (018)", () => {
+  // L'INVOCAZIONE della funzione di scrittura (non una menzione in un commento).
+  const RE_INVOCA = /\.rpc\(\s*["']prendi_persona_come_cliente["']/;
+
+  it("G19 · `prendi_persona_come_cliente` si INVOCA solo da un file server (\"use server\"), mai da un client", () => {
+    const files = [...sorgenti("app"), ...sorgenti("components"), ...sorgenti("lib")];
+    const violazioni: string[] = [];
+    for (const f of files) {
+      const src = readFileSync(f, "utf8");
+      if (!RE_INVOCA.test(src)) continue;
+      const isServer = /^\s*["']use server["'];?/m.test(src);
+      const isClient = /^\s*["']use client["'];?/m.test(src);
+      if (isClient || !isServer) violazioni.push(rel(f));
+    }
+    expect(
+      violazioni,
+      `prendi_persona_come_cliente invocata fuori da un file server (o da un client): ${violazioni.join(", ")}`
+    ).toEqual([]);
+  });
+
+  it("G19b · l'azione server `prendiComeCliente` esiste, è \"use server\" e passa dalla RPC", () => {
+    const azioni = leggi("lib/actions.ts");
+    expect(/^\s*["']use server["'];?/m.test(azioni), "lib/actions.ts non è più \"use server\"").toBe(true);
+    expect(azioni).toMatch(/export\s+async\s+function\s+prendiComeCliente/);
+    expect(RE_INVOCA.test(azioni), "la scrittura passa dalla funzione definer").toBe(true);
+  });
+
+  it("G19c · le azioni dell'agenda (client) chiamano l'azione, NON la RPC di scrittura", () => {
+    const comp = leggi("components/AzioniAgenda.tsx");
+    expect(/^\s*["']use client["'];?/m.test(comp), "AzioniAgenda non è più un client component").toBe(true);
+    expect(comp.includes("prendiComeCliente"), "il componente passa dall'azione server").toBe(true);
+    expect(
+      RE_INVOCA.test(comp),
+      "il client invoca la RPC di scrittura verso persone/registro (RLS aggirabile!)"
+    ).toBe(false);
+  });
+
+  it("G19d · la 018 tiene la scrittura security definer e revocata ad anon", () => {
+    const sql = leggi(M018);
+    // le due funzioni sono security definer (bypassano la RLS di persone/registro)
+    expect(
+      /create or replace function public\.prendi_persona_come_cliente[\s\S]*?security definer/i.test(sql),
+      "prendi_persona_come_cliente deve essere security definer"
+    ).toBe(true);
+    // e NON eseguibili da anon (solo authenticated): il browser passa dall'azione.
+    expect(
+      /revoke\s+execute\s+on\s+function\s+public\.prendi_persona_come_cliente[\s\S]*?from\s+anon/i.test(sql),
+      "prendi_persona_come_cliente deve revocare execute ad anon"
+    ).toBe(true);
+    expect(
+      /revoke\s+execute\s+on\s+function\s+public\.cliente_per_telefono[\s\S]*?from\s+anon/i.test(sql),
+      "cliente_per_telefono deve revocare execute ad anon (dati clienti)"
+    ).toBe(true);
+  });
+});
