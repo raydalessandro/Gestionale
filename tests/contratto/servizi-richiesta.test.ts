@@ -77,16 +77,23 @@ function piuGiorni(iso: string, n: number): string {
   }).format(d);
 }
 
-/** Telefoni italiani UNICI per RUN_ID (niente collisioni sull'indice di `persone`). */
+/**
+ * Telefoni italiani UNICI per RUN_ID (niente collisioni sull'indice unico di
+ * `persone.telefono_normalizzato`). NB: 10 cifre esatte — `3` + seed(5) + coda(4).
+ * Il seed è a 5 cifre di proposito: con 6 il numero finiva a 11 cifre e lo
+ * `slice(0,10)` tagliava l'ultima cifra della coda, rendendo NON unici i primi
+ * telSeq (invisibile agli altri file, che passano da crea_prenotazione e
+ * deduplicano la persona; qui invece si fanno insert DIRETTI su `persone`).
+ */
 let telSeq = 0;
 function telefonoUnico(): { grezzo: string; normalizzato: string } {
   const seed = Array.from(RUN_ID)
     .map((c) => c.charCodeAt(0) % 10)
     .join("")
-    .padEnd(6, "0")
-    .slice(0, 6);
+    .padEnd(5, "0")
+    .slice(0, 5);
   const coda = String(2000 + telSeq++).slice(-4);
-  const nazionale = `3${seed}${coda}`.slice(0, 10);
+  const nazionale = `3${seed}${coda}`; // 1 + 5 + 4 = 10 cifre, coda intera
   return { grezzo: nazionale, normalizzato: `+39${nazionale}` };
 }
 
