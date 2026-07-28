@@ -40,7 +40,7 @@ Un tenant pubblicato, orari 09–17 tutti i giorni, `visita` (appuntamento) + `s
 8. **servizi_pubblici espone `tipo`** (anon): `visita`=appuntamento con durata,
    `sole`=richiesta con durata NULL.
 
-### L3 · E2E — nuovo `e2e/g8-servizi-richiesta.spec.ts` (Scenario A, ATTIVO in CI)
+### L3 · E2E — nuovo `e2e/g7bis-servizi-richiesta.spec.ts` (Scenario A, ATTIVO in CI)
 Scenario A (viewport MOBILE): dalla pagina negozio, la sezione «Serve altro? Ti
 rispondiamo entro 24 ore» ospita le richieste (link con badge «Su richiesta ›»); si
 apre il percorso guidato → passo 1 «Che cosa ti serve?» (scelgo la voce richiesta) →

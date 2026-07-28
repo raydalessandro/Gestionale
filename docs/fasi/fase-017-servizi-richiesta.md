@@ -53,7 +53,7 @@ contro le 13 del prototipo.
   richiesta (controprova su `visita`); crea_prenotazione richiesta senza appuntamento;
   doppia richiesta non in conflitto; trigger nei due sensi (P0001); check durata
   (23514); `negozi_servizi` richiesta+durata; vista `tipo`.
-- **L3 E2E** `e2e/g8-servizi-richiesta.spec.ts` — Scenario A (3 passi, mobile,
+- **L3 E2E** `e2e/g7bis-servizi-richiesta.spec.ts` — Scenario A (3 passi, mobile,
   verifica DB); il 5-passi (Scenario B) resta su `g7-prenota.spec.ts`, invariato.
 - `tsc` + `build` + `npm test` (L1+L4, 127) verdi in locale.
 
