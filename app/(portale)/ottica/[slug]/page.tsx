@@ -137,10 +137,17 @@ export default async function PaginaNegozio({
   const righeOrario = raggruppaOrari(orari);
   const haOrari = orari.length > 0;
 
+  // I due gruppi (017): appuntamento (durata + griglia slot) e richiesta (senza).
+  const serviziApp = servizi.filter((s) => s.tipo === "appuntamento");
+  const serviziRich = servizi.filter((s) => s.tipo === "richiesta");
+
   // ── Slot liberi (G6) ── servizio e giorno si scelgono via query (link, no JS).
+  // Solo per i servizi su APPUNTAMENTO: una richiesta non ha slot (slot_liberi
+  // torna comunque vuoto, ma qui non la si offre nemmeno nel selettore).
   const oggi = oggiISO(new Date());
   const giorno = typeof sp.giorno === "string" && sp.giorno >= oggi ? sp.giorno : oggi;
-  const servizioSel = servizi.find((s) => s.codice === sp.servizio) ?? null;
+  const servizioSelTutti = servizi.find((s) => s.codice === sp.servizio) ?? null;
+  const servizioSel = servizioSelTutti?.tipo === "appuntamento" ? servizioSelTutti : null;
   const slots = servizioSel ? await slotLiberi(slug, servizioSel.codice, giorno) : [];
 
   // La provenienza (?da=qr|sito) segue la persona dentro il percorso di
@@ -203,16 +210,16 @@ export default async function PaginaNegozio({
           Scegli servizio, giorno e orario. Ci vuole un minuto.
         </p>
 
-        {/* Servizi attivi, nell'ordine del catalogo. Nessun prezzo: non li abbiamo. */}
-        {servizi.length > 0 && (
+        {/* Servizi su APPUNTAMENTO — con durata (017). Nessun prezzo: non li abbiamo. */}
+        {serviziApp.length > 0 && (
           <>
-            <Eyebrow>Servizi</Eyebrow>
+            <Eyebrow>Servizi su appuntamento</Eyebrow>
             <div className="mb-6 overflow-hidden rounded-2xl border border-lim-linea bg-white">
-              {servizi.map((s, i) => (
+              {serviziApp.map((s, i) => (
                 <div
                   key={s.codice}
                   className={`flex items-center justify-between gap-3 px-[18px] py-4 ${
-                    i < servizi.length - 1 ? "border-b border-lim-linea" : ""
+                    i < serviziApp.length - 1 ? "border-b border-lim-linea" : ""
                   }`}
                 >
                   <span className="text-[15.5px] font-semibold text-lim-inchiostro">
@@ -227,15 +234,38 @@ export default async function PaginaNegozio({
 
         {/* Orari liberi (G6). Servizio e giorno si scelgono con dei link
             (?servizio / ?giorno): nessun componente client, tutta navigazione
-            server. In sola lettura: il percorso guidato di prenotazione è G7. */}
-        {servizi.length > 0 && (
+            server. SOLO per i servizi su appuntamento: una richiesta non ha slot. */}
+        {serviziApp.length > 0 && (
           <SezioneSlot
-            servizi={servizi}
+            servizi={serviziApp}
             servizioSel={servizioSel}
             giorno={giorno}
             oggi={oggi}
             slots={slots}
           />
+        )}
+
+        {/* Servizi su RICHIESTA (017) — niente durata, niente griglia di slot: il
+            negozio risponde entro 24 ore. Ogni voce apre il percorso guidato, che
+            al passo 1 riconosce il tipo e prende la forma a 3 passi. */}
+        {serviziRich.length > 0 && (
+          <>
+            <Eyebrow>Serve altro? Ti rispondiamo entro 24 ore</Eyebrow>
+            <div className="mb-6 grid grid-cols-1 gap-2.5">
+              {serviziRich.map((s) => (
+                <Link
+                  key={s.codice}
+                  href={hrefPrenota}
+                  className="flex items-center justify-between gap-3 rounded-2xl border border-lim-linea bg-white px-[18px] py-4"
+                >
+                  <span className="text-[15.5px] font-semibold text-lim-inchiostro">
+                    {s.etichetta}
+                  </span>
+                  <span className="shrink-0 text-[13px] text-lim-soft">Su richiesta ›</span>
+                </Link>
+              ))}
+            </div>
+          </>
         )}
 
         {/* Orari raggruppati come li legge una persona. */}

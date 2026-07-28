@@ -15,7 +15,10 @@ import { controllaLimite } from "@/lib/ratelimit";
 export type DatiPrenotazione = {
   slug: string;
   servizio: string;
-  inizioISO: string;
+  /** appuntamento (con slot) | richiesta (senza): decide se serve `inizioISO`. */
+  tipo: "appuntamento" | "richiesta";
+  /** ISO dello slot per l'appuntamento; `null` per una richiesta (niente slot). */
+  inizioISO: string | null;
   nome: string;
   telefono: string;
   email: string;
@@ -28,7 +31,7 @@ export type DatiPrenotazione = {
 };
 
 export type RisultatoPrenota =
-  | { ok: true; codice: string; inizioISO: string; durata: number }
+  | { ok: true; codice: string; inizioISO: string | null; durata: number | null }
   | { ok: false; errore: string };
 
 /** Normalizzazione leggera SOLO per la chiave di rate limit (il dedup vero è nel DB). */
@@ -61,7 +64,10 @@ export async function inviaPrenotazione(dati: DatiPrenotazione): Promise<Risulta
   // 2 · Rivalida lato server: non fidarsi di niente che arriva dal modulo.
   const nome = dati.nome?.trim() ?? "";
   const telefono = dati.telefono?.trim() ?? "";
-  if (!dati.slug || !dati.servizio || !dati.inizioISO || !nome || !telefono) {
+  // Lo slot (`inizioISO`) è obbligatorio SOLO per un servizio su appuntamento;
+  // una richiesta non ha orario. Il DB (crea_prenotazione) è comunque l'arbitro.
+  const serveSlot = dati.tipo !== "richiesta";
+  if (!dati.slug || !dati.servizio || (serveSlot && !dati.inizioISO) || !nome || !telefono) {
     return { ok: false, errore: "Mancano dei dati. Torna indietro e completa i campi." };
   }
   if (!dati.informativa) {
