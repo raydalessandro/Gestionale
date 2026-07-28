@@ -86,27 +86,47 @@ describe.skipIf(!haEnv())("011 · Prenotazioni — sicurezza e accessi", () => {
       if (s.error) throw new Error(`seed servizio: ${s.error.message}`);
     }
 
-    // Una persona (di Limpidia) + una prenotazione del negozio `pub`. Il contatto
-    // è COPIATO sulla prenotazione: l'ottico lo vede senza leggere `persone`.
-    const persona = await svc
-      .from("persone")
-      .insert({ telefono_grezzo: "340 111 2233", nome: "Mario Prova" })
-      .select("id, telefono_normalizzato")
-      .single();
-    if (persona.error) throw new Error(`seed persona: ${persona.error.message}`);
-    // il telefono normalizzato è GENERATO: '340 111 2233' → '+393401112233'
-    expect(persona.data.telefono_normalizzato).toBe("+393401112233");
+    // Una prenotazione del negozio `pub`, seminata dalla STESSA porta dell'app:
+    // `crea_prenotazione` (013) scrive insieme appuntamento (in_attesa) +
+    // prenotazione collegata, così il seed non può divergere dallo schema — se
+    // divergesse, fallirebbe l'RPC che usano anche i clienti veri. Persona e
+    // contatto nascono dalla RPC. Anti-fuso: lo slot viene da slot_liberi (istante
+    // ASSOLUTO già corretto), mai costruito a mano.
+    const anonSeed = anonClient();
+    const slots = await anonSeed.rpc("slot_liberi", {
+      p_slug: pub.slug,
+      p_servizio: "visita",
+      p_giorno: giorno,
+    });
+    if (slots.error) throw new Error(`seed slot_liberi: ${slots.error.message}`);
+    const inizio = ((slots.data as string[]) ?? [])[0];
+    if (!inizio) throw new Error("seed: nessuno slot libero sul negozio pub");
 
-    const pren = await svc.from("prenotazioni").insert({
-      azienda_id: pub.aziendaId,
-      persona_id: persona.data.id,
-      servizio_codice: "visita",
-      inizio: "2099-05-01T09:00:00Z",
-      durata_minuti: 30,
-      contatto_nome: "Mario Prova",
-      contatto_telefono: "340 111 2233",
+    const pren = await anonSeed.rpc("crea_prenotazione", {
+      p_slug: pub.slug,
+      p_servizio: "visita",
+      p_inizio: inizio,
+      p_nome: "Mario Prova",
+      p_telefono: "340 111 2233",
+      p_email: "",
+      p_per_conto_di: "",
+      p_note: "",
+      p_fonte: "portale",
+      p_chiave_richiesta: `seed-${pub.slug}`,
+      p_lista_attesa: false,
     });
     if (pren.error) throw new Error(`seed prenotazione: ${pren.error.message}`);
+
+    // la persona nata dalla RPC ha il telefono normalizzato GENERATO:
+    // '340 111 2233' → '+393401112233' (verifica via service role: `persone` è
+    // revocata all'anon). Unica per l'indice univoco su telefono_normalizzato.
+    const persona = await svc
+      .from("persone")
+      .select("telefono_normalizzato")
+      .eq("telefono_normalizzato", "+393401112233")
+      .maybeSingle();
+    if (persona.error) throw new Error(`seed persona check: ${persona.error.message}`);
+    expect(persona.data?.telefono_normalizzato).toBe("+393401112233");
   });
   afterAll(pulisci);
 

@@ -1,7 +1,13 @@
-# TODO per Ray — setup CI & Supabase
+# TODO per Ray — setup CI & Supabase + incognite aperte
 
-Cose che deve fare **una persona** (non l'agente): riguardano segreti e
-account esterni. Aggiornato al completamento della Fase 3.
+Cose che deve fare **una persona** (non l'agente), più i **debiti/incognite
+tracciati**: segreti, account esterni, difetti noti e punti dove i moduli si
+toccano.
+
+> **Abitudine:** leggere questo file **prima di aprire una consegna**. Diverse
+> voci qui sotto vanno chiuse «al momento giusto» — cioè quando si mette mano
+> proprio a quel pezzo (cassa, wizard ordini, onboarding). Guardarle prima evita
+> di ricostruire un problema a memoria o di ricrearne uno già noto.
 
 ## 1 · Secret del progetto Supabase di test (per la CI GitHub) — DA FARE
 
@@ -72,10 +78,112 @@ esce senza icona e con anteprima social vuota.
   **non cancellabili** (trigger no-delete, §ID-01) e **pinnano la persona** (FK
   restrict): il contratto `crea-prenotazione` lascia quindi righe residue che una
   delete a cascata dell'azienda di test non riesce a rimuovere. Mitigato oggi con
-  slug/telefoni unici per `RUN_ID`, ma sul progetto `gestionale-test` serve una
-  **RPC `SECURITY DEFINER` di pulizia** (o un reset periodico) per non accumulare.
-  Da fare **insieme al setup del progetto di test (punto 1)**, prima che la CI
-  giri il contratto in continuo. Vedi `docs/agenti/report-test.md`.
+  slug/telefoni unici per `RUN_ID`. **→ CHIUSO** dalla consegna «Progetto di test»:
+  `svuota_dati_di_test()` (migrazione 015) fa la pulizia, chiamata dalla CI prima
+  del contratto. Vedi `docs/ambienti.md`.
+
+## 7 · Difetto preesistente — coerenza tenant del REGISTRO (scoperto nella consegna «Progetto di test»)
+
+Il trigger `trg_coerenza_registro` (migrazione **011**) su
+`persone_riferimento_registro` chiama `assicura_coerenza_tenant('prenotazione_id',
+'prenotazioni')`. Quella funzione confronta la riga riferita con `NEW.azienda_id`
+della riga che si scrive — ma **il registro non ha una colonna `azienda_id`** (ha
+`da_azienda_id` / `a_azienda_id`). Quindi `mia_azienda` è sempre `NULL` e, per
+qualunque `prenotazione_id` valorizzato, il confronto fallisce con `23514`:
+**ogni inserimento nel registro con una prenotazione collegata verrebbe respinto.**
+
+- **Dormiente oggi:** nessuno scrive ancora nel registro — quel flusso
+  (accettazione di una richiesta che àncora la persona a un negozio) è **G8**.
+  Emerso solo perché un dry-run della pulizia provava a seminare una riga registro.
+- **Da correggere in G8, dove il registro si scrive:** o passare al trigger la
+  coppia giusta usando `a_azienda_id` come tenant della riga (serve una variante
+  della funzione che legga un nome-colonna diverso da `azienda_id`), oppure una
+  verifica di coerenza dedicata al registro. Finché il registro resta vuoto non
+  rompe nulla, ma **non va abilitata la scrittura del registro senza averlo chiuso**.
+
+## 8 · Decisione (scritta) — il trigger di coerenza tenant inghiotte la superficie d'errore delle FK
+
+Su **tutte le 11 tabelle con `trg_tenant`** (coerenza tenant DB-01, migrazione **008**),
+il trigger è `BEFORE INSERT/UPDATE` e controlla ogni FK verso una tabella con
+`azienda_id` (es. `resi.busta_id → ordini_occhiali`, `appuntamenti.cliente_id →
+clienti`, …). Per un valore **non valido** — id inesistente *oppure* di un altro
+tenant — la lookup dà `azienda NULL`, `NULL is distinct from mia_azienda` è vero e
+il trigger alza **`23514`** (check_violation) *prima* che la FK venga raggiunta.
+
+Conseguenze pratiche, da tenere a mente:
+- **Quelle FK restano** come rete di sicurezza a livello di **storage**, ma sono
+  **irraggiungibili dall'applicazione**: un riferimento non valido dà sempre
+  `23514`, **mai `23503`** (foreign_key_violation). Vale anche per il **service
+  role** — i trigger non si bypassano come la RLS.
+- **Il front-end non deve mai mappare `23503`** per queste tabelle: non arriverà
+  mai. Il codice utile da intercettare è `23514`.
+- Verificato: nella suite di contratto `23503` compariva una volta sola
+  (`caparra-incasso`), ora corretta a `23514` e rinominata «coerenza tenant».
+  Nessun altro test da toccare.
+
+## 9 · E2E rimandati con `test.fixme` — moduli ancora aperti (da riscrivere sui doc)
+
+Cinque scenari E2E sono marcati **`test.fixme`** (skip esplicito, non nascosto):
+non falliscono la CI ma restano visibili come «in attesa». Vanno **riscritti bene
+sui doc** quando i rispettivi moduli sono finalizzati — sono parti delicate per
+il negozio.
+
+- **Cassa** (`fase4-cassa`): **S3** (consegna con caparra + incasso), **S6** (reso
+  con causale), **S8** (chiusura serale). Il modulo cassa non è chiuso: provisioning
+  dei metodi di pagamento (oggi nessun seed all'onboarding + auto-seed fragile a
+  render-time da togliere), IVA/fatturazione, e i **resi** ancora in rifacimento.
+  La parte che funziona — **vendita veloce col resto (S1)** — resta attiva.
+- **Ordine LAC** (`fase1-ordini-buste` **S1**, `fase2-magazzino` **S4**): la
+  **consegna** dell'ordine LAC passa ora dal modulo cassa («Consegna e incassa»),
+  e la **selezione ricetta** dipende dal modulo prescrizioni in rifacimento
+  (convertitore monofocale/progressiva/LAC). In più, il passo «Crea ordine» del
+  wizard LAC *Da catalogo* (S4) è andato in timeout **non diagnosticato**: da
+  guardare col trace quando si rimette mano al wizard — potrebbe essere
+  selettore/timing o una regressione vera. Lo scarico di magazzino alla consegna
+  è comunque coperto a **contratto** (`magazzino-trigger`).
+
+Quando cassa e prescrizioni/ordini sono finalizzati: togliere i `test.fixme`,
+riscrivere gli scenari sul comportamento deciso, e rimuovere l'auto-seed dei
+metodi a render-time (`app/(app)/cassa/vendita/nuova/page.tsx`) spostandolo
+all'onboarding o a un'azione.
+
+## 10 · INCOGNITA APERTA — `fase2 S4`: "Crea ordine" (wizard LAC «Da catalogo») in timeout, MAI diagnosticato
+
+**Non è "modulo da finire": è un possibile difetto vero, mai guardato, oggi
+dietro un `test.fixme` con la CI verde sopra.** Va tenuto separato dagli altri
+quattro sospesi (quelli sanno cosa aspettano; questo no).
+
+- **Sintomo:** nel run E2E, nel wizard ordine LAC con «Da catalogo», dopo aver
+  scelto il prodotto e premuto «Avanti», il bottone **«Crea ordine» va in timeout**
+  (passo 3 mai raggiunto). Dal codice *dovrebbe* funzionare (`daCatalogo` popola la
+  riga → `righeValide` vero → «Avanti» abilitato), quindi delle due l'una:
+  **selettore/timing del test**, oppure **regressione vera** nel wizard.
+- **Perché è finito in `fixme`:** la sua coda (consegna→scarico) sbatte comunque
+  sulla cassa non finita, quindi lo scenario non poteva chiudersi ora. Ma la causa
+  del timeout su «Crea ordine» **precede** la cassa e resta irrisolta.
+- **Chi lo chiude:** la **consegna di rifacimento del wizard ordini + modulo
+  prescrizioni** (il convertitore Rx monofocale/progressiva/LAC che hai in mente).
+  **All'inizio di quella consegna, PRIMA di rifattorizzare:** riprodurre il timeout
+  col trace Playwright e stabilire se è test o codice. Se è codice, è una
+  regressione da correggere, non solo un test da riscrivere.
+- Riferimento: commento su `e2e/fase2-magazzino.spec.ts` (S4) e §9 qui sopra.
+
+## 11 · Intersezione gestionale↔portale — seminare i metodi di pagamento tocca la NASCITA di ogni negozio
+
+Il buco del provisioning dei metodi di pagamento (§ TODO storico riga ~127: oggi
+l'onboarding non semina nulla, la pagina vendita fa un auto-seed fragile a
+render-time, ed è il motivo per cui i test chiamano `seedMetodiCassa` a mano) si
+chiude in modo naturale **seminando i metodi all'onboarding**, cioè dentro
+`crea_azienda_con_titolare`.
+
+**Attenzione: è la STESSA funzione che crea OGNI tenant — anche i negozi del
+portale Limpidia** — e che con la 014 ha già accumulato il trigger della «Sala 1».
+Quindi quando ci metterai mano per la cassa **starai modificando il percorso di
+nascita di tutti i negozi**, portale compreso. Non è un problema: è il punto in
+cui i due mondi si toccano davvero. Da sapere **prima e non durante** —
+verificare che la modifica regga sia per un negozio gestionale sia per un tenant
+creato dal flusso portale, e che i test di contratto sull'onboarding restino
+verdi.
 
 ## 6 · Fuso orario preesistente in `lib/utils.ts` (TERMINE: prima di stampare date)
 

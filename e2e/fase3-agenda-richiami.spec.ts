@@ -36,7 +36,9 @@ test.describe("Fase 3 · Agenda & Richiami", () => {
     await page.goto("/richiami");
     // La proposta compare con tipo "Sollecito ritiro" e il riferimento busta.
     await expect(page.getByText("Sollecito ritiro").first()).toBeVisible();
-    await expect(page.getByText(numero)).toBeVisible();
+    // Il numero compare due volte (nella frase "Busta … pronta" e nello <span>
+    // dedicato): exact aggancia solo lo <span>, niente strict mode.
+    await expect(page.getByText(numero, { exact: true })).toBeVisible();
 
     // Registra esito: telefono, appuntamento fissato → redirect in agenda.
     await page.getByRole("button", { name: "Registra esito" }).first().click();

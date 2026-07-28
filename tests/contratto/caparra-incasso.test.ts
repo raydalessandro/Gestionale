@@ -101,7 +101,7 @@ describe.skipIf(!haEnv())("007 · Caparra in cassa & consenso sanitario", () => 
 
   /* ── resi.busta_id · FK verso la busta, ON DELETE SET NULL ───────────── */
 
-  it("resi.busta_id accetta una busta esistente e rifiuta un id inesistente (FK)", async () => {
+  it("resi.busta_id accetta una busta esistente e rifiuta un id inesistente (coerenza tenant)", async () => {
     const b = await busta({ acconto: 80, acconto_metodo: "Contanti" });
     const { data, error } = await A.cli.rpc("prossimo_numero", { p_prefisso: "RE" });
     expect(error).toBeNull();
@@ -127,7 +127,15 @@ describe.skipIf(!haEnv())("007 · Caparra in cassa & consenso sanitario", () => 
       importo: 10,
       busta_id: "00000000-0000-0000-0000-000000000000",
     });
-    expect(ko.error?.code).toBe("23503"); // foreign_key_violation
+    // NON 23503 (FK): su `resi` c'è il trigger di coerenza tenant DB-01 (008),
+    // BEFORE INSERT, con la coppia busta_id→ordini_occhiali. Con una busta
+    // inesistente la lookup dà azienda NULL, `NULL is distinct from mia_azienda`
+    // è vero e il trigger alza 23514 PRIMA che la FK venga mai raggiunta. La FK
+    // resta come rete a livello di storage, ma è irraggiungibile dall'app: per
+    // tutte le tabelle con trg_tenant, un riferimento non valido dà sempre 23514,
+    // mai 23503 (vale anche per il service role: i trigger non si bypassano).
+    // Vedi docs/agenti/TODO-ray.md §8. Il front-end non deve mappare 23503 qui.
+    expect(ko.error?.code).toBe("23514"); // check_violation del trigger di coerenza tenant
   });
 
   it("ON DELETE SET NULL · cancellata la busta, resi.busta_id torna null (il reso resta)", async () => {

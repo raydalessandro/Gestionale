@@ -27,7 +27,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
       - name: Typecheck
@@ -75,9 +75,15 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
       - run: npm ci
+
+      # Pulizia del residuo PRIMA del contratto: se il giro precedente è fallito
+      # a metà, questo parte pulito lo stesso. La funzione si rifiuta di girare se
+      # il progetto non è marcato 'test' (public.ambiente), quindi è al sicuro.
+      - name: Pulisci il residuo delle prove (svuota_dati_di_test)
+        run: npx tsx scripts/svuota-test.ts
 
       # L2 · Contratto: parla col DB di test via service/anon. Prima dell'E2E.
       - name: L2 · contratto
