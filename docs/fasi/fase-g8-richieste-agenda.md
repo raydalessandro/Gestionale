@@ -76,21 +76,37 @@ Sposta, conferma automatica per negozio, griglia disponibilità, i tre contatori
 - **§1 caratterizzazione** (`e2e/g8-richieste-agenda.spec.ts`, primo commit):
   il flusso appuntamenti *esistente* (crea→compare, completa, mancato, annulla).
   Rete di non-regressione **prima** di toccare l'agenda.
-  - *Nota*: l'annulla inline dell'agenda **non** raccoglie un motivo (form nudo;
-    la §5 dice «come già fa l'annullamento», ma per l'agenda non è così). La §1
-    verifica la transizione, non il motivo in nota. La §5 Rifiuta ha il suo campo.
 - **§9 contratto + E2E**: li estende l'agente-test (accetta/rifiuta/idempotenza,
   prendi-come-cliente collega/crea/senza-consenso, registro a una riga,
   `NON_ACCETTATA`, isolamento fra negozi, giro completo portale→agenda→cliente).
 
+## Rifiniture chieste in revisione
+
+- **Motivo sull'annulla inline** (allineamento §5): l'annulla dell'agenda ora ha
+  il suo campo motivo facoltativo, come Rifiuta — `eventoAppuntamento` già lo
+  scriveva in nota, mancava lo spazio. Niente più scarto col modello mentale
+  «prima le note, poi la tabella».
+- **Fuso Europe/Rome (TODO §6) → sistemato per agenda/appuntamenti.** Il difetto:
+  `creaAppuntamento` costruiva l'istante con `new Date("gg T hh:mm")`, interpretato
+  nel fuso del **processo** (UTC su Vercel) → «10:00» al banco diventava un istante
+  diverso da quello che il portale scrive per le stesse 10:00 (e si rompeva **solo
+  in produzione**). Il conto era piccolo: **una riga** (1119). Fix:
+  - helper condivisi `istanteRomaISO`/`oggiRoma` in `lib/utils.ts` (ancorati a
+    Europe/Rome, DST inclusa, indipendenti dal processo);
+  - `creaAppuntamento` li usa; `oraDi`/`oraFine` e le finestre-giorno formattano/
+    filtrano in Europe/Rome (o il display mostrerebbe l'ora UTC);
+  - **migrazione 019**: backfill mirato e idempotente delle righe banco già scritte
+    (`fonte='banco' AND note<>'seed-g6'`), la trasformazione
+    `(inizio at time zone 'UTC') at time zone 'Europe/Rome'` gestisce l'ora legale;
+  - `seed_demo` allineato al pattern corretto;
+  - **sentinella** a contratto: banco 10:00 e portale 10:00, stesso giorno → stesso
+    istante. Impedisce alla divergenza di tornare.
+  Resta aperto solo lo strato dei formatter di *date* (`fmtData`/`fmtQuando`),
+  rischio di giorno solo a mezzanotte — vedi TODO §6.
+
 ## Debiti annotati
 
-- **TODO §7** → **chiuso** qui (fix trigger registro).
-- **TODO §6 (fuso)** → G8 lo rende concreto in agenda: gli orari da **banco** sono
-  naïve-UTC, quelli dal **portale** sono istanti assoluti `Europe/Rome` → in agenda
-  divergono dell'offset. Nessun fuso di *display* raddrizza entrambi: il fix
-  riconcilia lo **storage**. Annotato in TODO §6, da chiudere prima che l'agenda
-  diventi il calendario quotidiano.
+- **TODO §7** → **chiuso** qui (fix trigger registro, migrazione 018).
 
 ## Criterio di accettazione
 

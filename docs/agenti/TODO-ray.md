@@ -219,14 +219,17 @@ gestionale (orari e date mostrati/stampati possono slittare di 1–2 ore).
 - **Da chiudere PRIMA che si stampi qualcosa con delle date** (buste, quietanze,
   agenda): passare `timeZone: "Europe/Rome"` esplicito nei formatter di
   `lib/utils.ts`, o centralizzare un helper unico come nel portale.
-- **G8 lo rende concreto in agenda (leggere prima di sistemarlo).** Da G8 in
-  agenda convivono due *semantiche di storage* diverse dell'orario:
-  gli appuntamenti da **banco** (`creaAppuntamento`) salvano `new Date("gg T hh:mm")`
-  interpretato nel fuso del server (UTC su Vercel) → un orario **naïve** che
-  `oraDi` (slice UTC) ri-mostra corretto per caso; le richieste dal **portale**
-  (`crea_prenotazione`) salvano un **istante assoluto** ancorato a `Europe/Rome`,
-  che `oraDi` mostra **slittato** dell'offset (es. 10:00 Roma → «08:00» d'estate).
-  Nessun singolo fuso di *display* raddrizza entrambi: il fix vero riconcilia lo
-  **storage** (rendere assoluti anche gli appuntamenti da banco), non solo il
-  formato. Da fare insieme a questo §6, prima che l'agenda diventi il calendario
-  di lavoro quotidiano.
+- **Appuntamenti & agenda → SISTEMATI in G8.** La parte che G8 rendeva concreta
+  (banco naïve-UTC vs portale assoluto-Roma nella stessa agenda) è chiusa:
+  helper condivisi `istanteRomaISO`/`oggiRoma` in `lib/utils.ts` (ancorati a
+  Europe/Rome, DST inclusa); `creaAppuntamento` li usa; `oraDi`/`oraFine`
+  formattano in Europe/Rome; le finestre-giorno dell'agenda idem; **migrazione 019**
+  riallinea le righe banco già scritte (mirata: `fonte='banco' AND note<>'seed-g6'`,
+  idempotente). Sentinella a contratto: banco 10:00 e portale 10:00 → stesso
+  istante. Vedi `docs/fasi/fase-g8-richieste-agenda.md`.
+- **Resta aperto: gli ALTRI formatter di `lib/utils.ts`.** `fmtData`/`fmtQuando`
+  (e chi stampa date su buste/quietanze) formattano ancora **senza `timeZone`** →
+  ereditano il fuso del processo. Riguardano **date**, non orari, quindi il rischio
+  è lo slittamento di giorno solo a cavallo della mezzanotte — ma **prima di
+  stampare documenti con date** vanno passati a `Europe/Rome` (o centralizzati in
+  un helper, come per l'agenda). Il grosso — l'agenda — è chiuso.
