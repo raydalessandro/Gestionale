@@ -38,6 +38,44 @@ export function fmtData(iso: string | null | undefined): string {
   );
 }
 
+/* ── Fuso (Europe/Rome) — vedi TODO-ray §6 ──────────────────────────────
+ * Un orario di lavoro è un'ora di PARETE italiana. Costruirlo con
+ * `new Date("2026-08-01T10:00")` lo interpreta nel fuso del PROCESSO: su Vercel
+ * (UTC) «10:00» diventa le 10:00 UTC = mezzogiorno a Roma, mentre il portale
+ * scrive correttamente le 10:00 di Roma. Stessa ora scritta, due istanti diversi
+ * — e si rompe solo in produzione (in locale il fuso di sistema è italiano).
+ * Questi due helper ancorano tutto a Europe/Rome, indipendenti dal processo. */
+const TZ_ROMA = "Europe/Rome";
+
+/** Offset di Europe/Rome (in ms) all'istante dato — gestisce da sé l'ora legale. */
+function offsetRomaMs(istante: Date): number {
+  const p = new Intl.DateTimeFormat("en-US", {
+    timeZone: TZ_ROMA,
+    hour12: false,
+    year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit",
+  }).formatToParts(istante);
+  const g = (t: string) => Number(p.find((x) => x.type === t)!.value);
+  const comeUTC = Date.UTC(g("year"), g("month") - 1, g("day"), g("hour"), g("minute"), g("second"));
+  return comeUTC - istante.getTime();
+}
+
+/** Istante ASSOLUTO (ISO) da una data+ora di parete italiana. `("2026-08-01","10:00")`
+ *  → l'istante che a Roma segna le 10:00 (08:00Z d'estate). Indipendente dal fuso
+ *  del processo: è così che il banco e il portale finiscono sullo stesso istante. */
+export function istanteRomaISO(data: string, ora: string): string {
+  const [Y, M, D] = data.split("-").map(Number);
+  const [h, m] = ora.split(":").map(Number);
+  const guessUTC = Date.UTC(Y, M - 1, D, h, m);
+  const off = offsetRomaMs(new Date(guessUTC));
+  return new Date(guessUTC - off).toISOString();
+}
+
+/** La data odierna (YYYY-MM-DD) in ora italiana — non quella del processo. */
+export function oggiRoma(): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: TZ_ROMA }).format(new Date());
+}
+
 export function slugify(s: string): string {
   return s
     .toLowerCase()

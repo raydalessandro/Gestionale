@@ -21,6 +21,7 @@ import {
   contatoriCaparre,
   NOME_CAPARRA,
 } from "@/lib/cassa-calcoli";
+import { istanteRomaISO } from "@/lib/utils";
 
 /* ── Helper ────────────────────────────────────────────────────────── */
 
@@ -1115,9 +1116,13 @@ export async function creaAppuntamento(_prev: Esito, formData: FormData): Promis
   const data = str(formData, "data");
   const ora = str(formData, "ora");
   if (!data || !ora) return { errore: "Servono data e ora." };
-
-  const inizio = new Date(`${data}T${ora}`);
-  if (Number.isNaN(inizio.getTime())) return { errore: "Data o ora non valide." };
+  // L'ora scelta è di PARETE italiana: la si ancora a Europe/Rome, non al fuso
+  // del processo (UTC su Vercel), o «10:00» diventa un istante diverso da quello
+  // che scrive il portale per le stesse 10:00. Vedi lib/utils § fuso / TODO §6.
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(data) || !/^\d{2}:\d{2}/.test(ora)) {
+    return { errore: "Data o ora non valide." };
+  }
+  const inizioISO = istanteRomaISO(data, ora);
 
   const durata = Math.round(num(formData, "durata_minuti") ?? 20);
   if (durata < 5 || durata > 240) return { errore: "La durata dev'essere tra 5 e 240 minuti." };
@@ -1135,7 +1140,7 @@ export async function creaAppuntamento(_prev: Esito, formData: FormData): Promis
     cliente_id: str(formData, "cliente_id"),
     utente_id: str(formData, "utente_id") ?? prof.id,
     tipo,
-    inizio: inizio.toISOString(),
+    inizio: inizioISO,
     durata_minuti: durata,
     stato: "prenotato",
     riferimento: str(formData, "riferimento"),

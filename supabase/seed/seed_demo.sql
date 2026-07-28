@@ -158,11 +158,13 @@ begin
   -- AGENDA e FERMI (uno scaduto: il disponibile eroso si deve VEDERE)
   -- ──────────────────────────────────────────────────────────────────────
   insert into public.appuntamenti (azienda_id, cliente_id, utente_id, tipo, inizio, durata_minuti, stato, riferimento, note)
+  -- Orari ancorati a Europe/Rome (come il blocco seed-g6): un'ora di parete
+  -- italiana, non naïve-UTC. Vedi TODO-ray §6 / migrazione 019.
   values
-    (v_azienda, v_c[5], v_utente, 'controllo_vista', v_oggi + interval '1 day' + time '10:00', 30, 'prenotato', null, null),
-    (v_azienda, v_c[10],v_utente, 'consegna',        v_oggi + interval '2 days' + time '17:30', 15, 'prenotato', 'BL-2026-9003', null),
-    (v_azienda, v_c[2], v_utente, 'controllo_vista', v_oggi - interval '20 days' + time '11:00', 30, 'completato', null, null),
-    (v_azienda, v_c[9], v_utente, 'altro',           v_oggi - interval '3 days' + time '16:00', 15, 'mancato', null, null);
+    (v_azienda, v_c[5], v_utente, 'controllo_vista', ((v_oggi + 1)::text  || ' 10:00')::timestamp at time zone 'Europe/Rome', 30, 'prenotato', null, null),
+    (v_azienda, v_c[10],v_utente, 'consegna',        ((v_oggi + 2)::text  || ' 17:30')::timestamp at time zone 'Europe/Rome', 15, 'prenotato', 'BL-2026-9003', null),
+    (v_azienda, v_c[2], v_utente, 'controllo_vista', ((v_oggi - 20)::text || ' 11:00')::timestamp at time zone 'Europe/Rome', 30, 'completato', null, null),
+    (v_azienda, v_c[9], v_utente, 'altro',           ((v_oggi - 3)::text  || ' 16:00')::timestamp at time zone 'Europe/Rome', 15, 'mancato', null, null);
 
   insert into public.fermi (azienda_id, prodotto_id, cliente_id, utente_id, quantita, stato, scade_il, note)
   values

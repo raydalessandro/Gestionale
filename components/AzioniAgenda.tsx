@@ -67,7 +67,12 @@ function AzioniPrenotato({ id }: { id: string }) {
             {inM ? "…" : "Non presentato"}
           </button>
         </form>
-        <form action={runA}>
+        <form action={runA} className="flex items-center gap-1">
+          <input
+            name="motivo"
+            placeholder="Motivo (facolt.)"
+            className="w-32 rounded-lg border border-linea bg-white px-2 py-1.5 text-xs text-inchiostro placeholder:text-faint"
+          />
           <button type="submit" disabled={inA} className={BTN_ROSSO}>
             {inA ? "…" : "Annulla"}
           </button>

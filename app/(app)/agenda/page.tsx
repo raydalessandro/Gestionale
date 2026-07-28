@@ -4,9 +4,11 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader, Card, ButtonLink, Badge, Vuoto, tintaFonte } from "@/components/ui";
 import { AzioniAppuntamento } from "@/components/AzioniAgenda";
 import { oraDi, oraFine, etichettaTipoApp, PillStatoApp } from "@/components/AgendaUI";
-import { ETICHETTE_FONTE } from "@/lib/utils";
+import { ETICHETTE_FONTE, oggiRoma, istanteRomaISO } from "@/lib/utils";
 
 const GG = 24 * 60 * 60 * 1000;
+const giornoDopo = (iso: string) =>
+  new Date(new Date(`${iso}T12:00:00Z`).getTime() + GG).toISOString().slice(0, 10);
 
 export default async function AgendaPage({
   searchParams,
@@ -14,15 +16,18 @@ export default async function AgendaPage({
   searchParams: Promise<{ data?: string }>;
 }) {
   const sp = await searchParams;
-  const oggi = new Date().toISOString().slice(0, 10);
+  const oggi = oggiRoma();
   const data = sp.data && /^\d{4}-\d{2}-\d{2}$/.test(sp.data) ? sp.data : oggi;
   const supabase = await createClient();
 
+  // Finestra del giorno in ora italiana: [00:00 Roma, 00:00 Roma del giorno dopo).
+  // Ancorare a Europe/Rome (non a mezzanotte UTC) mette ogni appuntamento nel suo
+  // giorno anche vicino alla mezzanotte. Vedi lib/utils § fuso / TODO §6.
   const { data: appuntamenti } = await supabase
     .from("appuntamenti")
     .select("id, cliente_id, utente_id, tipo, inizio, durata_minuti, stato, riferimento, fonte")
-    .gte("inizio", `${data}T00:00:00`)
-    .lte("inizio", `${data}T23:59:59`)
+    .gte("inizio", istanteRomaISO(data, "00:00"))
+    .lt("inizio", istanteRomaISO(giornoDopo(data), "00:00"))
     .order("inizio");
   const righe = appuntamenti ?? [];
 
@@ -42,7 +47,7 @@ export default async function AgendaPage({
     .from("appuntamenti")
     .select("id, inizio")
     .eq("stato", "in_attesa")
-    .gte("inizio", `${oggi}T00:00:00`)
+    .gte("inizio", istanteRomaISO(oggi, "00:00"))
     .order("inizio");
   const sospesi = sospesiRaw ?? [];
   const sospIds = sospesi.map((s) => s.id);
