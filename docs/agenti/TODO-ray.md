@@ -82,7 +82,7 @@ esce senza icona e con anteprima social vuota.
   `svuota_dati_di_test()` (migrazione 015) fa la pulizia, chiamata dalla CI prima
   del contratto. Vedi `docs/ambienti.md`.
 
-## 7 · Difetto preesistente — coerenza tenant del REGISTRO (scoperto nella consegna «Progetto di test»)
+## 7 · Difetto preesistente — coerenza tenant del REGISTRO → **CHIUSO in G8 (migrazione 018)**
 
 Il trigger `trg_coerenza_registro` (migrazione **011**) su
 `persone_riferimento_registro` chiama `assicura_coerenza_tenant('prenotazione_id',
@@ -95,11 +95,12 @@ qualunque `prenotazione_id` valorizzato, il confronto fallisce con `23514`:
 - **Dormiente oggi:** nessuno scrive ancora nel registro — quel flusso
   (accettazione di una richiesta che àncora la persona a un negozio) è **G8**.
   Emerso solo perché un dry-run della pulizia provava a seminare una riga registro.
-- **Da correggere in G8, dove il registro si scrive:** o passare al trigger la
-  coppia giusta usando `a_azienda_id` come tenant della riga (serve una variante
-  della funzione che legga un nome-colonna diverso da `azienda_id`), oppure una
-  verifica di coerenza dedicata al registro. Finché il registro resta vuoto non
-  rompe nulla, ma **non va abilitata la scrittura del registro senza averlo chiuso**.
+- **CHIUSO in G8 (migrazione 018):** il trigger `trg_coerenza_registro` ora usa la
+  funzione dedicata `coerenza_registro_riferimento()` — verifica che la prenotazione
+  che autorizza il passaggio sia dell'azienda **ricevente** (`a_azienda_id`), non
+  un confronto con un `azienda_id` inesistente. Positivo/negativo (23514) verificati
+  in dry-run e con la scrittura reale del registro (`prendi_persona_come_cliente`).
+  Vedi `docs/fasi/fase-g8-richieste-agenda.md`.
 
 ## 8 · Decisione (scritta) — il trigger di coerenza tenant inghiotte la superficie d'errore delle FK
 
@@ -218,3 +219,17 @@ gestionale (orari e date mostrati/stampati possono slittare di 1–2 ore).
 - **Da chiudere PRIMA che si stampi qualcosa con delle date** (buste, quietanze,
   agenda): passare `timeZone: "Europe/Rome"` esplicito nei formatter di
   `lib/utils.ts`, o centralizzare un helper unico come nel portale.
+- **Appuntamenti & agenda → SISTEMATI in G8.** La parte che G8 rendeva concreta
+  (banco naïve-UTC vs portale assoluto-Roma nella stessa agenda) è chiusa:
+  helper condivisi `istanteRomaISO`/`oggiRoma` in `lib/utils.ts` (ancorati a
+  Europe/Rome, DST inclusa); `creaAppuntamento` li usa; `oraDi`/`oraFine`
+  formattano in Europe/Rome; le finestre-giorno dell'agenda idem; **migrazione 019**
+  riallinea le righe banco già scritte (mirata: `fonte='banco' AND note<>'seed-g6'`,
+  idempotente). Sentinella a contratto: banco 10:00 e portale 10:00 → stesso
+  istante. Vedi `docs/fasi/fase-g8-richieste-agenda.md`.
+- **Resta aperto: gli ALTRI formatter di `lib/utils.ts`.** `fmtData`/`fmtQuando`
+  (e chi stampa date su buste/quietanze) formattano ancora **senza `timeZone`** →
+  ereditano il fuso del processo. Riguardano **date**, non orari, quindi il rischio
+  è lo slittamento di giorno solo a cavallo della mezzanotte — ma **prima di
+  stampare documenti con date** vanno passati a `Europe/Rome` (o centralizzati in
+  un helper, come per l'agenda). Il grosso — l'agenda — è chiuso.

@@ -3,9 +3,160 @@
 Aggiornato: 2026-07-28 · Fasi coperte: 1, 2, 3, 4 (v0.1–v0.5) + interfasi
 **4b/4c/4d**; portale **G3–G7** (vocabolario fonte, pagina negozio, orari/servizi,
 slot, percorso di prenotazione), **G7-bis · l'agenda unica** (migrazione **013**),
-**G-014 · le sale** (migrazione **014**) e ora **017 · i servizi di tipo richiesta**
-(branch `portale/017-servizi-richiesta`, migrazione **017**). La copertura 017 è
-descritta subito qui sotto; i giri precedenti restano più in basso.
+**G-014 · le sale** (migrazione **014**), **017 · i servizi di tipo richiesta**
+(migrazione **017**) e ora **G8 · le richieste dentro l'agenda** (branch
+`gest/g8-richieste-agenda`, migrazioni **018** e **019 · fuso Europe/Rome**). Le
+coperture G8 (018) e G8-fuso (019) sono descritte subito qui sotto; i giri
+precedenti restano più in basso.
+
+## Giro G8-fuso · Europe/Rome per gli appuntamenti da banco (stesso branch, migrazione 019, TODO §6)
+
+Difetto preesistente reso critico da G8 (portale + banco nella stessa agenda):
+`creaAppuntamento` costruiva l'istante con `new Date(\`${data}T${ora}\`)`, interpretato
+nel fuso del PROCESSO (UTC su Vercel) → «10:00» digitate al banco diventavano
+mezzogiorno a Roma, mentre il portale scrive le 10:00 di Roma. Si rompeva SOLO in
+produzione (in locale il fuso è italiano). Il codice è corretto forward
+(`istanteRomaISO`/`oggiRoma` in `lib/utils.ts`, `oraDi`/`oraFine` in `AgendaUI.tsx`
+formattano in Europe/Rome) e la **019** riallinea le righe già scritte dal banco
+(backfill idempotente, marker `_riparazioni_dati`, solo `fonte='banco'`, esclude
+`seed-g6`). Nessun file dell'app toccato dai test.
+
+### L1 · Unit — nuovo `tests/unit/fuso.test.ts` (7 test, TZ-independent)
+`istanteRomaISO`: estate `2026-08-01 10:00 → 08:00Z`, inverno `2026-01-15 10:00 →
+09:00Z`, mezzanotte italiana → giorno prima in UTC (estate/inverno), i due salti
+DST 2026 (29/03 → +02, 25/10 → +01), round-trip (l'istante riletto a Roma torna
+«10:00»). `oggiRoma`: formato `YYYY-MM-DD` ed entro ±1 giorno da UTC. Il punto: i
+valori FISSI passano identici anche con `TZ=UTC` (Intl con timeZone esplicito +
+`Date.UTC`, mai il fuso di sistema) — è la prova che difende dalla recidiva.
+
+### L2 · Contratto — nuovo `tests/contratto/fuso-agenda.test.ts` (1 test, la sentinella)
+La prova che Ray vuole, collision-free e definitiva: su un giorno futuro,
+`istanteRomaISO(giorno,"10:00")` (come lo costruisce il banco) è ESATTAMENTE uno
+slot che `slot_liberi` offre per le 10:00 (e riletto a Roma sono le 10:00, non
+mezzogiorno); un appuntamento da banco (`fonte='banco'`) messo lì viene salvato
+verbatim e fa **sparire** lo slot delle 10:00 del portale; una `crea_prenotazione`
+sulle stesse 10:00 collide con **`SLOT_OCCUPATO`**. Se il fuso del banco divergesse
+(naïve-UTC), la riga cadrebbe su un altro istante, lo slot 10:00 resterebbe libero
+e la sentinella diventerebbe rossa. Importa `istanteRomaISO` da `@/lib/utils` (una
+sola fonte di verità: nessuna copia dell'algoritmo nel test).
+
+### L4 · Guardia statica — `tests/unit/guardie.test.ts` (nuovo blocco L4n, +3 → G20)
+Gated `skipIf(!existsSync(019))`. Difende la riga storica 1119 dal tornare naïve.
+- **G20**: `creaAppuntamento` àncora l'istante con `istanteRomaISO(` e **non** con
+  un `new Date(\`${data}T${ora}\`)` (template con la T fra due interpolazioni).
+- **G20b**: `AgendaUI.tsx` formatta l'ora con `timeZone: "Europe/Rome"` e `oraDi`
+  **non** torna a `.toISOString().slice(11, …)` (ora UTC del processo).
+- **G20c**: la 019 è idempotente e mirata (marker `_riparazioni_dati`, solo
+  `fonte='banco'`, esclude `seed-g6`, trasformazione `... at time zone 'UTC') at
+  time zone 'Europe/Rome'`).
+
+### Regressione display — nessun E2E/contratto da correggere
+Nessuno scenario asseriva un'ora VISUALIZZATA di un appuntamento: la §1 di
+`g8-richieste-agenda.spec.ts` digita l'«Ora» ma non la rilegge; le sole asserzioni
+su orari (`e2e/g6-slot.spec.ts`: celle 09:00…12:30) vengono da `slot_liberi`, già
+ancorato a Roma e invariato. Gli appuntamenti da banco ora si LEGGONO all'ora
+giusta anche in CI/UTC senza toccare i test esistenti.
+
+### Esito auto-verifica (locale) — giro G8-fuso
+`npm test` e **`TZ=UTC npm test`** danno lo stesso risultato: **141 passed** (9
+file), guardie 46 → **49**, `fuso` a 7 (identici sotto UTC — è il punto). `npx tsc
+--noEmit` exit 0. `tests/contratto/fuso-agenda.test.ts` senza env → 1 skippato
+pulito. `package.json`/CI invariati (script glob); nessuna nuova devDep.
+
+## Giro G8 · le richieste dentro l'agenda (branch `gest/g8-richieste-agenda`, migrazione 018)
+
+La 018 chiude il giro del portale: l'ottico ACCETTA/RIFIUTA una richiesta dal
+marciapiede (transizioni di stato dentro il tenant, via RLS — nessuna funzione
+nuova) e poi, come ATTO SEPARATO, può prendersi la persona come cliente. Quel
+passo passa dall'UNICA funzione di scrittura verso `persone` e
+`persone_riferimento_registro` (RLS attiva SENZA policy, ID-01): la security
+definer `prendi_persona_come_cliente` (con le guardie DENTRO) più la lettura
+`cliente_per_telefono`. La 018 corregge anche il TODO §7 (trigger di coerenza del
+registro, prima sempre 23514). Migrazione GIÀ applicata al progetto di TEST.
+Nessun file dell'app toccato.
+
+### L2 · Contratto — nuovo `tests/contratto/prendi-cliente.test.ts` (9 test, in CI)
+Un negozio pubblicato (orari 09–17 tutti i giorni, `visita` 30') + un secondo
+negozio per isolamento/cross-tenant. Ogni richiesta nasce da `crea_prenotazione`
+(anon, come il portale) su un GIORNO futuro dedicato (slot sempre freschi, zero
+contesa). Accetta/Rifiuta sono replicati 1:1 con il client AUTENTICATO del
+titolare (update condizionati `.eq("stato","in_attesa")`); il «prendi» e la
+ricerca telefono dal client authenticated; la verifica di `persone`/registro dal
+SERVICE ROLE (tabelle chiuse). Copre la §9:
+1. **Accetta**: appuntamento in_attesa→prenotato, prenotazione in_attesa→accettata.
+2. **Rifiuta**: appuntamento→annullato, prenotazione→rifiutata, e lo **slot
+   ricompare in `slot_liberi`** (l'EXCLUDE non conta gli annullati).
+3. **Accetta due volte**: il secondo update condizionato tocca 0 righe (stato
+   invariato) — l'idempotenza a livello dato dietro il messaggio UI «già gestita».
+4. **prendi con `p_cliente_id`** (telefono già proprio) → **collega** l'esistente,
+   **conteggio clienti invariato**; i due `cliente_id` puntano al collegato.
+5. **prendi senza `p_cliente_id`** (telefono nuovo) → **crea** il cliente con
+   **`consenso_marketing=false`** e **fonte dalla prenotazione**; nome unico
+   spezzato in nome/cognome.
+6. **dopo**: `persone.ottico_di_riferimento` = negozio e **UNA** riga in
+   `persone_riferimento_registro` (a_azienda, persona, utente = chi ha premuto);
+   secondo prendi idempotente → **nessuna** seconda riga.
+7. **respinto**: `NON_ACCETTATA` su richiesta non accettata; **cross-tenant** →
+   `NON_TUA` (e nessuna traccia: `cliente_id` resta null).
+8. **isolamento**: un altro negozio non vede la prenotazione (RLS) né la persona
+   (tabella chiusa: invisibile anche al proprio negozio, solo la definer scrive);
+   controprova: il negozio VEDE la propria richiesta.
+9. **`cliente_per_telefono`**: ognuno trova il PROPRIO cliente, mai quello del
+   vicino (inchiodata a `get_azienda_id`).
+
+### L3 · E2E — nuovo `e2e/g8b-richieste-agenda.spec.ts` (5 scenari, in CI)
+File SEPARATO (la §1 in `g8-richieste-agenda.spec.ts` resta intatta): questi
+scenari servono una richiesta VERA dal portale, seminata come il marciapiede
+(service role per pubblicare negozio+orari+servizio, poi `crea_prenotazione` da
+anon) e lavorata dalla UI dell'agenda del titolare loggato. Gated su `haEnv`,
+tenant usa-e-getta per test, telefoni unici per RUN_ID.
+- **Striscia + giorno giusto**: la richiesta appare in «1 richiesta in sospeso»
+  su `/agenda`; la voce è un link `/agenda?data=<giorno>` col nome; seguendolo si
+  arriva alla riga «In attesa» col bottone «Accetta».
+- **Accetta**: click «Accetta» → pill «Prenotato», bottoni
+  Completato/Non presentato, «Accetta» sparisce e appare «Prendi come cliente».
+- **Rifiuta**: motivo facolt. + «Rifiuta» → pill «Annullato».
+- **Prendi come cliente, telefono GIÀ presente**: con un cliente col medesimo
+  numero, il primo click propone «C'è già … con questo numero.» + «Collega
+  quello»/«Crea nuovo»; collegando → «Preso come cliente ✓».
+- **Giro completo** (il più importante): portale → accetta → prendi (telefono
+  nuovo) → «Preso come cliente ✓», con verifica a valle nel DB (prenotazione
+  `accettata` collegata, cliente creato con `consenso_marketing=false`,
+  `fonte=qr_vetrina`, nome/cognome dallo split).
+
+### L4 · Guardia statica — `tests/unit/guardie.test.ts` (nuovo blocco L4m, +4 → G19)
+Gated con `skipIf(!existsSync(018))` come L4i/L4l: enforca sul branch e in CI dopo
+il merge, salta pulito sui checkpoint paralleli. Blinda il percorso di scrittura
+verso le due tabelle chiuse.
+- **G19**: `prendi_persona_come_cliente` si **INVOCA** (`.rpc(...)`) solo da un
+  file server (`"use server"`), mai da un componente client — se il browser la
+  chiamasse, la RLS di `persone`/registro (che la funzione BYPASSA da owner)
+  sarebbe aggirabile.
+- **G19b**: l'azione `prendiComeCliente` esiste in `lib/actions.ts`, è
+  `"use server"` e passa dalla RPC definer.
+- **G19c**: `AzioniAgenda.tsx` è client, chiama l'azione `prendiComeCliente` e
+  **non** invoca la RPC di scrittura.
+- **G19d**: la 018 dichiara `prendi_persona_come_cliente` **security definer** e
+  **revoca execute ad anon** (solo `authenticated`); anche `cliente_per_telefono`
+  è revocata ad anon (dati clienti). Le 4 regex verificate contro la 018 reale.
+
+### Teardown 018 (contratto/E2E)
+Stesso residuo append-only dei giri G7/013: la prenotazione non è cancellabile e
+ora il «prendi» scrive anche `clienti` + registro e imposta l'ottico della
+persona (ulteriori pin). Il teardown cancella `lista_attesa` + gli appuntamenti
+NON collegati, poi TENTA la delete azienda (best-effort). Mitigazione invariata:
+slug/telefoni unici per RUN_ID. Nota pratica: il generatore telefoni di QUESTI
+file usa `3` + 3 cifre di run + 6 di contatore = **10 cifre esatte, coda intera**
+(evita il bug storico del taglio a 10 che collassava contatori diversi).
+
+### Esito auto-verifica (locale) — giro G8
+`npm test` (L1+L4): **131 passed** (8 file), guardie 42 → **46** (blocco L4m/018
+presente sul branch → enforca). `npx tsc --noEmit` sull'intero progetto → exit 0.
+`tests/contratto/prendi-cliente.test.ts` senza env → **9 skippati** puliti;
+`playwright --list` elenca i **5** scenari di `g8b`. L2/L3 restano alla CI (manca
+il Supabase di test + i secret). **CI (`ci.yml`) e `package.json` invariati**: gli
+script sono glob e raccolgono i file nuovi da soli; nessuna nuova devDep (bastano
+`vitest` + `@playwright/test`). Nessun gancio nuovo richiesto al codice app.
 
 ## Giro 017 · i servizi di tipo «richiesta» (branch `portale/017-servizi-richiesta`)
 
@@ -40,7 +191,7 @@ Un tenant pubblicato, orari 09–17 tutti i giorni, `visita` (appuntamento) + `s
 8. **servizi_pubblici espone `tipo`** (anon): `visita`=appuntamento con durata,
    `sole`=richiesta con durata NULL.
 
-### L3 · E2E — nuovo `e2e/g8-servizi-richiesta.spec.ts` (Scenario A, ATTIVO in CI)
+### L3 · E2E — nuovo `e2e/g7bis-servizi-richiesta.spec.ts` (Scenario A, ATTIVO in CI)
 Scenario A (viewport MOBILE): dalla pagina negozio, la sezione «Serve altro? Ti
 rispondiamo entro 24 ore» ospita le richieste (link con badge «Su richiesta ›»); si
 apre il percorso guidato → passo 1 «Che cosa ti serve?» (scelgo la voce richiesta) →

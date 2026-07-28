@@ -5,13 +5,22 @@ import {
   statoDi,
 } from "@/lib/utils";
 
-/** Ora HH:MM da un timestamp ISO (coerente col fuso del server). */
+/** Ora HH:MM di PARETE italiana da un timestamp ISO (Europe/Rome, non UTC del
+ *  processo): l'appuntamento delle 10:00 si legge «10:00» anche in produzione,
+ *  qualunque sia l'istante assoluto salvato. Vedi lib/utils § fuso / TODO §6. */
+const FMT_ORA_ROMA = new Intl.DateTimeFormat("it-IT", {
+  timeZone: "Europe/Rome",
+  hour: "2-digit",
+  minute: "2-digit",
+  hour12: false,
+});
+
 export function oraDi(iso: string): string {
-  return new Date(iso).toISOString().slice(11, 16);
+  return FMT_ORA_ROMA.format(new Date(iso));
 }
 
 export function oraFine(iso: string, durataMin: number): string {
-  return new Date(new Date(iso).getTime() + durataMin * 60000).toISOString().slice(11, 16);
+  return FMT_ORA_ROMA.format(new Date(new Date(iso).getTime() + durataMin * 60000));
 }
 
 export function etichettaTipoApp(tipo: string): string {

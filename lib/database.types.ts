@@ -210,6 +210,9 @@ export type AppuntamentoRow = {
   // `in_attesa` (013): lo slot è impegnato da una richiesta del portale non
   // ancora confermata dall'ottico. Occupa l'agenda ma è graficamente distinto.
   stato: "in_attesa" | "prenotato" | "completato" | "mancato" | "annullato";
+  // `fonte` (008 · DB-05): la porta da cui è entrata questa prenotazione (portale,
+  // qr_vetrina, banco…). Diverso da clienti.fonte (prima acquisizione del cliente).
+  fonte: Fonte;
   // `risorsa_id` (013→014): la sala/poltrona in cui sta l'appuntamento. Dalla 014
   // è OBBLIGATORIA (FK a `risorse`): ogni negozio ha almeno una sala e un trigger
   // la assegna quando l'inserimento non la passa (es. l'agenda del gestionale).
@@ -228,6 +231,40 @@ export type RisorsaRow = {
   ordine: number;
   attiva: boolean;
   created_at: string;
+}
+
+/** La RICHIESTA di prenotazione (la pratica; lo slot è l'appuntamento collegato).
+ *  `inizio`/`durata_minuti`/`appuntamento_id` sono nullable dalla 017 (i servizi
+ *  di tipo `richiesta` non occupano slot). Il contatto è COPIATO qui: il gestionale
+ *  legge la prenotazione, mai `persone`. */
+export type PrenotazioneRow = {
+  id: string;
+  azienda_id: string;
+  persona_id: string;
+  cliente_id: string | null;
+  appuntamento_id: string | null;
+  servizio_codice: string;
+  inizio: string | null;
+  durata_minuti: number | null;
+  stato: "in_attesa" | "accettata" | "rifiutata" | "annullata";
+  fonte: Fonte;
+  per_conto_di: string | null;
+  contatto_nome: string;
+  contatto_telefono: string;
+  contatto_email: string | null;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Catalogo globale dei servizi (010/017), in sola lettura dal gestionale. */
+export type ServizioRow = {
+  codice: string;
+  nome: string;
+  tipo: "appuntamento" | "richiesta";
+  durata_predefinita_minuti: number | null;
+  ordine: number;
+  attivo: boolean;
 }
 
 export type RichiamoRow = {
@@ -474,6 +511,8 @@ export type Database = {
       movimenti_magazzino: { Row: MovimentoMagazzinoRow; Insert: Omit<Partial<MovimentoMagazzinoRow>, "id" | "created_at"> & { id?: string }; Update: never; Relationships: [] };
       fermi: { Row: FermoRow; Insert: Ins<FermoRow>; Update: Upd<FermoRow>; Relationships: [] };
       appuntamenti: { Row: AppuntamentoRow; Insert: Ins<AppuntamentoRow>; Update: Upd<AppuntamentoRow>; Relationships: [] };
+      prenotazioni: { Row: PrenotazioneRow; Insert: Ins<PrenotazioneRow>; Update: Upd<PrenotazioneRow>; Relationships: [] };
+      servizi: { Row: ServizioRow; Insert: never; Update: never; Relationships: [] };
       risorse: { Row: RisorsaRow; Insert: Ins<RisorsaRow>; Update: Upd<RisorsaRow>; Relationships: [] };
       richiami: { Row: RichiamoRow; Insert: Ins<RichiamoRow>; Update: Upd<RichiamoRow>; Relationships: [] };
       metodi_pagamento: { Row: MetodoPagamentoRow; Insert: Ins<MetodoPagamentoRow>; Update: Upd<MetodoPagamentoRow>; Relationships: [] };
@@ -492,6 +531,15 @@ export type Database = {
         Returns: string;
       };
       prossimo_numero: { Args: { p_prefisso: string }; Returns: string };
+      // G8 (018): il percorso di scrittura verso persone/registro (ID-01).
+      cliente_per_telefono: {
+        Args: { p_telefono: string };
+        Returns: { id: string; nome: string; cognome: string }[];
+      };
+      prendi_persona_come_cliente: {
+        Args: { p_prenotazione_id: string; p_cliente_id?: string | null };
+        Returns: string;
+      };
     };
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };

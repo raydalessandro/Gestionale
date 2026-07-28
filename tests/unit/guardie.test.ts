@@ -1003,3 +1003,148 @@ describe.skipIf(!existsSync(join(ROOT, M014)))("L4l · guardie le sale (014)", (
     ).toBe(true);
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * L4m · GUARDIE «PRENDI COME CLIENTE» (G19 · migrazione 018)
+ *
+ * La 018 apre l'UNICO percorso di scrittura verso `persone` e
+ * `persone_riferimento_registro` — due tabelle con RLS attiva SENZA policy
+ * (ID-01 della 011: «ci arrivano solo le funzioni security definer»). Il rischio
+ * silenzioso: se `prendi_persona_come_cliente` (che gira coi privilegi
+ * dell'owner e BYPASSA quella RLS) finisse invocabile dal browser — direttamente
+ * o via un grant ad `anon` — chiunque potrebbe scrivere nel registro dei
+ * passaggi e reintestarsi persone altrui, aggirando le guardie che vivono DENTRO
+ * la funzione. Queste guardie tengono il percorso di scrittura dietro l'azione
+ * server e la funzione revocata ad anon.
+ *
+ * Gated su `existsSync(018)`: enforca dove la 018 è nel working tree (il suo
+ * branch e la CI dopo il merge), salta pulito altrove.
+ * ════════════════════════════════════════════════════════════════════════ */
+const M018 = "supabase/migrazioni/018_prendi_come_cliente.sql";
+describe.skipIf(!existsSync(join(ROOT, M018)))("L4m · guardie prendi come cliente (018)", () => {
+  // L'INVOCAZIONE della funzione di scrittura (non una menzione in un commento).
+  const RE_INVOCA = /\.rpc\(\s*["']prendi_persona_come_cliente["']/;
+
+  it("G19 · `prendi_persona_come_cliente` si INVOCA solo da un file server (\"use server\"), mai da un client", () => {
+    const files = [...sorgenti("app"), ...sorgenti("components"), ...sorgenti("lib")];
+    const violazioni: string[] = [];
+    for (const f of files) {
+      const src = readFileSync(f, "utf8");
+      if (!RE_INVOCA.test(src)) continue;
+      const isServer = /^\s*["']use server["'];?/m.test(src);
+      const isClient = /^\s*["']use client["'];?/m.test(src);
+      if (isClient || !isServer) violazioni.push(rel(f));
+    }
+    expect(
+      violazioni,
+      `prendi_persona_come_cliente invocata fuori da un file server (o da un client): ${violazioni.join(", ")}`
+    ).toEqual([]);
+  });
+
+  it("G19b · l'azione server `prendiComeCliente` esiste, è \"use server\" e passa dalla RPC", () => {
+    const azioni = leggi("lib/actions.ts");
+    expect(/^\s*["']use server["'];?/m.test(azioni), "lib/actions.ts non è più \"use server\"").toBe(true);
+    expect(azioni).toMatch(/export\s+async\s+function\s+prendiComeCliente/);
+    expect(RE_INVOCA.test(azioni), "la scrittura passa dalla funzione definer").toBe(true);
+  });
+
+  it("G19c · le azioni dell'agenda (client) chiamano l'azione, NON la RPC di scrittura", () => {
+    const comp = leggi("components/AzioniAgenda.tsx");
+    expect(/^\s*["']use client["'];?/m.test(comp), "AzioniAgenda non è più un client component").toBe(true);
+    expect(comp.includes("prendiComeCliente"), "il componente passa dall'azione server").toBe(true);
+    expect(
+      RE_INVOCA.test(comp),
+      "il client invoca la RPC di scrittura verso persone/registro (RLS aggirabile!)"
+    ).toBe(false);
+  });
+
+  it("G19d · la 018 tiene la scrittura security definer e revocata ad anon", () => {
+    const sql = leggi(M018);
+    // le due funzioni sono security definer (bypassano la RLS di persone/registro)
+    expect(
+      /create or replace function public\.prendi_persona_come_cliente[\s\S]*?security definer/i.test(sql),
+      "prendi_persona_come_cliente deve essere security definer"
+    ).toBe(true);
+    // e NON eseguibili da anon (solo authenticated): il browser passa dall'azione.
+    expect(
+      /revoke\s+execute\s+on\s+function\s+public\.prendi_persona_come_cliente[\s\S]*?from\s+anon/i.test(sql),
+      "prendi_persona_come_cliente deve revocare execute ad anon"
+    ).toBe(true);
+    expect(
+      /revoke\s+execute\s+on\s+function\s+public\.cliente_per_telefono[\s\S]*?from\s+anon/i.test(sql),
+      "cliente_per_telefono deve revocare execute ad anon (dati clienti)"
+    ).toBe(true);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * L4n · GUARDIE FUSO EUROPE/ROME (G20 · migrazione 019, TODO §6)
+ *
+ * Un orario di lavoro è un'ora di PARETE italiana. Costruirlo con
+ * `new Date(\`${data}T${ora}\`)` lo interpreta nel fuso del PROCESSO: su Vercel
+ * (UTC) «10:00» diventa mezzogiorno a Roma, mentre il portale scrive le 10:00 di
+ * Roma → stessa ora scritta, due istanti diversi, e SI ROMPE SOLO IN PRODUZIONE
+ * (in locale il fuso di sistema è italiano, i test di prodotto restano verdi).
+ * Queste guardie leggono il sorgente e impediscono la recidiva silenziosa:
+ * `creaAppuntamento` deve ancorare a Europe/Rome (`istanteRomaISO`), e l'agenda
+ * deve LEGGERE l'ora in Europe/Rome (non uno slice UTC).
+ *
+ * Gated su `existsSync(019)`: enforca sul branch e in CI dopo il merge, salta
+ * pulito sui checkpoint paralleli.
+ * ════════════════════════════════════════════════════════════════════════ */
+const M019 = "supabase/migrazioni/019_fuso_appuntamenti_banco.sql";
+describe.skipIf(!existsSync(join(ROOT, M019)))("L4n · guardie fuso Europe/Rome (019)", () => {
+  /** Corpo della funzione `creaAppuntamento` in lib/actions.ts (dalla firma alla
+   *  successiva `export ... function`). */
+  function corpoCreaAppuntamento(): string {
+    const src = leggi("lib/actions.ts");
+    const start = src.indexOf("export async function creaAppuntamento");
+    expect(start, "lib/actions.ts deve esporre creaAppuntamento").toBeGreaterThanOrEqual(0);
+    const rest = src.slice(start + 1);
+    const nextExport = rest.indexOf("\nexport ");
+    return rest.slice(0, nextExport === -1 ? rest.length : nextExport);
+  }
+
+  it("G20 · creaAppuntamento àncora l'istante con istanteRomaISO (non naïve dal fuso del processo)", () => {
+    const corpo = corpoCreaAppuntamento();
+    expect(
+      /istanteRomaISO\s*\(/.test(corpo),
+      "creaAppuntamento deve costruire l'istante con istanteRomaISO(data, ora)"
+    ).toBe(true);
+    // Nessun `new Date(`...T...`)` costruito da data+ora (la riga 1119 di un tempo):
+    // vietato un template literal con la T fra due interpolazioni dentro new Date.
+    expect(
+      /new\s+Date\(\s*`[^`]*\$\{[^}]*\}T\$\{[^}]*\}[^`]*`\s*\)/.test(corpo),
+      "creaAppuntamento NON deve costruire l'istante con new Date(`${data}T${ora}`) (naïve, fuso del processo)"
+    ).toBe(false);
+  });
+
+  it("G20b · l'agenda LEGGE l'ora in Europe/Rome (oraDi/oraFine), non con uno slice UTC", () => {
+    const ui = leggi("components/AgendaUI.tsx");
+    // Il formatter dell'ora deve dichiarare timeZone Europe/Rome.
+    expect(
+      /timeZone:\s*["']Europe\/Rome["']/.test(ui),
+      "AgendaUI deve formattare l'ora con timeZone Europe/Rome"
+    ).toBe(true);
+    // oraDi NON deve tornare a `.toISOString().slice(11, 16)` (ora UTC del processo).
+    const start = ui.indexOf("export function oraDi");
+    expect(start, "AgendaUI deve esporre oraDi").toBeGreaterThanOrEqual(0);
+    const corpoOraDi = ui.slice(start, start + 200);
+    expect(
+      /toISOString\(\)\.slice\(\s*11/.test(corpoOraDi),
+      "oraDi NON deve leggere l'ora da uno slice UTC (mostrerebbe l'ora sbagliata in produzione)"
+    ).toBe(false);
+  });
+
+  it("G20c · la 019 è una riparazione-dati idempotente e mirata (marker, solo banco, non seed-g6)", () => {
+    const sql = leggi(M019);
+    expect(sql.includes("_riparazioni_dati"), "manca il marker di idempotenza").toBe(true);
+    expect(/where\s+chiave\s*=\s*'019_fuso_appuntamenti_banco'/i.test(sql), "manca la guardia sul marker").toBe(true);
+    expect(/fonte\s*=\s*'banco'/i.test(sql), "il backfill deve toccare SOLO fonte='banco'").toBe(true);
+    expect(/'seed-g6'/.test(sql), "il backfill deve escludere le righe seed-g6 (già corrette)").toBe(true);
+    expect(
+      /at time zone 'UTC'\)\s*at time zone 'Europe\/Rome'/i.test(sql),
+      "la trasformazione deve reinterpretare l'orologio come Europe/Rome"
+    ).toBe(true);
+  });
+});
