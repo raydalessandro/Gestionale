@@ -269,8 +269,14 @@ begin
         (v_a,1,'09:00','19:00'),(v_a,2,'09:00','19:00'),(v_a,3,'09:00','19:00'),
         (v_a,4,'09:00','19:00'),(v_a,5,'09:00','19:00'),(v_a,6,'09:00','13:00');
     end if;
+    -- Negozio A mostra ENTRAMBI i gruppi (017): appuntamento + richiesta.
+    -- `controllo` NON si attiva: esiste in catalogo ma sul percorso sarebbe una
+    -- doppia di «Visita optometrica» (stessa cosa per chi prenota). Decisione
+    -- aperta finché non si allineano tipi-visita del gestionale e catalogo portale
+    -- (vedi docs/agenti/TODO-ray.md). Le richieste hanno durata NULL (trigger 017).
     insert into public.negozi_servizi (azienda_id, servizio_codice, durata_minuti, attivo) values
-      (v_a,'visita',null,true),(v_a,'occhiale',null,true),(v_a,'controllo',null,true)
+      (v_a,'visita',null,true),(v_a,'occhiale',null,true),
+      (v_a,'sole',null,true),(v_a,'lenti_prod',null,true),(v_a,'riparazione',null,true)
     on conflict (azienda_id, servizio_codice) do nothing;
   end if;
 
