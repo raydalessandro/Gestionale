@@ -5,8 +5,63 @@ Aggiornato: 2026-07-28 · Fasi coperte: 1, 2, 3, 4 (v0.1–v0.5) + interfasi
 slot, percorso di prenotazione), **G7-bis · l'agenda unica** (migrazione **013**),
 **G-014 · le sale** (migrazione **014**), **017 · i servizi di tipo richiesta**
 (migrazione **017**) e ora **G8 · le richieste dentro l'agenda** (branch
-`gest/g8-richieste-agenda`, migrazione **018**). La copertura G8 è descritta
-subito qui sotto; i giri precedenti restano più in basso.
+`gest/g8-richieste-agenda`, migrazioni **018** e **019 · fuso Europe/Rome**). Le
+coperture G8 (018) e G8-fuso (019) sono descritte subito qui sotto; i giri
+precedenti restano più in basso.
+
+## Giro G8-fuso · Europe/Rome per gli appuntamenti da banco (stesso branch, migrazione 019, TODO §6)
+
+Difetto preesistente reso critico da G8 (portale + banco nella stessa agenda):
+`creaAppuntamento` costruiva l'istante con `new Date(\`${data}T${ora}\`)`, interpretato
+nel fuso del PROCESSO (UTC su Vercel) → «10:00» digitate al banco diventavano
+mezzogiorno a Roma, mentre il portale scrive le 10:00 di Roma. Si rompeva SOLO in
+produzione (in locale il fuso è italiano). Il codice è corretto forward
+(`istanteRomaISO`/`oggiRoma` in `lib/utils.ts`, `oraDi`/`oraFine` in `AgendaUI.tsx`
+formattano in Europe/Rome) e la **019** riallinea le righe già scritte dal banco
+(backfill idempotente, marker `_riparazioni_dati`, solo `fonte='banco'`, esclude
+`seed-g6`). Nessun file dell'app toccato dai test.
+
+### L1 · Unit — nuovo `tests/unit/fuso.test.ts` (7 test, TZ-independent)
+`istanteRomaISO`: estate `2026-08-01 10:00 → 08:00Z`, inverno `2026-01-15 10:00 →
+09:00Z`, mezzanotte italiana → giorno prima in UTC (estate/inverno), i due salti
+DST 2026 (29/03 → +02, 25/10 → +01), round-trip (l'istante riletto a Roma torna
+«10:00»). `oggiRoma`: formato `YYYY-MM-DD` ed entro ±1 giorno da UTC. Il punto: i
+valori FISSI passano identici anche con `TZ=UTC` (Intl con timeZone esplicito +
+`Date.UTC`, mai il fuso di sistema) — è la prova che difende dalla recidiva.
+
+### L2 · Contratto — nuovo `tests/contratto/fuso-agenda.test.ts` (1 test, la sentinella)
+La prova che Ray vuole, collision-free e definitiva: su un giorno futuro,
+`istanteRomaISO(giorno,"10:00")` (come lo costruisce il banco) è ESATTAMENTE uno
+slot che `slot_liberi` offre per le 10:00 (e riletto a Roma sono le 10:00, non
+mezzogiorno); un appuntamento da banco (`fonte='banco'`) messo lì viene salvato
+verbatim e fa **sparire** lo slot delle 10:00 del portale; una `crea_prenotazione`
+sulle stesse 10:00 collide con **`SLOT_OCCUPATO`**. Se il fuso del banco divergesse
+(naïve-UTC), la riga cadrebbe su un altro istante, lo slot 10:00 resterebbe libero
+e la sentinella diventerebbe rossa. Importa `istanteRomaISO` da `@/lib/utils` (una
+sola fonte di verità: nessuna copia dell'algoritmo nel test).
+
+### L4 · Guardia statica — `tests/unit/guardie.test.ts` (nuovo blocco L4n, +3 → G20)
+Gated `skipIf(!existsSync(019))`. Difende la riga storica 1119 dal tornare naïve.
+- **G20**: `creaAppuntamento` àncora l'istante con `istanteRomaISO(` e **non** con
+  un `new Date(\`${data}T${ora}\`)` (template con la T fra due interpolazioni).
+- **G20b**: `AgendaUI.tsx` formatta l'ora con `timeZone: "Europe/Rome"` e `oraDi`
+  **non** torna a `.toISOString().slice(11, …)` (ora UTC del processo).
+- **G20c**: la 019 è idempotente e mirata (marker `_riparazioni_dati`, solo
+  `fonte='banco'`, esclude `seed-g6`, trasformazione `... at time zone 'UTC') at
+  time zone 'Europe/Rome'`).
+
+### Regressione display — nessun E2E/contratto da correggere
+Nessuno scenario asseriva un'ora VISUALIZZATA di un appuntamento: la §1 di
+`g8-richieste-agenda.spec.ts` digita l'«Ora» ma non la rilegge; le sole asserzioni
+su orari (`e2e/g6-slot.spec.ts`: celle 09:00…12:30) vengono da `slot_liberi`, già
+ancorato a Roma e invariato. Gli appuntamenti da banco ora si LEGGONO all'ora
+giusta anche in CI/UTC senza toccare i test esistenti.
+
+### Esito auto-verifica (locale) — giro G8-fuso
+`npm test` e **`TZ=UTC npm test`** danno lo stesso risultato: **141 passed** (9
+file), guardie 46 → **49**, `fuso` a 7 (identici sotto UTC — è il punto). `npx tsc
+--noEmit` exit 0. `tests/contratto/fuso-agenda.test.ts` senza env → 1 skippato
+pulito. `package.json`/CI invariati (script glob); nessuna nuova devDep.
 
 ## Giro G8 · le richieste dentro l'agenda (branch `gest/g8-richieste-agenda`, migrazione 018)
 

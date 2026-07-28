@@ -1076,3 +1076,75 @@ describe.skipIf(!existsSync(join(ROOT, M018)))("L4m · guardie prendi come clien
     ).toBe(true);
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * L4n · GUARDIE FUSO EUROPE/ROME (G20 · migrazione 019, TODO §6)
+ *
+ * Un orario di lavoro è un'ora di PARETE italiana. Costruirlo con
+ * `new Date(\`${data}T${ora}\`)` lo interpreta nel fuso del PROCESSO: su Vercel
+ * (UTC) «10:00» diventa mezzogiorno a Roma, mentre il portale scrive le 10:00 di
+ * Roma → stessa ora scritta, due istanti diversi, e SI ROMPE SOLO IN PRODUZIONE
+ * (in locale il fuso di sistema è italiano, i test di prodotto restano verdi).
+ * Queste guardie leggono il sorgente e impediscono la recidiva silenziosa:
+ * `creaAppuntamento` deve ancorare a Europe/Rome (`istanteRomaISO`), e l'agenda
+ * deve LEGGERE l'ora in Europe/Rome (non uno slice UTC).
+ *
+ * Gated su `existsSync(019)`: enforca sul branch e in CI dopo il merge, salta
+ * pulito sui checkpoint paralleli.
+ * ════════════════════════════════════════════════════════════════════════ */
+const M019 = "supabase/migrazioni/019_fuso_appuntamenti_banco.sql";
+describe.skipIf(!existsSync(join(ROOT, M019)))("L4n · guardie fuso Europe/Rome (019)", () => {
+  /** Corpo della funzione `creaAppuntamento` in lib/actions.ts (dalla firma alla
+   *  successiva `export ... function`). */
+  function corpoCreaAppuntamento(): string {
+    const src = leggi("lib/actions.ts");
+    const start = src.indexOf("export async function creaAppuntamento");
+    expect(start, "lib/actions.ts deve esporre creaAppuntamento").toBeGreaterThanOrEqual(0);
+    const rest = src.slice(start + 1);
+    const nextExport = rest.indexOf("\nexport ");
+    return rest.slice(0, nextExport === -1 ? rest.length : nextExport);
+  }
+
+  it("G20 · creaAppuntamento àncora l'istante con istanteRomaISO (non naïve dal fuso del processo)", () => {
+    const corpo = corpoCreaAppuntamento();
+    expect(
+      /istanteRomaISO\s*\(/.test(corpo),
+      "creaAppuntamento deve costruire l'istante con istanteRomaISO(data, ora)"
+    ).toBe(true);
+    // Nessun `new Date(`...T...`)` costruito da data+ora (la riga 1119 di un tempo):
+    // vietato un template literal con la T fra due interpolazioni dentro new Date.
+    expect(
+      /new\s+Date\(\s*`[^`]*\$\{[^}]*\}T\$\{[^}]*\}[^`]*`\s*\)/.test(corpo),
+      "creaAppuntamento NON deve costruire l'istante con new Date(`${data}T${ora}`) (naïve, fuso del processo)"
+    ).toBe(false);
+  });
+
+  it("G20b · l'agenda LEGGE l'ora in Europe/Rome (oraDi/oraFine), non con uno slice UTC", () => {
+    const ui = leggi("components/AgendaUI.tsx");
+    // Il formatter dell'ora deve dichiarare timeZone Europe/Rome.
+    expect(
+      /timeZone:\s*["']Europe\/Rome["']/.test(ui),
+      "AgendaUI deve formattare l'ora con timeZone Europe/Rome"
+    ).toBe(true);
+    // oraDi NON deve tornare a `.toISOString().slice(11, 16)` (ora UTC del processo).
+    const start = ui.indexOf("export function oraDi");
+    expect(start, "AgendaUI deve esporre oraDi").toBeGreaterThanOrEqual(0);
+    const corpoOraDi = ui.slice(start, start + 200);
+    expect(
+      /toISOString\(\)\.slice\(\s*11/.test(corpoOraDi),
+      "oraDi NON deve leggere l'ora da uno slice UTC (mostrerebbe l'ora sbagliata in produzione)"
+    ).toBe(false);
+  });
+
+  it("G20c · la 019 è una riparazione-dati idempotente e mirata (marker, solo banco, non seed-g6)", () => {
+    const sql = leggi(M019);
+    expect(sql.includes("_riparazioni_dati"), "manca il marker di idempotenza").toBe(true);
+    expect(/where\s+chiave\s*=\s*'019_fuso_appuntamenti_banco'/i.test(sql), "manca la guardia sul marker").toBe(true);
+    expect(/fonte\s*=\s*'banco'/i.test(sql), "il backfill deve toccare SOLO fonte='banco'").toBe(true);
+    expect(/'seed-g6'/.test(sql), "il backfill deve escludere le righe seed-g6 (già corrette)").toBe(true);
+    expect(
+      /at time zone 'UTC'\)\s*at time zone 'Europe\/Rome'/i.test(sql),
+      "la trasformazione deve reinterpretare l'orologio come Europe/Rome"
+    ).toBe(true);
+  });
+});
