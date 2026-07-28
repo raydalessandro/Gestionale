@@ -1180,6 +1180,148 @@ export async function eventoAppuntamento(
   return null;
 }
 
+/* ── Agenda · G8 · le richieste dal portale dentro l'agenda ──────────── */
+// Transizioni NUOVE, con guardie di stato PROPRIE: non si tocca
+// `eventoAppuntamento` (§7). Ogni azione verifica lo stato di partenza e
+// l'update è condizionato (`.eq("stato","in_attesa")`) così due tocchi non
+// producono due effetti. Tutto dentro il tenant via RLS: niente service role.
+
+/** Accetta una richiesta: appuntamento in_attesa→prenotato, prenotazione→accettata. */
+export async function accettaRichiesta(id: string, _prev: Esito, _formData: FormData): Promise<Esito> {
+  const supabase = await createClient();
+
+  const { data: app } = await supabase
+    .from("appuntamenti")
+    .select("stato")
+    .eq("id", id)
+    .maybeSingle();
+  if (!app) return { errore: "Appuntamento non trovato." };
+  if (app.stato !== "in_attesa") return { errore: `Nessuna azione: la richiesta è ${app.stato}.` };
+
+  const { data: upd, error: e1 } = await supabase
+    .from("appuntamenti")
+    .update({ stato: "prenotato" })
+    .eq("id", id)
+    .eq("stato", "in_attesa")
+    .select("id");
+  if (e1) return { errore: `Operazione non riuscita: ${e1.message}` };
+  if (!upd || upd.length === 0) return { errore: "La richiesta è già stata gestita." };
+
+  const { error: e2 } = await supabase
+    .from("prenotazioni")
+    .update({ stato: "accettata" })
+    .eq("appuntamento_id", id)
+    .eq("stato", "in_attesa");
+  if (e2) return { errore: `Prenotazione non aggiornata: ${e2.message}` };
+
+  revalidatePath("/agenda");
+  return null;
+}
+
+/** Rifiuta una richiesta: appuntamento in_attesa→annullato (motivo facoltativo in
+ *  nota), prenotazione→rifiutata. Lo slot torna libero da sé: l'EXCLUDE non conta
+ *  gli annullati (§5). */
+export async function rifiutaRichiesta(id: string, _prev: Esito, formData: FormData): Promise<Esito> {
+  const supabase = await createClient();
+
+  const { data: app } = await supabase
+    .from("appuntamenti")
+    .select("stato, note")
+    .eq("id", id)
+    .maybeSingle();
+  if (!app) return { errore: "Appuntamento non trovato." };
+  if (app.stato !== "in_attesa") return { errore: `Nessuna azione: la richiesta è ${app.stato}.` };
+
+  const motivo = str(formData, "motivo");
+  const patch: { stato: "annullato"; note?: string | null } = { stato: "annullato" };
+  if (motivo) patch.note = appendiNota(app.note, `— Rifiutata ${dataIt()}: ${motivo}`);
+
+  const { data: upd, error: e1 } = await supabase
+    .from("appuntamenti")
+    .update(patch)
+    .eq("id", id)
+    .eq("stato", "in_attesa")
+    .select("id");
+  if (e1) return { errore: `Operazione non riuscita: ${e1.message}` };
+  if (!upd || upd.length === 0) return { errore: "La richiesta è già stata gestita." };
+
+  const { error: e2 } = await supabase
+    .from("prenotazioni")
+    .update({ stato: "rifiutata" })
+    .eq("appuntamento_id", id)
+    .eq("stato", "in_attesa");
+  if (e2) return { errore: `Prenotazione non aggiornata: ${e2.message}` };
+
+  revalidatePath("/agenda");
+  return null;
+}
+
+/** Esegue la presa come cliente via la funzione security definer (unico percorso
+ *  di scrittura verso persone/registro, ID-01). Mappa gli errori del DB. */
+async function eseguiPrendiCliente(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  prenotazioneId: string,
+  clienteId: string | null
+): Promise<{ ok: true; clienteId: string } | { errore: string }> {
+  const { data, error } = await supabase.rpc("prendi_persona_come_cliente", {
+    p_prenotazione_id: prenotazioneId,
+    p_cliente_id: clienteId,
+  });
+  if (error) {
+    const m = error.message;
+    if (m.includes("NON_ACCETTATA")) return { errore: "Serve prima accettare la richiesta." };
+    if (m.includes("CLIENTE_NON_TUO")) return { errore: "Quel cliente non è del tuo negozio." };
+    if (m.includes("NON_TUA")) return { errore: "Questa richiesta non è del tuo negozio." };
+    if (m.includes("PRENOTAZIONE_NON_TROVATA")) return { errore: "Richiesta non trovata." };
+    return { errore: `Operazione non riuscita: ${m}` };
+  }
+  revalidatePath("/agenda");
+  return { ok: true, clienteId: data as string };
+}
+
+/**
+ * «Prendi come cliente» (§6) — atto SEPARATO, volontario. Chiamabile direttamente
+ * dal client (non form-bound).
+ *  · "auto"  → cerca un cliente proprio con lo stesso telefono. Se c'è, PROPONE di
+ *    collegarlo (non scrive); altrimenti crea subito.
+ *  · "nuovo" → crea comunque un nuovo cliente.
+ *  · {collega} → collega il cliente esistente scelto.
+ * Nessun consenso commerciale: quello si raccoglie con la procedura della 4d.
+ */
+export async function prendiComeCliente(
+  prenotazioneId: string,
+  scelta: "auto" | "nuovo" | { collega: string }
+): Promise<
+  | { ok: true; clienteId: string }
+  | { proposta: { id: string; nome: string; cognome: string } }
+  | { errore: string }
+> {
+  const supabase = await createClient();
+
+  const { data: pren } = await supabase
+    .from("prenotazioni")
+    .select("stato, cliente_id, contatto_telefono")
+    .eq("id", prenotazioneId)
+    .maybeSingle();
+  if (!pren) return { errore: "Richiesta non trovata." };
+  if (pren.stato !== "accettata") return { errore: "Serve prima accettare la richiesta." };
+  if (pren.cliente_id) return { ok: true, clienteId: pren.cliente_id }; // già presa (idempotente)
+
+  if (scelta === "auto") {
+    const { data: esist, error } = await supabase.rpc("cliente_per_telefono", {
+      p_telefono: pren.contatto_telefono,
+    });
+    if (error) return { errore: `Ricerca non riuscita: ${error.message}` };
+    const match = (Array.isArray(esist) ? esist[0] : esist) as
+      | { id: string; nome: string; cognome: string }
+      | undefined;
+    if (match) return { proposta: { id: match.id, nome: match.nome, cognome: match.cognome } };
+    return eseguiPrendiCliente(supabase, prenotazioneId, null);
+  }
+  if (scelta === "nuovo") return eseguiPrendiCliente(supabase, prenotazioneId, null);
+  return eseguiPrendiCliente(supabase, prenotazioneId, scelta.collega);
+}
+
 /* ── Richiami ──────────────────────────────────────────────────────── */
 
 const TIPI_RICHIAMO = [

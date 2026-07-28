@@ -166,6 +166,9 @@ export const TIPI_APPUNTAMENTO: Record<string, string> = {
 };
 
 export const STATI_APPUNTAMENTO: StatoPipeline[] = [
+  // in_attesa = richiesta dal portale non ancora vagliata: colore ottone (brand),
+  // distinto dall'ambra del "mancato", per saltare all'occhio (G8 §3).
+  { id: "in_attesa", label: "In attesa", bg: "#EFE4D3", fg: "#8A6533" },
   { id: "prenotato", label: "Prenotato", bg: "#E7EAF6", fg: "#5B6DA8" },
   { id: "completato", label: "Completato", bg: "#E2F0EE", fg: "#127E7A" },
   { id: "mancato", label: "Non presentato", bg: "#F7EEDD", fg: "#C98A2B" },

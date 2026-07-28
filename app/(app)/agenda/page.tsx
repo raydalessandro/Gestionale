@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus, Clock } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
-import { PageHeader, Card, ButtonLink, Badge, Vuoto } from "@/components/ui";
+import { PageHeader, Card, ButtonLink, Badge, Vuoto, tintaFonte } from "@/components/ui";
 import { AzioniAppuntamento } from "@/components/AzioniAgenda";
 import { oraDi, oraFine, etichettaTipoApp, PillStatoApp } from "@/components/AgendaUI";
+import { ETICHETTE_FONTE } from "@/lib/utils";
 
 const GG = 24 * 60 * 60 * 1000;
 
@@ -19,11 +20,52 @@ export default async function AgendaPage({
 
   const { data: appuntamenti } = await supabase
     .from("appuntamenti")
-    .select("id, cliente_id, utente_id, tipo, inizio, durata_minuti, stato, riferimento")
+    .select("id, cliente_id, utente_id, tipo, inizio, durata_minuti, stato, riferimento, fonte")
     .gte("inizio", `${data}T00:00:00`)
     .lte("inizio", `${data}T23:59:59`)
     .order("inizio");
   const righe = appuntamenti ?? [];
+
+  // Prenotazioni collegate alle righe del giorno: chi ha prenotato (§3) e se la
+  // riga è "prendibile" come cliente (§6). Una lettura in più su appuntamento_id.
+  const apptIds = righe.map((a) => a.id);
+  const { data: prenDay } = apptIds.length
+    ? await supabase
+        .from("prenotazioni")
+        .select("id, appuntamento_id, contatto_nome, contatto_telefono, per_conto_di, servizio_codice, stato, cliente_id")
+        .in("appuntamento_id", apptIds)
+    : { data: [] };
+  const prenByAppt = new Map((prenDay ?? []).map((p) => [p.appuntamento_id, p]));
+
+  // Le richieste in sospeso DA OGGI IN AVANTI (§2): non solo il giorno aperto.
+  const { data: sospesiRaw } = await supabase
+    .from("appuntamenti")
+    .select("id, inizio")
+    .eq("stato", "in_attesa")
+    .gte("inizio", `${oggi}T00:00:00`)
+    .order("inizio");
+  const sospesi = sospesiRaw ?? [];
+  const sospIds = sospesi.map((s) => s.id);
+  const { data: prenSosp } = sospIds.length
+    ? await supabase
+        .from("prenotazioni")
+        .select("appuntamento_id, contatto_nome, servizio_codice")
+        .in("appuntamento_id", sospIds)
+    : { data: [] };
+  const prenSospByAppt = new Map((prenSosp ?? []).map((p) => [p.appuntamento_id, p]));
+
+  // Etichette dei servizi richiesti (catalogo leggibile da ogni autenticato).
+  const codici = [
+    ...new Set(
+      [...(prenDay ?? []), ...(prenSosp ?? [])]
+        .map((p) => p.servizio_codice)
+        .filter(Boolean) as string[]
+    ),
+  ];
+  const { data: servizi } = codici.length
+    ? await supabase.from("servizi").select("codice, nome").in("codice", codici)
+    : { data: [] };
+  const nomeServizio = new Map((servizi ?? []).map((s) => [s.codice, s.nome]));
 
   const clienteIds = [...new Set(righe.map((a) => a.cliente_id).filter(Boolean))] as string[];
   const utenteIds = [...new Set(righe.map((a) => a.utente_id).filter(Boolean))] as string[];
@@ -55,6 +97,11 @@ export default async function AgendaPage({
     weekday: "long", day: "numeric", month: "long",
   }).format(new Date(`${data}T12:00:00Z`));
 
+  const giornoBreve = (iso: string) =>
+    new Intl.DateTimeFormat("it-IT", { weekday: "short", day: "numeric", month: "short" }).format(
+      new Date(`${iso.slice(0, 10)}T12:00:00Z`)
+    );
+
   return (
     <>
       <PageHeader
@@ -66,6 +113,44 @@ export default async function AgendaPage({
           </ButtonLink>
         }
       />
+
+      {/* §2 · Le richieste in sospeso da oggi in avanti. Se non ce ne sono, niente
+          striscia: nessuno spazio vuoto che ricorda che manca qualcosa. */}
+      {sospesi.length > 0 && (
+        <Card className="mb-4 border-ottone/30 bg-ottone-soft/40 !p-0">
+          <div className="flex items-center gap-2 border-b border-ottone/20 px-5 py-2.5">
+            <Clock size={15} className="text-ottone-scuro" />
+            <p className="text-sm font-semibold text-inchiostro">
+              {sospesi.length} {sospesi.length === 1 ? "richiesta in sospeso" : "richieste in sospeso"}
+            </p>
+          </div>
+          <ul className="divide-y divide-ottone/15">
+            {sospesi.map((s) => {
+              const pr = prenSospByAppt.get(s.id);
+              const giorno = s.inizio.slice(0, 10);
+              return (
+                <li key={s.id}>
+                  <Link
+                    href={`/agenda?data=${giorno}`}
+                    className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 px-5 py-2.5 hover:bg-white/50"
+                  >
+                    <span className="text-sm font-semibold text-inchiostro">{giornoBreve(giorno)}</span>
+                    <span className="f-mono text-sm text-soft">{oraDi(s.inizio)}</span>
+                    {pr?.servizio_codice && (
+                      <span className="text-sm text-soft">
+                        · {nomeServizio.get(pr.servizio_codice) ?? pr.servizio_codice}
+                      </span>
+                    )}
+                    {pr?.contatto_nome && (
+                      <span className="text-sm font-medium text-inchiostro">· {pr.contatto_nome}</span>
+                    )}
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+        </Card>
+      )}
 
       <div className="mb-4 flex items-center gap-2">
         <Link href={`/agenda?data=${prec}`} className="rounded-lg border border-linea bg-white p-2 text-soft hover:bg-carta" aria-label="Giorno precedente">
@@ -82,37 +167,67 @@ export default async function AgendaPage({
       {righe.length > 0 ? (
         <>
           <Card className="divide-y divide-linea !p-0">
-            {righe.map((a) => (
-              <div key={a.id} className="flex items-start gap-3 px-5 py-3.5">
-                <div className="w-20 shrink-0">
-                  <p className="f-mono text-sm font-semibold text-inchiostro">{oraDi(a.inizio)}</p>
-                  <p className="f-mono text-[11px] text-faint">{oraFine(a.inizio, a.durata_minuti)}</p>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <Badge tinta="neutro">{etichettaTipoApp(a.tipo)}</Badge>
-                    {a.cliente_id ? (
-                      <Link href={`/clienti/${a.cliente_id}`} className="text-sm font-semibold text-inchiostro hover:underline">
-                        {nomeCliente.get(a.cliente_id) ?? "Cliente"}
-                      </Link>
+            {righe.map((a) => {
+              const pren = prenByAppt.get(a.id);
+              const inAttesa = a.stato === "in_attesa";
+              const prendibile =
+                a.stato === "prenotato" && !!pren && pren.stato === "accettata" && !pren.cliente_id;
+              return (
+                <div
+                  key={a.id}
+                  className={`flex items-start gap-3 px-5 py-3.5${inAttesa ? " bg-ottone-soft/40" : ""}`}
+                >
+                  <div className="w-20 shrink-0">
+                    <p className="f-mono text-sm font-semibold text-inchiostro">{oraDi(a.inizio)}</p>
+                    <p className="f-mono text-[11px] text-faint">{oraFine(a.inizio, a.durata_minuti)}</p>
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Badge tinta="neutro">{etichettaTipoApp(a.tipo)}</Badge>
+                      {a.cliente_id ? (
+                        <Link href={`/clienti/${a.cliente_id}`} className="text-sm font-semibold text-inchiostro hover:underline">
+                          {nomeCliente.get(a.cliente_id) ?? "Cliente"}
+                        </Link>
+                      ) : pren ? (
+                        <span className="text-sm font-semibold text-inchiostro">{pren.contatto_nome}</span>
+                      ) : (
+                        <span className="text-sm font-semibold text-soft">Impegno interno</span>
+                      )}
+                      {pren && (
+                        <Badge tinta={tintaFonte(a.fonte)}>{ETICHETTE_FONTE[a.fonte] ?? a.fonte}</Badge>
+                      )}
+                      {sovrappone.has(a.id) && (
+                        <span title="Si sovrappone" className="inline-block h-2 w-2 rounded-full bg-ambra" />
+                      )}
+                    </div>
+                    {/* §3 · chi ha prenotato (per le richieste): telefono, per conto di, servizio. */}
+                    {inAttesa && pren ? (
+                      <p className="mt-0.5 text-xs text-soft">
+                        <span className="f-mono">{pren.contatto_telefono}</span>
+                        {pren.per_conto_di ? ` · per ${pren.per_conto_di}` : ""}
+                        {pren.servizio_codice && nomeServizio.get(pren.servizio_codice)
+                          ? ` · ${nomeServizio.get(pren.servizio_codice)}`
+                          : ""}
+                      </p>
                     ) : (
-                      <span className="text-sm font-semibold text-soft">Impegno interno</span>
-                    )}
-                    {sovrappone.has(a.id) && (
-                      <span title="Si sovrappone" className="inline-block h-2 w-2 rounded-full bg-ambra" />
+                      <p className="mt-0.5 text-xs text-faint">
+                        {a.utente_id && nomeUtente.get(a.utente_id) ? `con ${nomeUtente.get(a.utente_id)}` : ""}
+                        {a.riferimento ? ` · ${a.riferimento}` : ""}
+                      </p>
                     )}
                   </div>
-                  <p className="mt-0.5 text-xs text-faint">
-                    {a.utente_id && nomeUtente.get(a.utente_id) ? `con ${nomeUtente.get(a.utente_id)}` : ""}
-                    {a.riferimento ? ` · ${a.riferimento}` : ""}
-                  </p>
+                  <div className="flex shrink-0 flex-col items-end gap-1">
+                    <PillStatoApp stato={a.stato} />
+                    <AzioniAppuntamento
+                      id={a.id}
+                      stato={a.stato}
+                      prenotazioneId={pren?.id}
+                      prendibile={prendibile}
+                    />
+                  </div>
                 </div>
-                <div className="flex shrink-0 flex-col items-end gap-1">
-                  <PillStatoApp stato={a.stato} />
-                  {a.stato === "prenotato" && <AzioniAppuntamento id={a.id} />}
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </Card>
           {completati + mancati > 0 && (
             <p className="mt-3 text-xs text-faint">
