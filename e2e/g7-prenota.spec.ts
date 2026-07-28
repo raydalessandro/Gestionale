@@ -152,7 +152,9 @@ const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const cta = page.getByRole("link", { name: "Prenota un appuntamento" });
     await expect(cta).toHaveAttribute("href", /\/prenota\?da=qr/);
     await cta.click();
-    await expect(page).toHaveURL(/\/prenota\?da=qr/);
+    // Il wizard normalizza l'URL a `?passo=1&da=qr`: `da=qr` non è più subito
+    // dopo `?`. Basta che il percorso sia /prenota e che `da=qr` ci sia.
+    await expect(page).toHaveURL(/\/prenota\?.*da=qr/);
 
     // ── Passo 1 · che cosa ti serve ──────────────────────────────────────────
     await expect(page.getByRole("heading", { name: "Che cosa ti serve?" })).toBeVisible();
