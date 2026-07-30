@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FiguraVuota } from "@/components/FigureVuote";
 import { Icona } from "@/components/Icone";
 import { createClient } from "@/lib/supabase/server";
 import { Card, PageHeader, ButtonLink, Badge, tintaFonte, Vuoto } from "@/components/ui";
@@ -170,6 +171,7 @@ export default async function DashboardPage() {
         </Card>
       ) : (
         <Vuoto
+          figura={<FiguraVuota nome="clienti" />}
           titolo="L'anagrafica è pronta"
           testo="Il primo cliente è a un tap di distanza — da lì partono prescrizioni, ordini e tutto il resto."
           azione={

@@ -76,17 +76,26 @@ export function Button({
   type = "button",
   disabled,
   className = "",
+  onClick,
 }: {
   children: ReactNode;
   variante?: keyof typeof btnVarianti;
   type?: "button" | "submit";
   disabled?: boolean;
   className?: string;
+  /** Aggiunta col ramo 5. Nessuna firma è stata tolta: questa è in più, ed è
+   *  facoltativa, quindi i cinquanta chiamanti esistenti non se ne accorgono.
+   *  Serviva perché senza `onClick` un componente client non può usare
+   *  `Button` — e infatti oggi non lo usa nessuno: AzioniAgenda, AzioniOrdine
+   *  e gli altri si riscrivono le classi del pulsante a mano, ciascuno le sue.
+   *  Quello è il vero costo, e questa prop è il primo passo per toglierlo. */
+  onClick?: () => void;
 }) {
   return (
     <button
       type={type}
       disabled={disabled}
+      onClick={onClick}
       className={`${btnBase} ${btnVarianti[variante]} ${className}`}
     >
       {children}

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FiguraVuota } from "@/components/FigureVuote";
 import { Icona } from "@/components/Icone";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -208,13 +209,14 @@ export default async function OrdiniPage({
         </Card>
       ) : (
         <Vuoto
-          titolo={q || stato ? "Nessun ordine trovato" : "Ancora nessun ordine"}
+          figura={<FiguraVuota nome={q || stato ? "cerca" : "ordini"} />}
+          titolo={q || stato ? "Nessun ordine così" : "Ancora nessun ordine"}
           testo={
             q || stato
-              ? "Cambia filtro o ricerca per vedere altri ordini."
+              ? "Degli ordini ci sono, ma nessuno che corrisponda. Togli un filtro o cerca con meno lettere."
               : vista === "lac"
-                ? "Crea il primo ordine di lenti a contatto dal banco."
-                : "Apri la prima busta lavoro: dalla Rx alla consegna."
+                ? "Crea il primo ordine di lenti a contatto dal banco: da qui segui da_ordinare → ordinato → arrivato → consegnato senza rincorrere nessuno."
+                : "Apri la prima busta lavoro: dalla Rx alla consegna, con la numerazione che si assegna da sé."
           }
           azione={
             <ButtonLink

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FiguraVuota } from "@/components/FigureVuote";
 import { Icona } from "@/components/Icone";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader, Card, ButtonLink, Badge, Vuoto, tintaFonte } from "@/components/ui";
@@ -238,8 +239,9 @@ export default async function AgendaPage({
         </>
       ) : (
         <Vuoto
+          figura={<FiguraVuota nome="agenda" />}
           titolo="Giornata libera"
-          testo="Nessun appuntamento per questo giorno."
+          testo="Nessun appuntamento fissato. Le richieste che arrivano dalla pagina del negozio compaiono qui sopra, nella striscia."
           azione={
             <ButtonLink href={`/agenda/nuovo?data=${data}`} variante="ghost">
               <Icona nome="piu" size={16} /> Nuovo appuntamento

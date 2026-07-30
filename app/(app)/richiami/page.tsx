@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FiguraVuota } from "@/components/FigureVuote";
 import { Icona } from "@/components/Icone";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader, Card, Badge, Vuoto } from "@/components/ui";
@@ -157,7 +158,15 @@ export default async function RichiamiPage() {
           })}
         </Card>
       ) : (
-        <Card className="mb-6"><p className="text-sm text-faint">Niente da richiamare oggi. Buon lavoro.</p></Card>
+        <div className="mb-6">
+          {/* Tono «conferma»: questo elenco vuoto è una buona notizia e non
+              deve sembrare un guasto. Vedi DS-01 §5.3. */}
+          <Vuoto
+            figura={<FiguraVuota nome="fatto" />}
+            titolo="Niente da richiamare oggi"
+            testo="I controlli a dodici mesi entrano in lista da soli: quando ne matura uno lo trovi qui, senza doverlo cercare."
+          />
+        </div>
       )}
 
       {/* 2 · Proposte */}

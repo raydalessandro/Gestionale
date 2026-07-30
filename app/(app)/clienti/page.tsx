@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FiguraVuota } from "@/components/FigureVuote";
 import { Icona } from "@/components/Icone";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -88,8 +89,9 @@ export default async function ClientiPage({
         </Card>
       ) : q ? (
         <Vuoto
-          titolo="Nessun risultato"
-          testo={`Nessun cliente corrisponde a "${q}". Prova con meno lettere, o crealo al volo.`}
+          figura={<FiguraVuota nome="cerca" />}
+          titolo="Nessuno con questo nome"
+          testo={`In archivio non c'è nessun «${q}». Prova con meno lettere — la ricerca prende anche pezzi di cognome — oppure crealo adesso.`}
           azione={
             <ButtonLink href="/clienti/nuovo" variante="ghost">
               <Icona nome="cliente-nuovo" size={16} /> Nuovo cliente
@@ -98,8 +100,9 @@ export default async function ClientiPage({
         />
       ) : (
         <Vuoto
+          figura={<FiguraVuota nome="clienti" />}
           titolo="Ancora nessun cliente"
-          testo="Aggiungi il primo: bastano nome e cognome, il resto si completa strada facendo."
+          testo="Aggiungi il primo: bastano nome e cognome. Da lì partono prescrizioni, buste e richiami — il resto si completa strada facendo."
           azione={
             <ButtonLink href="/clienti/nuovo" variante="ghost">
               <Icona nome="cliente-nuovo" size={16} /> Aggiungi il primo cliente

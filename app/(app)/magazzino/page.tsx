@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FiguraVuota } from "@/components/FigureVuote";
 import { Icona } from "@/components/Icone";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -222,8 +223,13 @@ async function VistaProdotti({
         </Card>
       ) : (
         <Vuoto
-          titolo={q || filtro ? "Nessun prodotto" : "Catalogo vuoto"}
-          testo={q || filtro ? "Cambia ricerca o filtro." : "Aggiungi il primo prodotto al catalogo."}
+          figura={<FiguraVuota nome={q || filtro ? "cerca" : "magazzino"} />}
+          titolo={q || filtro ? "Nessun prodotto così" : "Catalogo vuoto"}
+          testo={
+            q || filtro
+              ? "Il catalogo ha dei prodotti, ma nessuno che corrisponda. Togli un filtro o cerca con meno lettere."
+              : "Aggiungi il primo prodotto: da lì il magazzino inizia a contare le giacenze da solo, a ogni vendita."
+          }
           azione={
             <ButtonLink href="/magazzino/prodotti/nuovo" variante="ghost">
               <Icona nome="piu" size={16} /> Nuovo prodotto
