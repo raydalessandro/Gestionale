@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Search, Plus, ChevronRight } from "lucide-react";
+import { Icona } from "@/components/Icone";
 import { createClient } from "@/lib/supabase/server";
 import {
   PageHeader,
@@ -48,11 +48,11 @@ export default async function MagazzinoPage({
         azione={
           vista === "prodotti" ? (
             <ButtonLink href="/magazzino/prodotti/nuovo" variante="accent">
-              <Plus size={16} /> Nuovo prodotto
+              <Icona nome="piu" size={16} /> Nuovo prodotto
             </ButtonLink>
           ) : vista === "fermi" ? (
             <ButtonLink href="/magazzino?vista=prodotti" variante="accent">
-              <Plus size={16} /> Nuovo fermo
+              <Icona nome="piu" size={16} /> Nuovo fermo
             </ButtonLink>
           ) : undefined
         }
@@ -173,7 +173,7 @@ async function VistaProdotti({
       <form className="relative mb-3" action="/magazzino" method="get">
         <input type="hidden" name="vista" value="prodotti" />
         {filtro && <input type="hidden" name="filtro" value={filtro} />}
-        <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-faint" />
+        <Icona nome="cerca" size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-faint" />
         <input type="search" name="q" defaultValue={q} placeholder="Cerca per nome, marca o SKU…" className={`${inputCls} !pl-10`} />
       </form>
 
@@ -215,7 +215,7 @@ async function VistaProdotti({
                   </p>
                   <p className="text-[10px] uppercase tracking-wide text-faint">giacenza</p>
                 </div>
-                <ChevronRight size={16} className="shrink-0 text-faint" />
+                <Icona nome="freccia-dx" size={16} className="shrink-0 text-faint" />
               </Link>
             );
           })}
@@ -226,7 +226,7 @@ async function VistaProdotti({
           testo={q || filtro ? "Cambia ricerca o filtro." : "Aggiungi il primo prodotto al catalogo."}
           azione={
             <ButtonLink href="/magazzino/prodotti/nuovo" variante="ghost">
-              <Plus size={16} /> Nuovo prodotto
+              <Icona nome="piu" size={16} /> Nuovo prodotto
             </ButtonLink>
           }
         />

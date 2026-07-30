@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Phone } from "lucide-react";
+import { Icona } from "@/components/Icone";
 import { createClient } from "@/lib/supabase/server";
 import { Card, PageHeader, Badge, tintaFonte } from "@/components/ui";
 import { PillStato, RxMono, waLink } from "@/components/OrdiniUI";
@@ -91,7 +91,7 @@ export default async function OrdineLacPage({
               </Link>
               {cliente.telefono && (
                 <span className="flex items-center gap-1.5 text-sm text-soft">
-                  <Phone size={14} className="text-ambra-600" /> {cliente.telefono}
+                  <Icona nome="telefono" size={14} className="text-ambra-600" /> {cliente.telefono}
                 </span>
               )}
             </div>

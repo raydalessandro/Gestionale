@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import Sidebar from "@/components/Sidebar";
+import Guscio from "@/components/Guscio";
 
 export default async function AppLayout({
   children,
@@ -26,12 +26,12 @@ export default async function AppLayout({
   const aziendaNome =
     (utente.aziende as unknown as { nome: string } | null)?.nome ?? "Il tuo negozio";
 
+  // Il guscio possiede la geometria: colonna, barra e area di contenuto stanno
+  // insieme in un componente solo perché la barra vive DENTRO l'area a destra
+  // della colonna, non sopra tutto. Le letture qui sopra sono invariate.
   return (
-    <div className="flex min-h-screen flex-col bg-carta md:flex-row">
-      <Sidebar aziendaNome={aziendaNome} utenteNome={utente.nome} />
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6 md:px-8 md:py-10">
-        {children}
-      </main>
-    </div>
+    <Guscio aziendaNome={aziendaNome} utenteNome={utente.nome}>
+      {children}
+    </Guscio>
   );
 }

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Phone, Printer } from "lucide-react";
+import { Icona } from "@/components/Icone";
 import { createClient } from "@/lib/supabase/server";
 import { Card, PageHeader, ButtonLink, Badge, tintaFonte } from "@/components/ui";
 import { PillStato, RxMono, waLink, ETICHETTE_TIPO_LAVORO } from "@/components/OrdiniUI";
@@ -96,11 +96,11 @@ export default async function BustaPage({
         </div>
         <div className="flex gap-2">
           <ButtonLink href={`/ordini/buste/${b.id}/stampa`} variante="ghost">
-            <Printer size={16} /> Stampa busta
+            <Icona nome="stampa" size={16} /> Stampa busta
           </ButtonLink>
           {b.acconto > 0 && (
             <ButtonLink href={`/ordini/buste/${b.id}/caparra`} variante="ghost">
-              <Printer size={16} /> Ricevuta caparra
+              <Icona nome="stampa" size={16} /> Ricevuta caparra
             </ButtonLink>
           )}
         </div>
@@ -119,7 +119,7 @@ export default async function BustaPage({
                 </Link>
                 {cliente.telefono && (
                   <span className="flex items-center gap-1.5 text-sm text-soft">
-                    <Phone size={14} className="text-ambra-600" /> {cliente.telefono}
+                    <Icona nome="telefono" size={14} className="text-ambra-600" /> {cliente.telefono}
                   </span>
                 )}
               </div>

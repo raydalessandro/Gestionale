@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Phone, MessageCircle } from "lucide-react";
+import { Icona } from "@/components/Icone";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader, Card, Badge, Vuoto } from "@/components/ui";
 import { normalizzaTelefono, waLink } from "@/components/OrdiniUI";
@@ -39,10 +39,10 @@ function Contatti({ telefono, messaggio }: { telefono: string | null; messaggio:
   return (
     <div className="flex gap-1.5">
       <a href={`tel:${normalizzaTelefono(telefono)}`} className="inline-flex items-center gap-1 rounded-lg border border-linea bg-white px-2.5 py-1 text-xs font-semibold text-inchiostro hover:bg-carta">
-        <Phone size={12} /> Chiama
+        <Icona nome="telefono" size={12} /> Chiama
       </a>
       <a href={waLink(telefono, messaggio)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-linea bg-white px-2.5 py-1 text-xs font-semibold text-inchiostro hover:bg-carta">
-        <MessageCircle size={12} /> WhatsApp
+        <Icona nome="messaggio" size={12} /> WhatsApp
       </a>
     </div>
   );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { Search } from "lucide-react";
+import { Icona } from "@/components/Icone";
 import { creaReso } from "@/lib/actions";
 import { createClient } from "@/lib/supabase/client";
 import { inputCls, Errore } from "@/components/ui";
@@ -43,7 +43,7 @@ export default function ResoEsterno({ metodi }: { metodi: { id: string; nome: st
         </div>
       ) : (
         <div className="relative">
-          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
+          <Icona nome="cerca" size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
           <input value={term} onChange={(e) => setTerm(e.target.value)} placeholder="Cliente (facoltativo)…" className={`${inputCls} !pl-9`} />
           {risultati.length > 0 && (
             <div className="mt-1 divide-y divide-linea rounded-xl border border-linea bg-white">

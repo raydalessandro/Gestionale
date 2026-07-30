@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { MessageCircle, CalendarPlus, Banknote } from "lucide-react";
+import { Icona } from "@/components/Icone";
 import {
   eventoOrdineLac,
   eventoBusta,
@@ -351,7 +351,7 @@ function BottoneWhatsApp({ href }: { href: string }) {
       rel="noopener noreferrer"
       className={`${btn} ${stili.ghost}`}
     >
-      <MessageCircle size={16} /> Apri WhatsApp
+      <Icona nome="messaggio" size={16} /> Apri WhatsApp
     </a>
   );
 }
@@ -359,7 +359,7 @@ function BottoneWhatsApp({ href }: { href: string }) {
 function LinkFissaRitiro({ href }: { href: string }) {
   return (
     <a href={href} className={`${btn} ${stili.ghost}`}>
-      <CalendarPlus size={16} /> Fissa ritiro
+      <Icona nome="agenda-piu" size={16} /> Fissa ritiro
     </a>
   );
 }
@@ -367,7 +367,7 @@ function LinkFissaRitiro({ href }: { href: string }) {
 function LinkConsegnaIncassa({ href }: { href: string }) {
   return (
     <a href={href} className={`${btn} ${stili.accent}`}>
-      <Banknote size={16} /> Consegna e incassa
+      <Icona nome="contanti" size={16} /> Consegna e incassa
     </a>
   );
 }

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Search, Plus, ChevronRight } from "lucide-react";
+import { Icona } from "@/components/Icone";
 import { createClient } from "@/lib/supabase/server";
 import {
   PageHeader,
@@ -100,11 +100,11 @@ export default async function OrdiniPage({
         azione={
           vista === "lac" ? (
             <ButtonLink href="/ordini/lac/nuovo" variante="accent">
-              <Plus size={16} /> Nuovo ordine LAC
+              <Icona nome="piu" size={16} /> Nuovo ordine LAC
             </ButtonLink>
           ) : (
             <ButtonLink href="/ordini/buste/nuova" variante="accent">
-              <Plus size={16} /> Nuova busta
+              <Icona nome="piu" size={16} /> Nuova busta
             </ButtonLink>
           )
         }
@@ -133,7 +133,7 @@ export default async function OrdiniPage({
       <form className="relative mb-3" action="/ordini" method="get">
         <input type="hidden" name="vista" value={vista} />
         {stato && <input type="hidden" name="stato" value={stato} />}
-        <Search
+        <Icona nome="cerca"
           size={16}
           className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-faint"
         />
@@ -201,7 +201,7 @@ export default async function OrdiniPage({
                     )}
                   </span>
                 </div>
-                <ChevronRight size={16} className="shrink-0 text-faint" />
+                <Icona nome="freccia-dx" size={16} className="shrink-0 text-faint" />
               </Link>
             );
           })}
@@ -221,7 +221,7 @@ export default async function OrdiniPage({
               href={vista === "lac" ? "/ordini/lac/nuovo" : "/ordini/buste/nuova"}
               variante="ghost"
             >
-              <Plus size={16} /> {vista === "lac" ? "Nuovo ordine LAC" : "Nuova busta"}
+              <Icona nome="piu" size={16} /> {vista === "lac" ? "Nuovo ordine LAC" : "Nuova busta"}
             </ButtonLink>
           }
         />

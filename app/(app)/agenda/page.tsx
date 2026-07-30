@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { Icona } from "@/components/Icone";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader, Card, ButtonLink, Badge, Vuoto, tintaFonte } from "@/components/ui";
 import { AzioniAppuntamento } from "@/components/AzioniAgenda";
@@ -115,7 +115,7 @@ export default async function AgendaPage({
         sotto={leggibile.charAt(0).toUpperCase() + leggibile.slice(1)}
         azione={
           <ButtonLink href={`/agenda/nuovo?data=${data}`} variante="accent">
-            <Plus size={16} /> Nuovo appuntamento
+            <Icona nome="piu" size={16} /> Nuovo appuntamento
           </ButtonLink>
         }
       />
@@ -146,13 +146,13 @@ export default async function AgendaPage({
 
       <div className="mb-4 flex items-center gap-2">
         <Link href={`/agenda?data=${prec}`} className="rounded-lg border border-linea bg-white p-2 text-soft hover:bg-carta" aria-label="Giorno precedente">
-          <ChevronLeft size={16} />
+          <Icona nome="freccia-sx" size={16} />
         </Link>
         <Link href="/agenda" className="rounded-lg border border-linea bg-white px-4 py-2 text-sm font-semibold text-inchiostro hover:bg-carta">
           Oggi
         </Link>
         <Link href={`/agenda?data=${succ}`} className="rounded-lg border border-linea bg-white p-2 text-soft hover:bg-carta" aria-label="Giorno successivo">
-          <ChevronRight size={16} />
+          <Icona nome="freccia-dx" size={16} />
         </Link>
       </div>
 
@@ -242,7 +242,7 @@ export default async function AgendaPage({
           testo="Nessun appuntamento per questo giorno."
           azione={
             <ButtonLink href={`/agenda/nuovo?data=${data}`} variante="ghost">
-              <Plus size={16} /> Nuovo appuntamento
+              <Icona nome="piu" size={16} /> Nuovo appuntamento
             </ButtonLink>
           }
         />

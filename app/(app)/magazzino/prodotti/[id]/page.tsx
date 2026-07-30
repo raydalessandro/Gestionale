@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Pencil } from "lucide-react";
+import { Icona } from "@/components/Icone";
 import { createClient } from "@/lib/supabase/server";
 import { Card, PageHeader, ButtonLink, Badge } from "@/components/ui";
 import {
@@ -68,7 +68,7 @@ export default async function ProdottoPage({
         titolo=""
         azione={
           <ButtonLink href={`/magazzino/prodotti/${p.id}/modifica`} variante="ghost">
-            <Pencil size={15} /> Modifica
+            <Icona nome="matita" size={15} /> Modifica
           </ButtonLink>
         }
       />

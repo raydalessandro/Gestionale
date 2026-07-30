@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { Search } from "lucide-react";
+import { Icona } from "@/components/Icone";
 import { creaBusta } from "@/lib/actions";
 import { createClient } from "@/lib/supabase/client";
 import type { PrescrizioneRow } from "@/lib/database.types";
@@ -161,7 +161,7 @@ export default function WizardBusta({
         {!cliente ? (
           <Card className="space-y-4">
             <div className="relative">
-              <Search
+              <Icona nome="cerca"
                 size={16}
                 className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-faint"
               />

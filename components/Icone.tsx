@@ -73,7 +73,20 @@ export type NomeIcona =
   | "freccia-sx"
   | "freccia-dx"
   | "giu"
-  | "tre-punti";
+  | "tre-punti"
+  /* ── otto disegnate col ramo 4 ────────────────────────────────────────
+   * Erano il costo dichiarato del set proprietario: «la sessantunesima va
+   * disegnata seguendo le regole, non presa altrove». Servivano tutte a
+   * togliere `lucide-react`, e ognuna copre un gesto che nel gestionale
+   * esiste davvero — non sono riempitivo di catalogo. */
+  | "luogo"
+  | "cliente-nuovo"
+  | "scatola-cerca"
+  | "scatola-piu"
+  | "agenda-piu"
+  | "segnalibro"
+  | "cursori"
+  | "bacchetta";
 
 export function Icona({
   nome,
@@ -166,4 +179,18 @@ const TRACCIATI: Record<NomeIcona, ReactElement> = {
   "freccia-dx": <><path d="M4 12h15.6M13.2 5.6L19.6 12l-6.4 6.4"/></>,
   "giu": <><path d="M5.6 9.2L12 15.6l6.4-6.4"/></>,
   "tre-punti": <><circle cx="5.4" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/><circle cx="18.6" cy="12" r="1.5" fill="currentColor" stroke="none"/></>,
+
+  /* ── ramo 4 ────────────────────────────────────────────────────────────
+   * Stessa grammatica delle sessanta: riquadro 24, area viva 2–22, tratto
+   * 1.75, nessun riempimento. Le quattro col «più» lo portano sempre nello
+   * stesso angolo, in basso a destra, con la stessa misura (croce da 6):
+   * così «aggiungi» si legge come una parola sola su tutte e quattro. */
+  "luogo": <><path d="M12 21.2s6.9-5.6 6.9-11.3a6.9 6.9 0 1 0-13.8 0c0 5.7 6.9 11.3 6.9 11.3z"/><circle cx="12" cy="9.7" r="2.6"/></>,
+  "cliente-nuovo": <><circle cx="9.4" cy="8" r="3.4"/><path d="M2.8 19.8c.7-3.4 3.3-5.2 6.6-5.2 1 0 2 .17 2.8.5"/><path d="M18 14.6v6M15 17.6h6"/></>,
+  "scatola-cerca": <><path d="M20.4 12.2V7.7L12 3.5 3.6 7.7v8.6l8.4 4.2 1.5-.75"/><path d="M3.6 7.7L12 11.9l8.4-4.2M12 11.9v8.6"/><circle cx="17.6" cy="16.8" r="3.1"/><path d="M19.9 19.1L22 21.2"/></>,
+  "scatola-piu": <><path d="M20.4 12.2V7.7L12 3.5 3.6 7.7v8.6l8.4 4.2 1.2-.6"/><path d="M3.6 7.7L12 11.9l8.4-4.2M12 11.9v8.6"/><path d="M18 14.6v6M15 17.6h6"/></>,
+  "agenda-piu": <><path d="M20.8 12.6V7.4a2.4 2.4 0 0 0-2.4-2.4H5.6A2.4 2.4 0 0 0 3.2 7.4v11.2A2.4 2.4 0 0 0 5.6 21h7.2"/><path d="M3.2 10h17.6M8 2.8v4.4M16 2.8v4.4"/><path d="M18 14.6v6M15 17.6h6"/></>,
+  "segnalibro": <><path d="M17.6 21L12 17.2 6.4 21V5.4a2.2 2.2 0 0 1 2.2-2.2h6.8a2.2 2.2 0 0 1 2.2 2.2z"/><path d="M12 7.6v5.2M9.4 10.2h5.2"/></>,
+  "cursori": <><path d="M3.2 7.6h6.2M14.6 7.6h6.2M3.2 16.4h3.8M12.2 16.4h8.6"/><circle cx="12" cy="7.6" r="2.6"/><circle cx="9.6" cy="16.4" r="2.6"/></>,
+  "bacchetta": <><path d="M3.4 20.6L13.8 10.2"/><path d="M15.6 2.8l1 2.4 2.4 1-2.4 1-1 2.4-1-2.4-2.4-1 2.4-1z"/><path d="M20.2 12.4l.66 1.6 1.6.66-1.6.66-.66 1.6-.66-1.6-1.6-.66 1.6-.66z"/></>,
 };

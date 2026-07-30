@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, UserPlus } from "lucide-react";
+import { Icona } from "@/components/Icone";
 import { createClient } from "@/lib/supabase/server";
 import { Card, PageHeader, ButtonLink, Badge, tintaFonte, Vuoto } from "@/components/ui";
 import { sottoScorta } from "@/components/MagazzinoUI";
@@ -78,7 +78,7 @@ export default async function DashboardPage() {
         sotto="Il polso del negozio, a colpo d'occhio."
         azione={
           <ButtonLink href="/clienti/nuovo" variante="accent">
-            <UserPlus size={16} /> Nuovo cliente
+            <Icona nome="cliente-nuovo" size={16} /> Nuovo cliente
           </ButtonLink>
         }
       />
@@ -174,7 +174,7 @@ export default async function DashboardPage() {
           testo="Il primo cliente è a un tap di distanza — da lì partono prescrizioni, ordini e tutto il resto."
           azione={
             <ButtonLink href="/clienti/nuovo" variante="ghost">
-              <Plus size={16} /> Aggiungi il primo cliente
+              <Icona nome="piu" size={16} /> Aggiungi il primo cliente
             </ButtonLink>
           }
         />

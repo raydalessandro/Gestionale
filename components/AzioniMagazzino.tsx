@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { PackagePlus, SlidersHorizontal, Minus, BookmarkPlus, Search } from "lucide-react";
+import { Icona } from "@/components/Icone";
 import {
   caricoDaBolla,
   registraMovimento,
@@ -35,16 +35,16 @@ export function AzioniProdotto({
     <div className="space-y-3">
       <div className="flex flex-wrap gap-2">
         <button type="button" onClick={() => toggle("carico")} className={`${btn} ${stili.primary}`}>
-          <PackagePlus size={16} /> Carico da bolla
+          <Icona nome="scatola-piu" size={16} /> Carico da bolla
         </button>
         <button type="button" onClick={() => toggle("rettifica")} className={`${btn} ${stili.ghost}`}>
-          <SlidersHorizontal size={16} /> Rettifica
+          <Icona nome="cursori" size={16} /> Rettifica
         </button>
         <button type="button" onClick={() => toggle("altro")} className={`${btn} ${stili.ghost}`}>
-          <Minus size={16} /> Altro movimento
+          <Icona nome="meno" size={16} /> Altro movimento
         </button>
         <button type="button" onClick={() => toggle("fermo")} className={`${btn} ${stili.ghost}`}>
-          <BookmarkPlus size={16} /> Nuovo fermo
+          <Icona nome="segnalibro" size={16} /> Nuovo fermo
         </button>
       </div>
 
@@ -205,7 +205,7 @@ function FormFermo({
           </div>
         ) : (
           <div className="relative">
-            <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-faint" />
+            <Icona nome="cerca" size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-faint" />
             <input value={term} onChange={(e) => setTerm(e.target.value)} placeholder="Cerca cliente…" className={`${inputCls} !pl-10`} />
             {risultati.length > 0 && (
               <div className="mt-1 divide-y divide-linea rounded-xl border border-linea bg-white">
