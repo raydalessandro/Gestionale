@@ -98,7 +98,47 @@ la forma attuale regge, se sono dieci il gruppo «richieste» va compattato.
 
 ---
 
-## 6 · Ritirate dalla revisione 1
+## 6 · Il telefono della richiesta in sospeso
+
+**Dove si vede.** La striscia dei sospesi in cima all'agenda, sotto il nome di chi
+ha prenotato. Il componente `StrisciaRichieste` lo accetta già: `telefono` è
+facoltativo e se manca non si vede niente.
+
+**Perché serve.** Spesso l'ottico non vuole accettare: vuole chiamare e chiedere —
+«guardi, sabato alle 9:30 ho già una consegna, le va bene alle 10?». Senza il
+numero deve aprire il giorno, aprire la scheda, tornare indietro, e a quel punto
+ha perso il filo. È l'unica voce di caso C dei rami 1–3.
+
+**Non serve nessuna migrazione.** La colonna esiste: `prenotazioni.contatto_telefono`,
+ed è già letta venti righe più su nella stessa pagina, per le prenotazioni del
+giorno. Manca solo nella lettura delle **sospese**, che sono una query diversa.
+
+**La modifica, per intero** — `app/(app)/agenda/page.tsx`, una parola:
+
+```diff
+   const { data: prenSosp } = sospIds.length
+     ? await supabase
+         .from("prenotazioni")
+-        .select("appuntamento_id, contatto_nome, servizio_codice")
++        .select("appuntamento_id, contatto_nome, contatto_telefono, servizio_codice")
+         .in("appuntamento_id", sospIds)
+     : { data: [] };
+```
+
+e poi, nel `map` che costruisce le richieste, una riga:
+
+```diff
+             cliente: pr?.contatto_nome ?? "Senza nome",
++            telefono: pr?.contatto_telefono,
+```
+
+**Perché non l'ho fatta io.** È una lettura di dati, e le letture sono fuori dal
+perimetro di chi fa design (consegna §2). La lascio scritta invece che applicata:
+è la regola, e il costo di applicarla è trenta secondi.
+
+---
+
+## 7 · Ritirate dalla revisione 1
 
 - **«Serve uno stato *da guardare* per le prenotazioni».** Esisteva dalla 013:
   `appuntamenti.stato` include `in_attesa`. Chiedevo una cosa già fatta.
@@ -109,7 +149,7 @@ la forma attuale regge, se sono dieci il gruppo «richieste» va compattato.
 
 ---
 
-## 7 · Cosa non ho chiesto, di proposito
+## 8 · Cosa non ho chiesto, di proposito
 
 - Nessuna coordinata, nessuna distanza — paletto 4.
 - Nessun punteggio né ordinamento per rilevanza — paletto 1.

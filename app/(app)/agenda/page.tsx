@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { ChevronLeft, ChevronRight, Plus, Clock } from "lucide-react";
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader, Card, ButtonLink, Badge, Vuoto, tintaFonte } from "@/components/ui";
 import { AzioniAppuntamento } from "@/components/AzioniAgenda";
+import { StrisciaRichieste } from "@/components/StrisciaRichieste";
 import { oraDi, oraFine, etichettaTipoApp, PillStatoApp } from "@/components/AgendaUI";
 import { ETICHETTE_FONTE, oggiRoma, istanteRomaISO } from "@/lib/utils";
 
@@ -120,42 +121,28 @@ export default async function AgendaPage({
       />
 
       {/* §2 · Le richieste in sospeso da oggi in avanti. Se non ce ne sono, niente
-          striscia: nessuno spazio vuoto che ricorda che manca qualcosa. */}
-      {sospesi.length > 0 && (
-        <Card className="mb-4 border-verde-200 bg-verde-50 !p-0">
-          <div className="flex items-center gap-2 border-b border-verde-200 px-5 py-2.5">
-            <Clock size={15} className="text-verde-700" />
-            <p className="text-sm font-semibold text-inchiostro">
-              {sospesi.length} {sospesi.length === 1 ? "richiesta in sospeso" : "richieste in sospeso"}
-            </p>
-          </div>
-          <ul className="divide-y divide-verde-200">
-            {sospesi.map((s) => {
-              const pr = prenSospByAppt.get(s.id);
-              const giorno = s.inizio.slice(0, 10);
-              return (
-                <li key={s.id}>
-                  <Link
-                    href={`/agenda?data=${giorno}`}
-                    className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 px-5 py-2.5 hover:bg-white/50"
-                  >
-                    <span className="text-sm font-semibold text-inchiostro">{giornoBreve(giorno)}</span>
-                    <span className="f-mono text-sm text-soft">{oraDi(s.inizio)}</span>
-                    {pr?.servizio_codice && (
-                      <span className="text-sm text-soft">
-                        · {nomeServizio.get(pr.servizio_codice) ?? pr.servizio_codice}
-                      </span>
-                    )}
-                    {pr?.contatto_nome && (
-                      <span className="text-sm font-medium text-inchiostro">· {pr.contatto_nome}</span>
-                    )}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </Card>
-      )}
+          striscia: nessuno spazio vuoto che ricorda che manca qualcosa.
+          Il blocco è passato in un componente: le letture qui sopra sono le
+          stesse di G8, cambia solo chi disegna la striscia. */}
+      <StrisciaRichieste
+        richieste={sospesi.map((s) => {
+          const pr = prenSospByAppt.get(s.id);
+          const giorno = s.inizio.slice(0, 10);
+          return {
+            id: s.id,
+            inizio: s.inizio,
+            giorno,
+            giornoEtichetta: giornoBreve(giorno),
+            servizio: pr?.servizio_codice
+              ? nomeServizio.get(pr.servizio_codice) ?? pr.servizio_codice
+              : "Richiesta dal portale",
+            cliente: pr?.contatto_nome ?? "Senza nome",
+            // Il telefono non c'è: la lettura delle sospese non lo porta.
+            // È l'unica voce di caso C del ramo — vedi docs/design/dati-mancanti.md §6.
+          };
+        })}
+      />
+      {/* fine §2 */}
 
       <div className="mb-4 flex items-center gap-2">
         <Link href={`/agenda?data=${prec}`} className="rounded-lg border border-linea bg-white p-2 text-soft hover:bg-carta" aria-label="Giorno precedente">
@@ -180,7 +167,16 @@ export default async function AgendaPage({
               return (
                 <div
                   key={a.id}
-                  className={`flex items-start gap-3 px-5 py-3.5${inAttesa ? " bg-verde-50" : ""}`}
+                  // La riga in attesa resta nella sequenza oraria del giorno, non
+                  // raccolta in cima: la posizione nell'orario È l'informazione che
+                  // serve per decidere se accettare. Si distingue col filetto verde
+                  // a sinistra — lo stesso segno dell'errore, sempre a sinistra,
+                  // sempre a dire «guarda qui prima» — e il fondo appena tinto.
+                  className={`flex items-start gap-3 py-3.5${
+                    inAttesa
+                      ? " border-l-[3px] border-l-verde-600 bg-verde-50 pl-[17px] pr-5"
+                      : " px-5"
+                  }`}
                 >
                   <div className="w-20 shrink-0">
                     <p className="f-mono text-sm font-semibold text-inchiostro">{oraDi(a.inizio)}</p>
