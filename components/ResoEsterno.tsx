@@ -29,7 +29,7 @@ export default function ResoEsterno({ metodi }: { metodi: { id: string; nome: st
   }, [term, cliente, supabase]);
 
   if (!aperto) {
-    return <button type="button" onClick={() => setAperto(true)} className="inline-flex items-center gap-2 rounded-xl bg-ottone px-4 py-2.5 text-sm font-semibold text-white hover:bg-ottone-scuro">Nuovo reso</button>;
+    return <button type="button" onClick={() => setAperto(true)} className="inline-flex items-center gap-2 rounded-xl bg-ambra-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-ambra-700">Nuovo reso</button>;
   }
   return (
     <form action={run} className="space-y-3 rounded-xl border border-linea bg-white p-4">
@@ -39,7 +39,7 @@ export default function ResoEsterno({ metodi }: { metodi: { id: string; nome: st
       {cliente ? (
         <div className="flex items-center justify-between rounded-xl border border-linea bg-carta px-3 py-2">
           <span className="text-sm font-semibold text-inchiostro">{cliente.cognome} {cliente.nome}</span>
-          <button type="button" onClick={() => setCliente(null)} className="text-xs font-semibold text-ottone-scuro hover:underline">Cambia</button>
+          <button type="button" onClick={() => setCliente(null)} className="text-xs font-semibold text-ambra-700 hover:underline">Cambia</button>
         </div>
       ) : (
         <div className="relative">

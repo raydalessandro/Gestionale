@@ -40,10 +40,10 @@ export default async function VenditaPage({ params }: { params: Promise<{ id: st
         <h1 className="f-mono text-3xl font-semibold text-inchiostro">{v.numero}</h1>
         <p className="mt-1 text-sm text-soft">
           {fmtQuando(v.data_vendita)} · {cliente ? <Link href={`/clienti/${cliente.id}`} className="hover:underline">{cliente.cognome} {cliente.nome}</Link> : "Non associato"}
-          {v.origine === "riallineamento" && <Badge tinta="ambra">Riallineamento</Badge>}
+          {v.origine === "riallineamento" && <Badge tinta="blu">Riallineamento</Badge>}
         </p>
         {fuoriQuadratura && (
-          <p className="mt-2 rounded-lg border border-ambra/40 bg-ambra-soft px-3 py-2 text-xs text-ambra">
+          <p className="mt-2 rounded border-l-[3px] border-blu-600 bg-blu-50 px-3 py-2 text-xs text-inchiostro">
             La giornata di questa vendita è già chiusa: la vendita è nella lista ma resta fuori dalle quadrature.
           </p>
         )}
@@ -64,7 +64,7 @@ export default async function VenditaPage({ params }: { params: Promise<{ id: st
           <tbody>
             {righe.map((r, i) => (
               <tr key={i} className="border-b border-linea/60">
-                <td className="py-2 text-inchiostro">{r.descrizione}{r.dm && <span className="ml-1 text-[10px] font-semibold text-ottone-scuro">DM</span>}</td>
+                <td className="py-2 text-inchiostro">{r.descrizione}{r.dm && <span className="ml-1 text-[10px] font-semibold text-ambra-700">DM</span>}</td>
                 <td className="py-2 text-soft">{etichettaAliquota(r.aliquota)}</td>
                 <td className="py-2 text-right f-mono tabular-nums">{r.quantita}</td>
                 <td className="py-2 text-right f-mono tabular-nums">{fmtEuro(r.prezzo_unitario)}</td>

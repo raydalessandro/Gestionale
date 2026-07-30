@@ -122,7 +122,7 @@ export default function WizardVendita({
         {cliente ? (
           <div className="flex items-center justify-between rounded-xl border border-linea bg-white px-3 py-2">
             <span className="text-sm font-semibold text-inchiostro">{cliente.cognome} {cliente.nome}</span>
-            {!consegna && <button type="button" onClick={() => setCliente(null)} className="text-xs font-semibold text-ottone-scuro hover:underline">Cambia</button>}
+            {!consegna && <button type="button" onClick={() => setCliente(null)} className="text-xs font-semibold text-ambra-700 hover:underline">Cambia</button>}
           </div>
         ) : (
           <div className="relative">
@@ -144,7 +144,7 @@ export default function WizardVendita({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-faint">Righe</p>
           <div className="flex flex-wrap gap-1.5">
-            <button type="button" onClick={() => setCatAperto((v) => !v)} className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${catAperto ? "border-inchiostro bg-inchiostro text-carta" : "border-ottone bg-ottone-soft text-ottone-scuro"}`}>
+            <button type="button" onClick={() => setCatAperto((v) => !v)} className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${catAperto ? "border-inchiostro bg-inchiostro text-carta" : "border-ambra-500 bg-ambra-50 text-ambra-700"}`}>
               <PackageSearch size={13} /> Da catalogo
             </button>
             <button type="button" onClick={() => setRighe((r) => [...r, { ...rigaVuota }])} className="inline-flex items-center gap-1.5 rounded-full border border-linea bg-white px-3 py-1 text-xs font-medium text-soft hover:border-faint hover:text-inchiostro">
@@ -269,7 +269,7 @@ export default function WizardVendita({
                 <>
                   <Field label="Data vendita (passata)" className="mt-2"><input name="data_vendita" type="date" value={dataVendita} onChange={(e) => setDataVendita(e.target.value)} className={inputCls} /></Field>
                   {giornoChiuso && (
-                    <p className="mt-2 rounded-lg border border-ambra/40 bg-ambra-soft px-3 py-2 text-xs text-ambra">
+                    <p className="mt-2 rounded border-l-[3px] border-blu-600 bg-blu-50 px-3 py-2 text-xs text-inchiostro">
                       Questa giornata è già chiusa: la vendita resterà fuori dalle quadrature (comparirà nella lista, non nella chiusura).
                     </p>
                   )}
@@ -282,7 +282,7 @@ export default function WizardVendita({
       </details>
 
       <div className="flex justify-end">
-        <button type="submit" disabled={inCorso || !righeValide || !quadra} className="rounded-xl bg-ottone px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-ottone-scuro disabled:opacity-50">
+        <button type="submit" disabled={inCorso || !righeValide || !quadra} className="rounded-xl bg-ambra-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-ambra-700 disabled:opacity-50">
           {inCorso ? "Registro…" : consegna ? "Consegna e incassa" : "Registra vendita"}
         </button>
       </div>

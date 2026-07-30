@@ -49,7 +49,7 @@ const btnBase =
 
 const btnVarianti = {
   primary: "bg-inchiostro text-carta hover:bg-black",
-  accent: "bg-ottone text-white hover:bg-ottone-scuro",
+  accent: "bg-ambra-500 text-white hover:bg-ambra-700",
   ghost:
     "border border-linea bg-white text-inchiostro hover:border-faint hover:bg-carta",
 } as const;
@@ -121,7 +121,7 @@ export function Field({
 }
 
 export const inputCls =
-  "w-full rounded-xl border border-linea bg-white px-3.5 py-2.5 text-sm text-inchiostro placeholder:text-faint focus:border-ottone focus:outline-none focus:ring-2 focus:ring-ottone-soft";
+  "w-full rounded-xl border border-linea bg-white px-3.5 py-2.5 text-sm text-inchiostro placeholder:text-faint focus:border-ambra-500 focus:outline-none focus:ring-2 focus:ring-ambra-100";
 
 export function Errore({ msg }: { msg?: string | null }) {
   if (!msg) return null;
@@ -136,11 +136,11 @@ export function Errore({ msg }: { msg?: string | null }) {
 
 const badgeTinte = {
   verde: "bg-verde-soft text-verde",
-  ambra: "bg-ambra-soft text-ambra",
+  ambra: "bg-ambra-50 text-ambra-700",
   blu: "bg-blu-soft text-blu",
   rosso: "bg-rosso-soft text-rosso",
   neutro: "bg-carta text-soft border border-linea",
-  ottone: "bg-ottone-soft text-ottone-scuro",
+  ottone: "bg-ambra-50 text-ambra-700",
 } as const;
 
 export function Badge({

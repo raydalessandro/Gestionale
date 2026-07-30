@@ -41,7 +41,7 @@ export default function Sidebar({
       {/* Wordmark */}
       <Link href="/dashboard" className="mr-2 flex items-baseline gap-1.5 md:mb-8 md:mr-0">
         <span className="f-serif text-xl font-semibold tracking-tight">VISTA</span>
-        <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-ottone">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.2em] text-ambra-600">
           gestionale
         </span>
       </Link>

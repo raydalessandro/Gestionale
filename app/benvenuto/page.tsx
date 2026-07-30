@@ -27,7 +27,7 @@ export default async function BenvenutoPage() {
         <span className="f-serif text-3xl font-semibold tracking-tight text-inchiostro">
           VISTA
         </span>
-        <span className="text-xs font-semibold uppercase tracking-[0.25em] text-ottone">
+        <span className="text-xs font-semibold uppercase tracking-[0.25em] text-ambra-600">
           gestionale
         </span>
       </div>

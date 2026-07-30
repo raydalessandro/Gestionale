@@ -12,9 +12,11 @@ function nn(s: string): number {
 
 function coloreDiff(d: number): string {
   const a = Math.abs(d);
-  if (a < 0.005) return "text-verde";
-  if (a <= 0.05) return "text-ambra";
-  return "text-rosso";
+  if (a < 0.005) return "text-verde-700";
+  // Sotto i cinque centesimi è tolleranza di cassa: esiste, non pesa. Grigio,
+  // non ambra — l'ambra è l'azione e uno scarto non chiede di premere niente.
+  if (a <= 0.05) return "text-neutro-700";
+  return "text-rosso-700";
 }
 
 export default function WizardChiusura({
@@ -129,7 +131,7 @@ export default function WizardChiusura({
           emesse {fmtEuro(caparre.emesse)} · scontate {fmtEuro(caparre.scontate)} · rese {fmtEuro(caparre.rese)} · incamerate {fmtEuro(caparre.incamerate)}
         </p>
         {caparre.senzaMetodo > 0 && (
-          <p className="text-[11px] text-ambra">
+          <p className="text-[11px] text-blu-700">
             Caparre senza metodo registrato: {fmtEuro(caparre.senzaMetodo)} (fuori dal conteggio per metodo).
           </p>
         )}
@@ -137,7 +139,7 @@ export default function WizardChiusura({
       </Card>
 
       <div className="flex justify-end">
-        <button type="submit" disabled={inCorso} className="rounded-xl bg-ottone px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-ottone-scuro disabled:opacity-50">
+        <button type="submit" disabled={inCorso} className="rounded-xl bg-ambra-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-ambra-700 disabled:opacity-50">
           {inCorso ? "Chiudo…" : "Chiudi la giornata"}
         </button>
       </div>

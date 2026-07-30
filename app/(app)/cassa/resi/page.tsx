@@ -30,7 +30,7 @@ export default async function ResiPage() {
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="f-mono text-sm font-semibold text-inchiostro">{r.numero}</span>
-                  <Badge tinta={r.tipo === "denaro" ? "ambra" : "neutro"}>{r.tipo === "denaro" ? "Rimborso" : "Gestionale"}</Badge>
+                  <Badge tinta={r.tipo === "denaro" ? "blu" : "neutro"}>{r.tipo === "denaro" ? "Rimborso" : "Gestionale"}</Badge>
                   {r.cliente_id && <span className="text-sm text-soft">{nomeCliente.get(r.cliente_id)}</span>}
                 </div>
                 <p className="mt-0.5 text-xs text-faint">

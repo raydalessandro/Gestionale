@@ -111,7 +111,7 @@ export default async function RichiamiPage() {
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <Badge tinta="ottone">{etichettaTipoRichiamo(r.tipo)}</Badge>
+                      <Badge tinta="neutro">{etichettaTipoRichiamo(r.tipo)}</Badge>
                       {c && r.cliente_id && (
                         <Link href={`/clienti/${r.cliente_id}`} className="text-sm font-semibold text-inchiostro hover:underline">
                           {c.cognome} {c.nome}
@@ -144,7 +144,7 @@ export default async function RichiamiPage() {
               <div key={r.id} className="flex items-center justify-between gap-2 px-5 py-3">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <Badge tinta="ottone">{etichettaTipoRichiamo(r.tipo)}</Badge>
+                    <Badge tinta="neutro">{etichettaTipoRichiamo(r.tipo)}</Badge>
                     {c && r.cliente_id && (
                       <Link href={`/clienti/${r.cliente_id}`} className="text-sm font-semibold text-inchiostro hover:underline">{c.cognome} {c.nome}</Link>
                     )}
@@ -174,7 +174,7 @@ export default async function RichiamiPage() {
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <Badge tinta="ottone">{etichettaTipoRichiamo(p.tipo)}</Badge>
+                    <Badge tinta="neutro">{etichettaTipoRichiamo(p.tipo)}</Badge>
                     <Link href={`/clienti/${p.cliente_id}`} className="text-sm font-semibold text-inchiostro hover:underline">{p.clienteNome}</Link>
                     {p.nonContattare && <Badge tinta="neutro">Non contattare</Badge>}
                   </div>

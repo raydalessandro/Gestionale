@@ -122,14 +122,14 @@ export default async function AgendaPage({
       {/* §2 · Le richieste in sospeso da oggi in avanti. Se non ce ne sono, niente
           striscia: nessuno spazio vuoto che ricorda che manca qualcosa. */}
       {sospesi.length > 0 && (
-        <Card className="mb-4 border-ottone/30 bg-ottone-soft/40 !p-0">
-          <div className="flex items-center gap-2 border-b border-ottone/20 px-5 py-2.5">
-            <Clock size={15} className="text-ottone-scuro" />
+        <Card className="mb-4 border-verde-200 bg-verde-50 !p-0">
+          <div className="flex items-center gap-2 border-b border-verde-200 px-5 py-2.5">
+            <Clock size={15} className="text-verde-700" />
             <p className="text-sm font-semibold text-inchiostro">
               {sospesi.length} {sospesi.length === 1 ? "richiesta in sospeso" : "richieste in sospeso"}
             </p>
           </div>
-          <ul className="divide-y divide-ottone/15">
+          <ul className="divide-y divide-verde-200">
             {sospesi.map((s) => {
               const pr = prenSospByAppt.get(s.id);
               const giorno = s.inizio.slice(0, 10);
@@ -180,7 +180,7 @@ export default async function AgendaPage({
               return (
                 <div
                   key={a.id}
-                  className={`flex items-start gap-3 px-5 py-3.5${inAttesa ? " bg-ottone-soft/40" : ""}`}
+                  className={`flex items-start gap-3 px-5 py-3.5${inAttesa ? " bg-verde-50" : ""}`}
                 >
                   <div className="w-20 shrink-0">
                     <p className="f-mono text-sm font-semibold text-inchiostro">{oraDi(a.inizio)}</p>
@@ -202,7 +202,7 @@ export default async function AgendaPage({
                         <Badge tinta={tintaFonte(a.fonte)}>{ETICHETTE_FONTE[a.fonte] ?? a.fonte}</Badge>
                       )}
                       {sovrappone.has(a.id) && (
-                        <span title="Si sovrappone" className="inline-block h-2 w-2 rounded-full bg-ambra" />
+                        <span title="Si sovrappone" className="inline-block h-2 w-2 rounded-full bg-rosso-500" />
                       )}
                     </div>
                     {/* §3 · chi ha prenotato (per le richieste): telefono, per conto di, servizio. */}

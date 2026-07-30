@@ -112,7 +112,7 @@ export default async function DashboardPage() {
       {nSottoScorta > 0 && (
         <Link
           href="/magazzino?vista=prodotti&filtro=sotto_scorta"
-          className="mb-6 flex items-center justify-between gap-2 rounded-xl border border-ambra/40 bg-ambra-soft px-4 py-3 text-sm font-medium text-ambra transition-colors hover:border-ambra"
+          className="mb-6 flex items-center justify-between gap-2 rounded-xl border border-ambra-200 bg-ambra-50 px-4 py-3 text-sm font-medium text-ambra-700 transition-colors hover:border-ambra-500"
         >
           <span>
             {nSottoScorta} prodott{nSottoScorta === 1 ? "o" : "i"} sotto scorta
@@ -130,7 +130,7 @@ export default async function DashboardPage() {
             </Link>
           )}
           {nRichiami > 0 && (
-            <Link href="/richiami" className="flex items-center justify-between gap-2 rounded-xl border border-ambra/40 bg-ambra-soft px-4 py-3 text-sm font-medium text-ambra transition-colors hover:border-ambra">
+            <Link href="/richiami" className="flex items-center justify-between gap-2 rounded-xl border border-ambra-200 bg-ambra-50 px-4 py-3 text-sm font-medium text-ambra-700 transition-colors hover:border-ambra-500">
               <span>Richiami da fare: {nRichiami}</span>
               <span aria-hidden>→</span>
             </Link>

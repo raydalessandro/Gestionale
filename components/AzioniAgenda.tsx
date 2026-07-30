@@ -17,7 +17,7 @@ const BTN_CHIARO =
 const BTN_ROSSO =
   "rounded-lg border border-rosso/40 bg-white px-3 py-1.5 text-xs font-semibold text-rosso hover:bg-rosso-soft disabled:opacity-50";
 const BTN_OTTONE =
-  "rounded-lg bg-ottone px-3 py-1.5 text-xs font-semibold text-white hover:bg-ottone-scuro disabled:opacity-50";
+  "rounded-lg bg-ambra-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-ambra-700 disabled:opacity-50";
 
 /**
  * Le azioni sulla riga d'agenda sono ORA consapevoli dello stato (§7):

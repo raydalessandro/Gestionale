@@ -70,7 +70,7 @@ export default function OnboardingForm({
         <button
           type="submit"
           disabled={inCorso}
-          className="w-full rounded-xl bg-ottone px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-ottone-scuro disabled:opacity-50"
+          className="w-full rounded-xl bg-ambra-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-ambra-700 disabled:opacity-50"
         >
           {inCorso ? "Creo il negozio…" : "Apri il gestionale"}
         </button>

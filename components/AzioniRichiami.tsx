@@ -15,7 +15,7 @@ const btn =
   "inline-flex items-center justify-center gap-2 rounded-xl px-3.5 py-2 text-xs font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50";
 const stili = {
   primary: "bg-inchiostro text-carta hover:bg-black",
-  accent: "bg-ottone text-white hover:bg-ottone-scuro",
+  accent: "bg-ambra-500 text-white hover:bg-ambra-700",
   ghost: "border border-linea bg-white text-inchiostro hover:border-faint hover:bg-carta",
 } as const;
 
@@ -184,7 +184,7 @@ export function NuovoRichiamo() {
 
   if (!aperto) {
     return (
-      <button type="button" onClick={() => setAperto(true)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-ottone px-4 py-2.5 text-sm font-semibold text-white hover:bg-ottone-scuro">
+      <button type="button" onClick={() => setAperto(true)} className="inline-flex items-center justify-center gap-2 rounded-xl bg-ambra-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-ambra-700">
         Nuovo richiamo
       </button>
     );
@@ -195,7 +195,7 @@ export function NuovoRichiamo() {
       {cliente ? (
         <div className="flex items-center justify-between rounded-xl border border-linea bg-carta px-3 py-2">
           <span className="text-sm font-semibold text-inchiostro">{cliente.cognome} {cliente.nome}</span>
-          <button type="button" onClick={() => setCliente(null)} className="text-xs font-semibold text-ottone-scuro hover:underline">Cambia</button>
+          <button type="button" onClick={() => setCliente(null)} className="text-xs font-semibold text-ambra-700 hover:underline">Cambia</button>
         </div>
       ) : (
         <div className="relative">

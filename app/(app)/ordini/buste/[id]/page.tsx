@@ -119,7 +119,7 @@ export default async function BustaPage({
                 </Link>
                 {cliente.telefono && (
                   <span className="flex items-center gap-1.5 text-sm text-soft">
-                    <Phone size={14} className="text-ottone" /> {cliente.telefono}
+                    <Phone size={14} className="text-ambra-600" /> {cliente.telefono}
                   </span>
                 )}
               </div>
@@ -192,7 +192,7 @@ export default async function BustaPage({
               <RigaEconomia label="Totale" valore={b.totale} />
             </div>
             <RigaEconomia label="Acconto" valore={b.acconto} />
-            <div className="rounded-xl bg-ottone-soft px-3 py-2">
+            <div className="rounded-xl bg-ambra-50 px-3 py-2">
               <RigaEconomia label="Saldo" valore={b.saldo} forte />
             </div>
           </Card>

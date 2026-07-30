@@ -26,7 +26,7 @@ export function SeedMetodi() {
   const [stato, run, inCorso] = useActionState(seedMetodiPagamento, null);
   return (
     <form action={run} className="space-y-2">
-      <button type="submit" disabled={inCorso} className={`${btn} bg-ottone text-white hover:bg-ottone-scuro`}>
+      <button type="submit" disabled={inCorso} className={`${btn} bg-ambra-500 text-white hover:bg-ambra-700`}>
         {inCorso ? "Creo…" : "Crea i metodi di base"}
       </button>
       <Errore msg={stato?.errore} />

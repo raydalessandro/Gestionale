@@ -91,7 +91,7 @@ export default async function OrdineLacPage({
               </Link>
               {cliente.telefono && (
                 <span className="flex items-center gap-1.5 text-sm text-soft">
-                  <Phone size={14} className="text-ottone" /> {cliente.telefono}
+                  <Phone size={14} className="text-ambra-600" /> {cliente.telefono}
                 </span>
               )}
             </div>

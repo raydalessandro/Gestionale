@@ -23,7 +23,7 @@ export default function PrescrizioneCard({ p }: { p: PrescrizioneRow }) {
         </Badge>
         {p.uso && <Badge tinta="neutro">{ETICHETTE_USO[p.uso] ?? p.uso}</Badge>}
         {p.origine === "esterna" && (
-          <Badge tinta="ottone">
+          <Badge tinta="blu">
             Ricetta esterna{p.esaminatore ? ` · ${p.esaminatore}` : ""}
           </Badge>
         )}

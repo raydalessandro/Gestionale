@@ -33,7 +33,7 @@ function IncameraCaparra({ bustaId, acconto }: { bustaId: string; acconto: numbe
     return <button type="button" onClick={() => setAperto(true)} className={`${btn} border border-linea bg-white text-inchiostro hover:bg-carta`}>Incamera caparra</button>;
   }
   return (
-    <form action={run} className="w-full space-y-2 rounded-xl border border-ottone bg-ottone-soft p-3">
+    <form action={run} className="w-full space-y-2 rounded-xl border border-ambra-500 bg-ambra-50 p-3">
       <p className="text-sm text-inchiostro">
         Trattieni la caparra di <span className="f-mono font-semibold">{fmtEuro(acconto)}</span> per mancato ritiro?
       </p>
@@ -42,7 +42,7 @@ function IncameraCaparra({ bustaId, acconto }: { bustaId: string; acconto: numbe
       </p>
       <Errore msg={stato?.errore} />
       <div className="flex gap-2">
-        <button type="submit" disabled={inCorso} className={`${btn} bg-ottone text-white hover:bg-ottone-scuro`}>{inCorso ? "…" : "Conferma incameramento"}</button>
+        <button type="submit" disabled={inCorso} className={`${btn} bg-ambra-500 text-white hover:bg-ambra-700`}>{inCorso ? "…" : "Conferma incameramento"}</button>
         <button type="button" onClick={() => setAperto(false)} className={`${btn} border border-linea bg-white text-inchiostro hover:bg-carta`}>Chiudi</button>
       </div>
     </form>

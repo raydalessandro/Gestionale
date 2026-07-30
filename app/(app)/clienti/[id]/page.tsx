@@ -148,7 +148,7 @@ export default async function ClientePage({
             </Badge>
             {eta !== null && <Badge tinta="neutro">{eta} anni</Badge>}
             {cliente.tutore_legale && (
-              <Badge tinta="ottone">Tutore: {cliente.tutore_legale}</Badge>
+              <Badge tinta="neutro">Tutore: {cliente.tutore_legale}</Badge>
             )}
             {cliente.non_contattare && <Badge tinta="neutro">Non contattare</Badge>}
             {cliente.consenso_marketing ? (
@@ -170,10 +170,10 @@ export default async function ClientePage({
                     key={i}
                     className={`flex items-center gap-2.5 text-sm ${preferito ? "font-semibold text-inchiostro" : "text-inchiostro"}`}
                   >
-                    <c.icona size={15} className="shrink-0 text-ottone" />
+                    <c.icona size={15} className="shrink-0 text-ambra-600" />
                     {c.testo}
                     {preferito && (
-                      <span className="rounded-md bg-ottone/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ottone-scuro">
+                      <span className="rounded-md bg-ambra-500/10 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-ambra-700">
                         {ETICHETTE_CANALE_PREFERITO[canalePreferito!] ?? "preferito"}
                       </span>
                     )}
@@ -256,7 +256,7 @@ export default async function ClientePage({
       {(fermiAttivi.count ?? 0) > 0 && (
         <Link
           href="/magazzino?vista=fermi&filtro=attivo"
-          className="mt-8 flex items-center justify-between gap-2 rounded-xl border border-ambra/40 bg-ambra-soft px-4 py-3 text-sm font-medium text-ambra transition-colors hover:border-ambra"
+          className="mt-8 flex items-center justify-between gap-2 rounded-xl border border-ambra-200 bg-ambra-50 px-4 py-3 text-sm font-medium text-ambra-700 transition-colors hover:border-ambra-500"
         >
           <span>
             Ha {fermiAttivi.count} articol{fermiAttivi.count === 1 ? "o" : "i"} fermat

@@ -27,7 +27,7 @@ export default async function ResoPage({ params }: { params: Promise<{ id: strin
       <div className="-mt-2 mb-6">
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="f-mono text-3xl font-semibold text-inchiostro">{r.numero}</h1>
-          <Badge tinta={r.tipo === "denaro" ? "ambra" : "neutro"}>{r.tipo === "denaro" ? "Rimborso" : "Gestionale"}</Badge>
+          <Badge tinta={r.tipo === "denaro" ? "blu" : "neutro"}>{r.tipo === "denaro" ? "Rimborso" : "Gestionale"}</Badge>
         </div>
         <p className="mt-1 text-sm text-soft">{fmtQuando(r.created_at)}{cliente ? <> · <Link href={`/clienti/${cliente.id}`} className="hover:underline">{cliente.cognome} {cliente.nome}</Link></> : ""}</p>
       </div>

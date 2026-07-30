@@ -60,7 +60,7 @@ export default function FormAppuntamento({
               <span className="text-sm font-semibold text-inchiostro">
                 {cliente.cognome} {cliente.nome}
               </span>
-              <button type="button" onClick={() => setCliente(null)} className="text-xs font-semibold text-ottone-scuro hover:underline">
+              <button type="button" onClick={() => setCliente(null)} className="text-xs font-semibold text-ambra-700 hover:underline">
                 Cambia
               </button>
             </div>
@@ -118,7 +118,7 @@ export default function FormAppuntamento({
       </Card>
 
       <div className="flex justify-end">
-        <button type="submit" disabled={inCorso} className="rounded-xl bg-ottone px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-ottone-scuro disabled:opacity-50">
+        <button type="submit" disabled={inCorso} className="rounded-xl bg-ambra-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-ambra-700 disabled:opacity-50">
           {inCorso ? "Salvo…" : "Salva appuntamento"}
         </button>
       </div>

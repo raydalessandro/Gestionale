@@ -18,7 +18,7 @@ export function AnnullaVendita({ id, daOrdine = false }: { id: string; daOrdine?
     <form action={run} className="w-full space-y-2 rounded-xl border border-linea p-3">
       <textarea name="motivo" rows={2} required placeholder="Motivo dell'annullo…" className={inputCls} />
       {daOrdine ? (
-        <p className="text-[11px] text-ambra">Vendita da un ordine: la merce è dal cliente, quindi il magazzino non rientra. Per riprendere la merce registra un reso con le righe che tornano.</p>
+        <p className="text-[11px] text-blu-700">Vendita da un ordine: la merce è dal cliente, quindi il magazzino non rientra. Per riprendere la merce registra un reso con le righe che tornano.</p>
       ) : (
         <p className="text-[11px] text-faint">Annullo consentito solo in giornata e prima della chiusura; la merce libera rientra a magazzino.</p>
       )}

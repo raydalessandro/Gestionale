@@ -112,14 +112,14 @@ export default function RegistratiPage() {
         <button
           type="submit"
           disabled={invio}
-          className="w-full rounded-xl bg-ottone px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-ottone-scuro disabled:opacity-50"
+          className="w-full rounded-xl bg-ambra-500 px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-ambra-700 disabled:opacity-50"
         >
           {invio ? "Un attimo…" : "Crea account"}
         </button>
       </form>
       <p className="mt-4 text-center text-sm text-soft">
         Hai già un account?{" "}
-        <Link href="/login" className="font-semibold text-ottone-scuro hover:underline">
+        <Link href="/login" className="font-semibold text-ambra-700 hover:underline">
           Accedi
         </Link>
       </p>
