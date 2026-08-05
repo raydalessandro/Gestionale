@@ -1,6 +1,6 @@
 # Ramo 6 · `design/scrivania`
 
-Portata dal prototipo `scrivania-ipad.html`. Il prototipo è **riferimento
+Portata dal prototipo, **revisione 2** (`limpidia-oggi.html`). Il prototipo è **riferimento
 visivo, non sorgente** (consegna §2): quello che segue è cosa ho preso, cosa ho
 corretto, e cosa non si può costruire finché qualcuno non decide.
 
@@ -150,35 +150,99 @@ segnate come finte.
 
 ---
 
-## 4 · Il conflitto vero: due gusci diversi
+## 4 · La revisione 2 · cosa ha chiuso e cosa resta
 
-Questo va risolto prima di andare avanti, perché **le due cose non possono
-stare insieme.**
+Il secondo prototipo (`limpidia-oggi.html`) corregge **quasi tutto** quello
+che avevo elencato nel §2. Lo scrivo per intero perché è la parte utile:
 
-| | ramo 4 (`Guscio.tsx`, già consegnato) | prototipo Scrivania |
+| §2 | nella revisione 2 |
+|---|---|
+| token sbagliati | **corretti**: `carta #F9EFEA`, `inchiostro #1D1511`, tutta la rampa neutra |
+| pelle 14/10px e due ombre | **corretta**: `--r:5px`, zero ombre |
+| caratteri del portale | **corretti**: Fraunces + Sora + JetBrains Mono |
+| il conflitto del guscio | **chiuso**: colonna a 212px, sei moduli, Clienti fuori, «Oggi» |
+| la riga contestuale mancante | **c'è**, ed è disegnata bene |
+
+E aggiunge due cose che non c'erano, su cui ha ragione e che ho adottato:
+
+**La colonna è bianca, non scura.** Al banco si sta davanti a questo schermo
+otto ore, e una fascia scura alta quanto la finestra è un peso che si paga
+tutto il giorno. C'è anche un guadagno tecnico: su bianco la voce attiva può
+usare `ambra-50`/`ambra-700` (**9.08**), mentre su fondo scuro l'ambra del
+marchio era vietata e serviva `ambra-300`.
+
+**La barra in cima non c'è più.** Ricerca e azioni sono scese nella colonna.
+Sparisce l'unica fascia orizzontale — 62px restituiti a ogni schermata, e su
+un tablet in orizzontale l'altezza è la risorsa scarsa. È il ragionamento di
+`DS-01 §4.1` portato fino in fondo, più di quanto l'avessi fatto io nel ramo 4.
+
+### Cosa resta da correggere
+
+**`faint` come testo, in tre punti.** È l'unico errore del §2 sopravvissuto,
+ed è lo stesso di prima:
+
+| dove | contrasto | serve |
 |---|---|---|
-| navigazione | **colonna** a sinistra, 212px | **barra orizzontale** in cima, 62px |
-| voci | **sei** — Clienti fuori | **sette** — Clienti dentro |
-| nome della prima | «Oggi» | «Scrivania» |
-| azione grande | «Nuova busta», nella colonna | «Nuovo», nella barra |
+| `.voce.finita` — ora e nome degli appuntamenti passati | **2.91** | 4.5 |
+| `.voce.pausa` — le righe di apertura e chiusura, 11.5px | **2.91** | 4.5 |
+| `.trova` — l'etichetta «Cerca cliente o busta» | **2.57** | 4.5 |
 
-E `DS-01 §4.1` è esplicito su tutti e quattro i punti, dalla parte del ramo 4:
-sei moduli, colonna a sinistra, «la colonna costa poco, ogni fascia orizzontale
-costa il doppio». Su un iPad in orizzontale l'altezza è la risorsa scarsa, e la
-barra ne prende 62px su ogni schermata.
+Nel ramo: `neutro-500` (4.67) per quello che va spento, `soft` (6.65) per la
+ricerca — che non è un segnaposto, è l'etichetta di un bersaglio.
 
-Anche il **nome della prima voce** ha ormai tre versioni: `Dashboard` nel
-registro (`lib/modules.ts`), «Oggi» nel guscio, «Scrivania» nel prototipo.
-Vanno ridotte a una.
+**Le due opacità della riga contestuale passano, ma di poco.** `ambra-700` al
+75% su `ambra-50` fa **4.82** su un corpo di 9.5px; l'80% fa 5.49. Sono legali.
+Ho messo il colore pieno lo stesso (**9.08**): non c'era niente da guadagnare a
+stare sul filo.
 
-**Nel ramo non ho toccato il guscio.** La Scrivania è contenuto: sta dentro
-qualunque guscio, e oggi sta dentro quello del ramo 4. Se vince la barra
-orizzontale, il ramo 4 si rifà — ma è una decisione, non una svista, e non la
-prendo dentro un commit.
+**Tre cose non toccate dalla revisione**, tutte già nel §2.6: `aria-pressed`
+sulle caselle di spunta invece di `role="checkbox"`; il cassetto con
+`aria-modal="true"` ma **senza fuoco intrappolato né ritorno del fuoco** — una
+promessa che il codice non mantiene; `viewport-fit=cover` senza
+`env(safe-area-inset-*)`.
 
----
+**Una nuova, e va detta perché è una trappola di implementazione.**
+«Adesso sono le 08:02» in testata: **un orologio reso dal server è già
+sbagliato quando la pagina arriva**, e con la cache di Next resta sbagliato per
+minuti. O è client, o non c'è. Nel ramo è dentro l'anteprima, quindi finto come
+tutto il resto, e c'è il commento che lo dice.
 
-## 5 · Cosa contiene il ramo, e cosa no
+### L'ambra è tre volte, e stavolta è una scelta
+
+«Nuova busta», la voce attiva, **e tutta la riga contestuale** — fondo
+`ambra-50`, bordo `ambra-200`, testo `ambra-700`. È la superficie ambra più
+grande dello schermo, ed è una terza. La regola dice due.
+
+Regge per un motivo solo, e lo scrivo perché va verificato al collaudo e non a
+tavolino: **la riga contestuale non c'è quasi mai.** Senza una scheda aperta le
+ambre sono due; quando compare, è perché è successo qualcosa che merita di
+essere la cosa più visibile della pagina. Se al banco si scopre che resta su
+per mezza giornata — e può succedere, basta dimenticarsi di chiudere — allora
+è ambra permanente su uno stato, cioè esattamente ciò che la regola vieta.
+Spegnerla a `neutro-100` è una riga.
+
+## 5 · Il conflitto del guscio · CHIUSO
+
+**La revisione 2 dà ragione al ramo 4 su tutti e quattro i punti**, e la
+questione si chiude qui. Colonna a 212px, sei moduli, Clienti fuori, e la prima
+voce si chiama **«Oggi»**.
+
+Resta una cosa sola, minima: `lib/modules.ts` chiama ancora quel modulo
+`Dashboard`. Il guscio lo rinomina con una mappa di due righe perché `lib/` è
+fuori perimetro. **Quando qualcuno rinomina il registro, la mappa `NOMI` si
+toglie, non si aggiorna.**
+
+## 6 · Com'era il conflitto, per memoria
+
+La revisione 1 aveva una **barra orizzontale con sette voci e Clienti dentro**;
+il ramo 4 una **colonna con sei e Clienti fuori**. Non potevano stare insieme, e
+l'avevo lasciato aperto invece di deciderlo dentro un commit. La revisione 2 ha
+scelto la colonna. Lo lascio scritto perché è il tipo di divergenza che ricapita
+ogni volta che un prototipo e un ramo camminano in parallelo: **il costo di
+lasciarla aperta è stato zero, quello di indovinare sarebbe stato un ramo da
+rifare.**
+
+## 7 · Cosa contiene il ramo, e cosa no
 
 | file | cosa |
 |---|---|
@@ -200,11 +264,11 @@ Escape — è un componente suo, non un pezzo di questa passata. Il secondo
 pannello (WhatsApp a più clienti) invece è quasi tutto costruibile: `waLink`
 e `messaggioRichiamo` esistono già in `OrdiniUI` e `lib/utils`.
 
-## 6 · Prima della PR
+## 8 · Prima della PR
 
 - [x] `npx tsc --noEmit` verde · `npm test` verde (142) · `next build` verde
 - [x] Nessun file in `supabase/`, `lib/`, `proxy.ts`, `app/layout.tsx` toccato
 - [x] Nessuna lettura di dati aggiunta
 - [x] Ambra due volte per schermata, contrasti verificati, raggio 5, zero ombre
-- [ ] **La decisione del §4 (colonna o barra) prima di andare avanti**
+- [x] La decisione sul guscio: **chiusa dalla revisione 2**, vince la colonna
 - [ ] Anteprima guardata da iPad in orizzontale — non l'ho potuta guardare

@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { PageHeader } from "@/components/ui";
 import { Icona } from "@/components/Icone";
+import { RigaContestuale } from "@/components/Guscio";
 import {
   ImpiantoScrivania,
   ProssimoAppuntamento,
@@ -61,7 +61,7 @@ const bottoncino =
   "inline-flex min-h-[44px] shrink-0 items-center gap-2 rounded border border-linea bg-white px-3.5 text-[13.5px] font-semibold text-inchiostro transition-colors duration-scatto hover:bg-carta";
 
 const AVVISARE: RigaScrivania[] = [
-  { id: "v1", q: "Paolo Neri", m: "Occhiali da vista · arrivati ieri", stato: { tinta: "grigio", testo: "da avvisare" }, azione: <span className={bottoncino}><Icona nome="messaggio" size={15} />WhatsApp</span> },
+  { id: "v1", q: "Paolo Neri", m: "Occhiali da vista · arrivati ieri", stato: { tinta: "neutro", testo: "da avvisare" }, azione: <span className={bottoncino}><Icona nome="messaggio" size={15} />WhatsApp</span> },
   { id: "v2", q: "Laura Verdi", m: "Lenti a contatto · arrivate stamattina", stato: { tinta: "blu", testo: "messaggio pronto" }, azione: <span className={bottoncino}><Icona nome="messaggio" size={15} />WhatsApp</span> },
   { id: "v3", q: "Franco Alberti", m: "Occhiali da sole · scritto il 03/08", stato: { tinta: "rosso", testo: "non risponde" }, azione: <span className={bottoncino}><Icona nome="telefono" size={15} />Chiama</span> },
 ];
@@ -92,7 +92,25 @@ export default function AnteprimaScrivania() {
         </Link>
       </div>
 
-      <PageHeader titolo="Scrivania" sotto="Martedì 4 agosto · Ottica Aurora" />
+      <div className="mb-5 flex flex-wrap items-end gap-3.5">
+        <h1 className="f-serif text-[25px] font-semibold tracking-tight text-inchiostro">Oggi</h1>
+        <span className="pb-0.5 text-sm text-soft">mercoledì 5 agosto</span>
+        {/* «Adesso sono le 08:02» è la sola cosa di questa schermata che va
+            resa dal client: un orologio reso dal server è già sbagliato
+            quando la pagina arriva, e con la cache di Next resta sbagliato
+            per minuti. Qui è finto come tutto il resto. */}
+        <span className="ml-auto pb-0.5 text-[13.5px] text-soft">
+          Adesso sono le <b className="font-mono text-sm font-semibold text-inchiostro">08:02</b>
+        </span>
+      </div>
+
+      <div className="-mx-4 mb-5 lg:-mx-5">
+        <RigaContestuale
+          chi="Marchetti Elena"
+          cosa="BL-2026-0141 · progressive, in lavorazione"
+          href="/ordini"
+        />
+      </div>
 
       <ImpiantoScrivania
         sinistra={

@@ -59,21 +59,23 @@ export function Etichetta({ children }: { children: ReactNode }) {
   );
 }
 
-type Tinta = "verde" | "blu" | "rosso" | "grigio";
+type Tinta = "verde" | "blu" | "rosso" | "neutro" | "spento";
 
 const TINTE: Record<Tinta, string> = {
-  verde: "bg-verde-50 border-verde-100 text-verde-700",
-  blu: "bg-blu-50 border-blu-100 text-blu-700",
-  rosso: "bg-rosso-50 border-rosso-100 text-rosso-700",
-  grigio: "bg-carta border-linea text-soft",
+  verde: "bg-verde-100 text-verde-700",
+  blu: "bg-blu-100 text-blu-700",
+  rosso: "bg-rosso-100 text-rosso-700",
+  // `neutro` è una fase che esiste, `spento` è una fase finita: due grigi
+  // diversi perché «da avvisare» e «consegnato» non pesano uguale.
+  neutro: "bg-neutro-200 text-neutro-700",
+  spento: "bg-neutro-100 text-neutro-600",
 };
 
 export function Stato({ tinta, children }: { tinta: Tinta; children: ReactNode }) {
   return (
     <span
-      className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-xs font-semibold ${TINTE[tinta]}`}
+      className={`inline-flex shrink-0 items-center whitespace-nowrap rounded px-2.5 py-1 text-[11.5px] font-semibold ${TINTE[tinta]}`}
     >
-      <i className="block h-1.5 w-1.5 shrink-0 rounded-full bg-current" />
       {children}
     </span>
   );
@@ -123,20 +125,21 @@ export function ProssimoAppuntamento({
     // Niente ombra, al contrario del prototipo: su carta tinta la scheda
     // bianca si solleva da sola, ed è il meccanismo di tutta l'applicazione.
     // Qui la scheda si distingue perché è l'unica col bordo pieno `linea`.
-    <section className="overflow-hidden rounded border border-linea bg-white">
+    <section className="overflow-hidden rounded border border-inchiostro bg-white">
       <div className="flex items-center gap-3 px-5 pt-4">
         <Etichetta>Prossimo appuntamento</Etichetta>
-        <span className="ml-auto inline-flex items-center gap-2 rounded-full border border-linea bg-carta px-3 py-1.5 text-[13px] font-semibold text-inchiostro">
-          <i className="block h-1.5 w-1.5 rounded-full bg-verde-500" />
+        <span className="ml-auto inline-flex items-center rounded border border-linea bg-carta px-3 py-1 text-[13px] font-semibold text-inchiostro">
           {prossimo.manca}
         </span>
       </div>
 
       <div className="flex flex-wrap items-baseline gap-x-4 px-5 pt-2">
-        <span className="f-serif text-[34px] font-semibold tabular-nums tracking-tight text-inchiostro">
+        {/* L'ora in mono con cifre tabellari: si legge in colonna e si
+            confronta, come i codici busta e le diottrie. */}
+        <span className="font-mono text-[31px] font-semibold leading-none tabular-nums text-inchiostro">
           {prossimo.ora}
         </span>
-        <span className="f-serif text-[30px] font-semibold tracking-tight text-inchiostro">
+        <span className="f-serif text-[27px] font-semibold tracking-tight text-inchiostro">
           {prossimo.chi}
         </span>
       </div>
@@ -419,7 +422,7 @@ export function ImpiantoScrivania({
   destra: ReactNode;
 }) {
   return (
-    <div className="grid gap-4 lg:grid-cols-[1.3fr_1fr]">
+    <div className="grid gap-4 lg:grid-cols-[1.28fr_1fr]">
       <div className="flex min-w-0 flex-col gap-4">{sinistra}</div>
       <div className="flex min-w-0 flex-col gap-4">{destra}</div>
     </div>
