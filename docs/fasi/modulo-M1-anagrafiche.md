@@ -217,6 +217,10 @@ scheda mostra una volta aperta al banco → superfici/PWA, parcheggiate
 al lavoro UI. In attesa: passata della collega (stasera).
 
 ## 10 · Congelamento
+**Annotazione 1 · 05/08 (checkpoint B1)** — `azienda_convenzionata_id`
+è FK a CLIENTI (l'ente convenzionato è una scheda cliente-ente, come
+il tutore-ente): il `references convenzioni` del §4 si legge così
+finché il modulo convenzioni non nascerà (ponte additive allora).
 (dopo il sigillo)
 
 ## 11-bis · Risposte finali (01/08) — il sigillo

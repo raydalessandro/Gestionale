@@ -267,6 +267,11 @@ tipologie ometteva `office` (restaurata in §2, che FA FEDE); la
 migrazione B2 la include. Inoltre: «prescrizioni_attivazioni: resta» è
 SUPERATO da f2x-definitivo — nessuna tabella: l'ordine è
 l'attivazione, la lettura è una proiezione (piano B2).
+**Annotazione 3 · 05/08 (checkpoint B1)** — il §4 rimandava a un DDL
+di `oculisti` mai scolpito (buco della fusione): RATIFICATA
+l'inferenza dell'esecutore — registro per azienda con nome, studio,
+citta, note, attivo e dedup su nome+studio normalizzati (fedele a
+f2b: la disambiguazione degli omonimi).
 **Annotazione 2 · 04/08 sera** — CONFERMATO da Ray, col requisito di
 lettura («ci dicono chi ha la Rx progressiva: info utili all'ottico;
 assicuriamoci di leggerle dal DB per la dashboard»): garanzia in piano
