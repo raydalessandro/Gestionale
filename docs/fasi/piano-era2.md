@@ -15,7 +15,11 @@ FASE X (dedicata, dopo): qui non si spreca contesto a girare.*
 - **Le default privileges sono CHIUSE (dalla 021, decisione 05/08)**:
   tabelle E funzioni nuove nascono senza grant ad anon/PUBLIC; le
   viste-portale ricevono grant ESPLICITO (VP-01). La 020 era la
-  fotografia, questa è l'invariante.
+  fotografia, questa è l'invariante. Perimetro (05/08): copre gli
+  oggetti delle NOSTRE migrazioni — quelli degli strumenti interni
+  Supabase (supabase_admin) restano fuori: la strada-che-registra
+  rende il residuo teorico; l'eventuale cintura dal dashboard è a
+  discrezione della regia.
 - **Errori di tenant**: sulle tabelle con `trg_tenant` il codice si
   aspetta SEMPRE `23514` (mai `23503`): il trigger parla prima delle
   FK, che restano rete di fondo. Nessun ramo di gestione su 23503.
