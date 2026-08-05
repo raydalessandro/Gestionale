@@ -32,7 +32,7 @@ Ogni capitolo inizia con una riga: `*Aggiornato a: v0.X (Fase N)*`.
 
 ## Fonti (in quest'ordine, e solo queste)
 
-1. **Le spec di fase** (`docs/fasi/fase-N-*.md`): la sezione *Regole di
+1. **Le spec di fase** (`docs/fasi/archivio/fase-N-*.md`): la sezione *Regole di
    dominio* dice come funziona davvero; la sezione *Collaudo* È già la
    sequenza dei gesti utente — i capitoli si costruiscono da lì.
 2. **La UI reale** del repo (etichette, nomi dei bottoni, testi): il manuale

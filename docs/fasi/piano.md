@@ -1,5 +1,11 @@
 # Piano delle fasi — da v0.1 a MIDO
 
+> **28/07/2026 — La campagna di completamento è aperta**: il piano
+> operativo dei prossimi tre mesi (moduli M1–M11, metodo, conti aperti)
+> vive in [`piano-completamento.md`](piano-completamento.md). Questo
+> file resta lo storico delle fasi 1–4 e delle G del portale; verrà
+> riscritto in M11 a campagna chiusa.
+
 Metodo di lavoro: per ogni fase (1) si scrive la **specifica** con le regole di
 dominio vincolanti, (2) si prepara il **DB** (migrazione additiva, mai
 distruttiva: il contratto v0.1 non si tocca), (3) si manda tutto a **Opus**

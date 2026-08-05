@@ -1,0 +1,131 @@
+{
+  "versione": "v1",
+  "aggiornato": "2026-08-04",
+  "principio": "La matrice è POLICY di piattaforma, non pietra: si cambia qui e nelle azioni, mai con migrazioni. Titolare e responsabile condividono la stessa policy. Enforcement nelle azioni (orchestrazione), firma utente_id sui fatti.",
+  "ruoli": [
+    "titolare",
+    "responsabile",
+    "ottico",
+    "addetto"
+  ],
+  "stessa_policy": [
+    [
+      "titolare",
+      "responsabile"
+    ]
+  ],
+  "matrice": {
+    "vendite": {
+      "titolare": true,
+      "responsabile": true,
+      "ottico": true,
+      "addetto": true
+    },
+    "resi": {
+      "titolare": true,
+      "responsabile": true,
+      "ottico": true,
+      "addetto": true
+    },
+    "ordini": {
+      "titolare": true,
+      "responsabile": true,
+      "ottico": true,
+      "addetto": true
+    },
+    "carico_bolle": {
+      "titolare": true,
+      "responsabile": true,
+      "ottico": true,
+      "addetto": true
+    },
+    "modifica_bolle": {
+      "titolare": true,
+      "responsabile": true,
+      "ottico": true,
+      "addetto": true
+    },
+    "scarichi_con_causale": {
+      "titolare": true,
+      "responsabile": true,
+      "ottico": true,
+      "addetto": true
+    },
+    "anagrafiche_consensi": {
+      "titolare": true,
+      "responsabile": true,
+      "ottico": true,
+      "addetto": true
+    },
+    "agenda": {
+      "titolare": true,
+      "responsabile": true,
+      "ottico": true,
+      "addetto": true
+    },
+    "richiami": {
+      "titolare": true,
+      "responsabile": true,
+      "ottico": true,
+      "addetto": true
+    },
+    "rettifiche_inventario": {
+      "titolare": true,
+      "responsabile": true,
+      "ottico": false,
+      "addetto": false
+    },
+    "parametri_negozio": {
+      "titolare": true,
+      "responsabile": true,
+      "ottico": false,
+      "addetto": false
+    },
+    "tarature_richiami": {
+      "titolare": true,
+      "responsabile": true,
+      "ottico": false,
+      "addetto": false
+    },
+    "servizi_portale": {
+      "titolare": true,
+      "responsabile": true,
+      "ottico": false,
+      "addetto": false
+    },
+    "gestione_utenti": {
+      "titolare": true,
+      "responsabile": true,
+      "ottico": false,
+      "addetto": false
+    },
+    "apertura_negozio": {
+      "titolare": true,
+      "responsabile": true,
+      "ottico": true,
+      "addetto": true
+    },
+    "chiusura_cassa_negozio": {
+      "titolare": true,
+      "responsabile": true,
+      "ottico": true,
+      "addetto": true,
+      "nota": "apre il primo che arriva, chiude l'ultimo che se ne va: roba quotidiana (04/08)"
+    },
+    "anonimizzazione": {
+      "titolare": true,
+      "responsabile": true,
+      "ottico": false,
+      "addetto": false,
+      "nota": "eliminazione definitiva protetta (C1, contratti-B1)"
+    }
+  },
+  "esaminatori_selezionabili": {
+    "ruoli": [
+      "titolare",
+      "responsabile",
+      "ottico"
+    ],
+    "nota": "NON è un permesso d'azione: è il FILTRO della lista esaminatori sulla Rx (M2). Tutti inseriscono prescrizioni; l'addetto non compare come esaminatore (abilitazione professionale, non divieto software). Il titolare di solito È ottico."
+  }
+}
