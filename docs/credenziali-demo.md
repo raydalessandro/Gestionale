@@ -6,7 +6,7 @@
 > script come variabili d'ambiente. In questo file c'è solo l'email pubblica.
 
 Due negozi dimostrativi, **completi e di colore opposto**, entrambi visibili in
-vetrina e accessibili dal gestionale (vedi `docs/fasi/fase-g5bis-dati-dimostrativi.md`).
+vetrina e accessibili dal gestionale (vedi `docs/fasi/archivio/fase-g5bis-dati-dimostrativi.md`).
 
 ## Negozio A — l'azienda con tutti i dati (insegna scura)
 

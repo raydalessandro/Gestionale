@@ -1,0 +1,43 @@
+{
+  "_titolo": "Il ponte con La Chiave — regole prese in prestito, consultabili",
+  "_natura": "METODOLOGICO: parla al metodo dell'Era 1, mai al codice. Interfaccia a senso unico: La Chiave → metodo → grammatica → database. Le sigle Σ non entrano mai nel DB, nel codice o nelle migrazioni.",
+  "_fonte": "Atlante de «La Grammatica delle Cose» (Ray D'Alessandro, EAR Lab · Spirale Editrice) · analisi e riconteggio del 28/07/2026 (72 stati, 444 archi, diametro 4)",
+  "_confermato": "Ray, 29/07/2026",
+
+  "scala_gravita": {
+    "_uso": "misura di ogni modifica proposta (spec, migrazione, UI) nelle camminate e nelle revisioni; il costo di un cambiamento è il livello più profondo che tocca (regola del massimo)",
+    "1_modo":      {"significa": "cambia la forma senza toccare il senso", "esempi": "rinominare un'etichetta, riordinare un form, riformulare un testo"},
+    "3_asse":      {"significa": "cambia struttura o profondità", "esempi": "spostare un campo di tabella, ristrutturare un flusso, aggiungere un livello"},
+    "6_polo":      {"significa": "inverte un significato o un verso", "esempi": "un default che da opt-in diventa opt-out, un segno che cambia direzione; quasi mai, e mai in silenzio"},
+    "9_attributo": {"significa": "cambia l'operazione fondamentale", "regola": "MAI in corsa; se inevitabile, da solo e per gradi — è la disciplina delle migrazioni additive e del vocabolario intoccabile detta in astratto"}
+  },
+
+  "domande_fisse_contro_interrogatorio": [
+    "1 · Cosa dovrà essere leggibile, un giorno, da questo gesto?",
+    "2 · Cosa fotografo adesso perché domani sarà diverso?",
+    "3 · Dov'è il GEMELLO di questo gesto? (ogni + ha il suo −, gestito o escluso per iscritto)"
+  ],
+
+  "registro_gemelli": {
+    "_uso": "generatore di completezza: ogni gesto che apre deve avere il gesto che chiude, o una riga scritta che spiega perché no. Stati: gestito (nel sistema) · progettato (sciolto in spec, esecuzione in Era 2) · da_verificare (si scioglie nella spec del modulo indicato) · escluso (con motivo)",
+    "coppie": [
+      {"piu": "carico merce", "meno": "scarico/rettifica con segno", "stato": "gestito", "dove": "movimenti_magazzino"},
+      {"piu": "vendita emessa", "meno": "reso / annullo guardato", "stato": "gestito", "dove": "resi + guardrail 4c"},
+      {"piu": "apertura busta", "meno": "annullo busta", "stato": "gestito", "dove": "transizioni + restituzione/incamero"},
+      {"piu": "caparra incassata", "meno": "restituita XOR incamerata", "stato": "gestito", "dove": "mutuamente esclusive, 4 contatori"},
+      {"piu": "fermo attivo", "meno": "ritirato / annullato (rilascio)", "stato": "gestito", "dove": "fermi.stato"},
+      {"piu": "incasso saldo consegna", "meno": "storno via reso", "stato": "gestito", "dove": "guardrail annullo"},
+      {"piu": "prodotto attivo", "meno": "spento (attivo=false)", "stato": "gestito", "dove": "registro, mai delete"},
+      {"piu": "rettifica inventario +", "meno": "rettifica −", "stato": "gestito", "dove": "quantità con segno"},
+      {"piu": "prenotazione accettata", "meno": "disdetta del cliente dal link firmato → annullata, slot libero, banco avvisato", "stato": "progettato", "dove": "spec M6 f6d"},
+      {"piu": "appuntamento prenotato", "meno": "annullato ✓ + riprogramma = annulla+ricrea legati (storia pulita)", "stato": "progettato", "dove": "spec M6 f6c"},
+      {"piu": "consenso dato (marketing/sanitario)", "meno": "revoca: tasto nei permessi → riga nel mastro, commerciali fermi subito, operativi leciti", "stato": "progettato", "dove": "spec M1 §3-f1e"},
+      {"piu": "prescrizione inserita", "meno": "rettifica per errore clinico (contro-scrittura, non riscrittura)", "stato": "da_verificare", "dove": "spec M2"},
+      {"piu": "utente assunto", "meno": "uscita/disattivazione (accessi, firma sui fatti passati)", "stato": "da_verificare", "dove": "spec M10"},
+      {"piu": "servizio pubblicato sul portale", "meno": "ritirato: il registro si spegne (attivo=false), storia intatta", "stato": "progettato", "dove": "spec M6 f6g"},
+      {"piu": "cliente registrato", "meno": "eliminazione definitiva protetta → anonimizzazione che preserva i fatti fiscali (possibile, non comodissima: scope dichiarato)", "stato": "progettato", "dove": "spec M1 §3-f1e"},
+      {"piu": "lista d'attesa: avvisata", "meno": "chiusa", "stato": "gestito", "dove": "lista_attesa.stato"},
+      {"piu": "vendita di merce poi difettosa", "meno": "la catena del difettoso: reso cliente (cassa) + reso a fornitore (magazzino), due fatti in due canali, ORCHESTRATI in un gesto guidato", "stato": "da_verificare", "dove": "spec M3+M8 (AR-01)"}
+    ]
+  }
+}

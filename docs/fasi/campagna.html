@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>limpidia · La campagna, in una mappa</title>
+<style>
+:root{
+  --inchiostro:#1C1714; --avorio:#F6F1EA; --carta:#FFFDF9;
+  --ottone:#A67C42; --ottone-scuro:#7A5A2E; --verde:#4A6B4F;
+  --linea:rgba(28,23,20,.16); --linea-forte:rgba(28,23,20,.34);
+  --serif:"Iowan Old Style",Georgia,"Times New Roman",serif;
+  --sans:-apple-system,system-ui,"Segoe UI",Roboto,sans-serif;
+  --mono:ui-monospace,"SF Mono",Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box;margin:0}
+html{-webkit-text-size-adjust:100%}
+body{background:var(--avorio);color:var(--inchiostro);font-family:var(--sans);
+  font-size:16px;line-height:1.45;padding:0 14px 80px}
+.tela{max-width:640px;margin:0 auto}
+
+header{padding:26px 2px 18px;border-bottom:2px solid var(--inchiostro)}
+.occhiello{font-family:var(--mono);font-size:11px;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--ottone-scuro)}
+h1{font-family:var(--serif);font-weight:600;font-size:30px;line-height:1.12;margin:6px 0 8px}
+.sotto{font-size:14px;color:rgba(28,23,20,.72);max-width:48ch}
+.totale{margin-top:14px}
+.totale b{font-family:var(--mono);font-size:12.5px;font-weight:600}
+.barra{height:4px;background:rgba(28,23,20,.12);margin:5px 0 10px;overflow:hidden}
+.barra i{display:block;height:100%;width:0%;transition:width .35s}
+.barra.doc i{background:var(--ottone)} .barra.flu i{background:var(--verde)}
+@media (prefers-reduced-motion:reduce){.barra i{transition:none}}
+
+.era{margin-top:34px}
+.era>h2{font-family:var(--serif);font-size:21px;font-weight:600;
+  padding-bottom:6px;border-bottom:1px solid var(--linea-forte)}
+.era>h2 small{font-family:var(--mono);font-size:11px;font-weight:400;
+  letter-spacing:.1em;color:var(--ottone-scuro);display:block;margin-bottom:2px}
+.era>p{font-size:13.5px;color:rgba(28,23,20,.7);margin:8px 0 0}
+.binario{list-style:none;padding:0;margin:18px 0 0;position:relative}
+.binario::before{content:"";position:absolute;left:11px;top:8px;bottom:8px;
+  width:2px;background:var(--linea)}
+.binario>li{position:relative;padding:0 0 22px 34px}
+.binario>li::before{content:"";position:absolute;left:5px;top:14px;width:14px;height:14px;
+  border-radius:50%;background:var(--avorio);border:2px solid var(--ottone)}
+.binario>li.pieno::before{background:var(--verde);border-color:var(--verde)}
+
+.busta{background:var(--carta);border:1px solid var(--linea-forte);
+  clip-path:polygon(0 0,calc(100% - 22px) 0,100% 22px,100% 100%,0 100%);
+  box-shadow:2px 3px 0 rgba(28,23,20,.10);padding:14px 14px 12px}
+.busta .riga1{display:flex;align-items:baseline;gap:10px}
+.timbro{font-family:var(--mono);font-size:12px;font-weight:700;letter-spacing:.06em;
+  border:1.6px solid var(--inchiostro);padding:2px 7px;transform:rotate(-2deg);
+  background:var(--carta)}
+.busta h3{font-family:var(--serif);font-size:18px;font-weight:600;flex:1}
+.conta{font-family:var(--mono);font-size:11.5px;color:var(--ottone-scuro);white-space:nowrap;text-align:right}
+.busta .desc{font-size:13px;color:rgba(28,23,20,.66);margin:5px 0 10px}
+.sez{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;
+  color:rgba(28,23,20,.55);margin:12px 0 2px}
+
+/* flussi — l'agenda dei racconti */
+.flusso{display:flex;gap:10px;align-items:flex-start;padding:8px 2px;
+  border-top:1px dashed var(--linea)}
+.chip{flex:none;width:26px;height:26px;border-radius:50%;border:2px solid var(--linea-forte);
+  background:var(--carta);cursor:pointer;font-size:12px;line-height:1;display:grid;place-content:center;
+  font-family:var(--mono);color:var(--inchiostro)}
+.chip[data-s="1"]{border-color:var(--ottone);background:var(--ottone);color:#fff}
+.chip[data-s="2"]{border-color:var(--verde);background:var(--verde);color:#fff}
+.chip:focus-visible{outline:2px solid var(--ottone);outline-offset:2px}
+.flusso .corpo{flex:1;min-width:0}
+.flusso .titolo{font-size:14.5px;cursor:pointer}
+.flusso[data-s="2"] .titolo{color:rgba(28,23,20,.55)}
+.flusso .nota{display:none;width:100%;margin-top:6px;border:1px solid var(--linea);
+  background:var(--avorio);padding:7px 9px;font:inherit;font-size:13px;min-height:36px;resize:vertical}
+.flusso.aperta .nota{display:block}
+.flusso .via{background:none;border:0;color:rgba(28,23,20,.4);font-size:16px;cursor:pointer;padding:0 4px}
+.legenda{font-family:var(--mono);font-size:10.5px;color:rgba(28,23,20,.55);margin:4px 0 0}
+
+/* documenti */
+.doc{display:flex;gap:10px;align-items:flex-start;padding:9px 2px;
+  border-top:1px dashed var(--linea);cursor:pointer}
+.doc input{appearance:none;-webkit-appearance:none;width:22px;height:22px;flex:none;
+  border:2px solid var(--inchiostro);background:var(--carta);margin-top:1px;cursor:pointer;
+  display:grid;place-content:center}
+.doc input:checked{background:var(--verde);border-color:var(--verde)}
+.doc input:checked::after{content:"✓";color:#fff;font-size:14px;font-weight:700;line-height:1}
+.doc input:focus-visible{outline:2px solid var(--ottone);outline-offset:2px}
+.doc span{font-size:14.5px}
+.doc.spuntato span{color:rgba(28,23,20,.5);text-decoration:line-through;
+  text-decoration-color:rgba(28,23,20,.35)}
+.badge{font-family:var(--mono);font-size:10px;letter-spacing:.08em;padding:1px 6px;
+  border:1px solid;margin-left:6px;white-space:nowrap;vertical-align:1px}
+.badge.casa{color:var(--verde);border-color:var(--verde)}
+.badge.dec{color:var(--ottone-scuro);border-color:var(--ottone)}
+.doc .via{margin-left:auto;background:none;border:0;color:rgba(28,23,20,.4);
+  font-size:16px;cursor:pointer;padding:0 4px}
+
+.aggiungi{display:flex;gap:8px;margin-top:10px}
+.aggiungi input{flex:1;border:1px solid var(--linea-forte);background:var(--avorio);
+  padding:9px 10px;font:inherit;font-size:14px;min-width:0}
+.aggiungi button,.azioni button{border:1.6px solid var(--inchiostro);background:var(--inchiostro);
+  color:var(--avorio);font:inherit;font-size:13.5px;padding:9px 14px;cursor:pointer}
+.aggiungi button{background:var(--carta);color:var(--inchiostro)}
+.appunti{width:100%;margin-top:10px;border:1px solid var(--linea);background:var(--avorio);
+  padding:9px 10px;font:inherit;font-size:14px;min-height:44px;resize:vertical}
+.appunti::placeholder,.aggiungi input::placeholder,.flusso .nota::placeholder{color:rgba(28,23,20,.4)}
+
+.semplice{background:var(--carta);border:1px solid var(--linea);padding:12px 14px;font-size:14px}
+.semplice li{margin:6px 0 6px 18px}
+.nota-mf{border-left:3px solid var(--ottone);padding:8px 12px;margin-top:16px;
+  font-size:13.5px;color:rgba(28,23,20,.75);background:var(--carta)}
+
+.azioni{display:flex;gap:10px;margin-top:26px;flex-wrap:wrap}
+.azioni .fantasma{background:var(--avorio);color:var(--inchiostro)}
+#uscita{width:100%;margin-top:12px;border:1px solid var(--linea-forte);background:var(--carta);
+  font-family:var(--mono);font-size:12px;padding:10px;min-height:120px;display:none}
+.eco{font-family:var(--mono);font-size:12px;color:var(--verde);margin-top:8px;min-height:16px}
+footer{margin-top:34px;font-size:12px;color:rgba(28,23,20,.5);font-family:var(--mono)}
+</style>
+</head>
+<body>
+<div class="tela">
+
+<header>
+  <div class="occhiello">limpidia · completamento del gestionale</div>
+  <h1>La campagna, in una mappa</h1>
+  <p class="sotto">Era 1 in due cacce: <b>i flussi</b> (Ray racconta, il chip fa tre
+  scatti: ○ da raccontare → ◐ raccontato → ● sigillato in spec) e
+  <b>i documenti</b> che li verificano. Tocca il titolo di un flusso per
+  appuntarci varianti e casi limite. Poi <i>Esporta per Claude</i>.</p>
+  <div class="totale">
+    <b id="tot-f">0 / 0 flussi raccontati</b>
+    <div class="barra flu"><i id="bar-f"></i></div>
+    <b id="tot-d">0 / 0 documenti recuperati</b>
+    <div class="barra doc"><i id="bar-d"></i></div>
+  </div>
+</header>
+
+<section class="era">
+  <h2><small>ora · 2–3 giorni</small>S0 · Fondazioni</h2>
+  <p>Codice, non racconti: l'unico consentito durante l'Era 1.</p>
+  <ul class="semplice" style="margin-top:12px">
+    <li>Diagnosi dell'incognita <b>§10</b> — timeout del wizard LAC «Da catalogo» (fix poi in M5)</li>
+    <li>Favicon + immagine OG del portale (<code>public/</code> oggi non esiste) — termine: primo negozio reale</li>
+    <li>Commento stale nello schema (<code>sito</code>→<code>sito_negozio</code>) — cosmetico</li>
+  </ul>
+</section>
+
+<section class="era">
+  <h2><small>29 lug → metà set · un modulo ogni 3–4 giorni</small>Era 1 · La grande specifica</h2>
+  <p>Il rito nuovo: <b>racconto</b> del flusso come al banco → contro-interrogatorio
+  di Claude («e se succedesse…?») → <b>triage a tre vie</b> (si gestisce così /
+  in negozio non accade / l'ottico lo sa già fare) → i manuali come verifica e
+  vocabolario → spec → camminata a tavolino → sigillo.</p>
+  <ol class="binario" id="moduli"></ol>
+</section>
+
+<section class="era">
+  <h2><small>chiusura Era 1 · 3–4 giorni</small>C0 · Passata di coerenza</h2>
+  <ul class="semplice" style="margin-top:12px">
+    <li>Rilettura incrociata di tutte le spec sigillate: anagrafica↔Rx↔busta↔cassa,
+    agenda↔portale, magazzino↔buste, LAC↔richiami</li>
+    <li>Regola rossa degli intrecci: le letture possono vivere sul fronte;
+    <b>denaro e giacenza si muovono solo lato server</b></li>
+    <li>Esce il verbale C0 e l'ordine definitivo d'esecuzione</li>
+  </ul>
+</section>
+
+<section class="era">
+  <h2><small>metà set → fine ott (buffer: novembre)</small>Era 2 · L'esecuzione</h2>
+  <ul class="semplice" style="margin-top:12px">
+    <li>Modulo per modulo, a spec <b>congelate</b>: test prima (contratto + E2E del
+    flusso completo) → codice → CI verde → manuale → collaudo S dal vivo</li>
+    <li>I cinque <code>fixme</code> ereditati si riscrivono qui: LAC in M5, cassa in M8</li>
+    <li><b>M11 · Collaudo generale</b>: l'E2E «la settimana del negozio», manuale v1.0</li>
+  </ul>
+  <div class="nota-mf"><b>MF · Fiscalità</b> — dopo, coi commercialisti: modulo di
+  confine su transazioni chiuse, append-only (decisione FI-01). Nel core i numeri
+  restano al netto d'IVA, e basta.</div>
+</section>
+
+<div class="azioni">
+  <button id="esporta">Esporta per Claude</button>
+  <button id="copia" class="fantasma" style="display:none">Copia il testo</button>
+  <button id="azzera" class="fantasma">Azzera tutto</button>
+</div>
+<textarea id="uscita" readonly></textarea>
+<div class="eco" id="eco"></div>
+
+<footer>docs/fasi/campagna.html · si salva da solo su questo dispositivo · v2 — 28/07/2026</footer>
+</div>
+
+<script>
+const MODULI = [
+ {id:"M1", nome:"Anagrafiche & Privacy", giorni:"3–4 gg",
+  desc:"La scheda cliente a regime, i consensi, l'anonimizzazione GDPR.",
+  flussi:[
+   {id:"f1a", t:"Nuovo cliente al banco (scheda completa, consensi)"},
+   {id:"f1b", t:"Cliente veloce / di passaggio: dati minimi"},
+   {id:"f1c", t:"Aggiornamento recapiti o consensi a distanza di tempo"},
+   {id:"f1d", t:"Minore con tutore legale"},
+   {id:"f1e", t:"Richiesta di cancellazione dati"}],
+  docs:[
+   {id:"m1a", t:"Moduli consenso marketing (catena)"},
+   {id:"m1b", t:"Informativa privacy completa consegnata al cliente"},
+   {id:"m1c", t:"Modulo consenso dati sanitari"},
+   {id:"m1d", t:"Procedura cancellazione / anonimizzazione"},
+   {id:"m1e", t:"Schermate CIAO! anagrafica restanti", casa:true},
+   {id:"m1f", t:"Regolamento privacy interno del negozio"}]},
+ {id:"M2", nome:"Prescrizioni", giorni:"3–4 gg",
+  desc:"La Rx come la fa un ottico vero, storia compresa.",
+  flussi:[
+   {id:"f2a", t:"Rx da controllo vista interno"},
+   {id:"f2b", t:"Rx portata da oculista esterno"},
+   {id:"f2c", t:"Rinnovo: si riparte dalla Rx precedente"},
+   {id:"f2d", t:"Rx LAC dopo la prova applicativa"},
+   {id:"f2e", t:"Rx scaduta: cosa si può fare e cosa no"}],
+  docs:[
+   {id:"m2a", t:"Scheda Rx completa di catena (fronte/retro)"},
+   {id:"m2b", t:"Tabelle visus / acuità in uso"},
+   {id:"m2c", t:"Scheda clinica LAC (cheratometria, prova)"},
+   {id:"m2d", t:"Esempio di refertazione oculista esterna"},
+   {id:"m2e", t:"Regole di validità della ricetta (documento)"}]},
+ {id:"M3", nome:"Catalogo & Magazzino", giorni:"4–5 gg",
+  desc:"Inventario a due livelli, valore sugli smaltimenti, import.",
+  flussi:[
+   {id:"f3a", t:"Arrivo merce con bolla: il carico"},
+   {id:"f3b", t:"Inventario di fine periodo (conta e rettifiche)"},
+   {id:"f3c", t:"Rottura / smaltimento (551)"},
+   {id:"f3d", t:"Reso a fornitore"},
+   {id:"f3e", t:"Fermo merce per un cliente"},
+   {id:"f3f", t:"Prodotto nuovo a catalogo (da listino o a mano)"}],
+  docs:[
+   {id:"m3a", t:"Procedura inventario completa"},
+   {id:"m3b", t:"Report On-Hand per marchio e per SKU", casa:true},
+   {id:"m3c", t:"Bolle / ricevimento merce (esempi)"},
+   {id:"m3d", t:"Listini fornitore + tracciati di import"},
+   {id:"m3e", t:"Documento 551 rottamazione", casa:true},
+   {id:"m3f", t:"Procedure resi a fornitore", casa:true}]},
+ {id:"M4", nome:"Buste & Laboratorio", giorni:"4–5 gg",
+  desc:"La montatura scarica il magazzino, il laboratorio ha i suoi stati.",
+  flussi:[
+   {id:"f4a", t:"Occhiale completo da Rx: la busta tipo, dall'apertura al ritiro"},
+   {id:"f4b", t:"Solo lenti su montatura del cliente"},
+   {id:"f4c", t:"Solo montatura"},
+   {id:"f4d", t:"Riparazione / garanzia"},
+   {id:"f4e", t:"Caparra all'apertura, saldo al ritiro"},
+   {id:"f4f", t:"Lavoro urgente / promessa stretta"},
+   {id:"f4g", t:"Cliente che non ritira: solleciti e incamero"}],
+  docs:[
+   {id:"m4a", t:"Buste lavoro compilate — 3–4 casi diversi"},
+   {id:"m4b", t:"Modulo ordine lenti / laboratorio"},
+   {id:"m4c", t:"Tabelle di montaggio (altezze, DNP)"},
+   {id:"m4d", t:"Check di qualità alla consegna"}]},
+ {id:"M5", nome:"LAC", giorni:"3–4 gg",
+  desc:"Riordino rapido, finestra dalla consegna, l'incognita §10 chiusa.",
+  flussi:[
+   {id:"f5a", t:"Prima applicazione con prova"},
+   {id:"f5b", t:"Riordino abituale: cliente che chiama o passa"},
+   {id:"f5c", t:"Ordine arrivato → avviso → ritiro"},
+   {id:"f5d", t:"Cliente che sparisce: il win-back"}],
+  docs:[
+   {id:"m5a", t:"Scheda applicazione LAC"},
+   {id:"m5b", t:"Protocollo prova e porto"},
+   {id:"m5c", t:"Schemi di riordino"},
+   {id:"m5d", t:"Registro consegne lenti di prova"}]},
+ {id:"M6", nome:"Agenda & Prenotazioni", giorni:"3 gg",
+  desc:"Riprogramma, sale e blocchi rifiniti, banco+portale una cosa sola.",
+  flussi:[
+   {id:"f6a", t:"Prenotazione dal portale (già viva): cosa vede il banco"},
+   {id:"f6b", t:"Appuntamento preso al banco o al telefono"},
+   {id:"f6c", t:"«Posso venire domani invece?» — lo spostamento"},
+   {id:"f6d", t:"No-show e come si recupera"},
+   {id:"f6e", t:"Blocco agenda: ferie, riunione, sala occupata"}],
+  docs:[
+   {id:"m6a", t:"Regole appuntamenti di catena (durate, tipi)"},
+   {id:"m6b", t:"DECISIONE §12 — tassonomia servizi↔visite", dec:true}]},
+ {id:"M7", nome:"Richiami", giorni:"3 gg",
+  desc:"Le tarature dei motori, gli esiti, il Fondo Est predisposto.",
+  flussi:[
+   {id:"f7a", t:"Il giro richiami del lunedì: lista → telefonate → esiti"},
+   {id:"f7b", t:"Richiamo controllo annuale"},
+   {id:"f7c", t:"Richiamo LAC in esaurimento"},
+   {id:"f7d", t:"Compleanno / promozione"}],
+  docs:[
+   {id:"m7a", t:"Script di richiamo di catena", casa:true},
+   {id:"m7b", t:"Matrice tempi / tipologie di richiamo"}]},
+ {id:"M8", nome:"Cassa & Resi (non fiscale)", giorni:"4–5 gg",
+  desc:"Rifiniture, riconciliazioni, numeri al netto d'IVA.",
+  flussi:[
+   {id:"f8a", t:"Vendita veloce a banco"},
+   {id:"f8b", t:"Consegna busta con saldo (e caparra scalata)"},
+   {id:"f8c", t:"Reso con rimborso"},
+   {id:"f8d", t:"Chiusura serale con quadratura"},
+   {id:"f8e", t:"Spesa o prelievo di cassa"},
+   {id:"f8f", t:"Caparra incamerata dopo i solleciti"}],
+  docs:[
+   {id:"m8a", t:"Chiusure giornaliere campione", casa:true},
+   {id:"m8b", t:"Elenco causali resi completo"},
+   {id:"m8c", t:"Procedure fondo cassa / versamenti"}]},
+ {id:"M9", nome:"Report & Export", giorni:"3 gg",
+  desc:"La dashboard che dice il vero, l'export TS-ready.",
+  flussi:[
+   {id:"f9a", t:"Il lunedì del titolare: che numeri guarda davvero"},
+   {id:"f9b", t:"Estrazione spese sanitarie per commercialista / TS"}],
+  docs:[
+   {id:"m9a", t:"Report direzionali / KPI di catena"},
+   {id:"m9b", t:"Specifiche pubbliche tracciato Sistema TS"}]},
+ {id:"M10", nome:"Utenti, Ruoli & Onboarding", giorni:"3 gg",
+  desc:"La matrice permessi vera, la nascita del negozio che semina tutto.",
+  flussi:[
+   {id:"f10a", t:"Arriva un nuovo addetto: cosa può fare, cosa no"},
+   {id:"f10b", t:"Nasce un negozio: la semina del primo giorno"},
+   {id:"f10c", t:"Cambio di ruolo o uscita di un collaboratore"}],
+  docs:[
+   {id:"m10a", t:"Mansionari / permessi per ruolo"},
+   {id:"m10b", t:"Checklist apertura nuovo negozio"},
+   {id:"m10c", t:"DECISIONE §11 — seed metodi alla nascita", dec:true},
+   {id:"m10d", t:"DECISIONE — multi-sede: fare o rimandare", dec:true}]}
+];
+
+const CHIAVE = "limpidia-campagna-v1";
+let stato = {spunte:{}, extra:{}, note:{}, flu:{}, fluExtra:{}, fluNote:{}};
+try { const s = localStorage.getItem(CHIAVE); if (s) Object.assign(stato, JSON.parse(s)); } catch(e){}
+function salva(){ try{ localStorage.setItem(CHIAVE, JSON.stringify(stato)); }catch(e){} }
+
+const SIMBOLI = ["○","◐","●"];
+const $moduli = document.getElementById("moduli");
+
+function spuntato(d){ return (d.id in stato.spunte) ? !!stato.spunte[d.id] : !!d.casa; }
+function statoFlu(id){ return stato.flu[id] || 0; }
+
+function rendi(){
+  $moduli.innerHTML = "";
+  for (const m of MODULI){
+    const li = document.createElement("li");
+    const exF = stato.fluExtra[m.id] || [];
+    const flussi = [...m.flussi, ...exF.map((t,i)=>({id:m.id+"-fx"+i, t, aggiunto:true}))];
+    const exD = stato.extra[m.id] || [];
+    const docs = [...m.docs.map(d=>({...d})), ...exD.map((t,i)=>({id:m.id+"-x"+i, t, aggiunto:true}))];
+    const fRacc = flussi.filter(f=>statoFlu(f.id)>=1).length;
+    const dFatti = docs.filter(d=>spuntato(d)).length;
+    if (flussi.every(f=>statoFlu(f.id)===2) && docs.every(d=>spuntato(d))) li.classList.add("pieno");
+    li.innerHTML = `<div class="busta">
+      <div class="riga1"><span class="timbro">${m.id}</span>
+        <h3>${m.nome}</h3>
+        <span class="conta">flussi ${fRacc}/${flussi.length}<br>doc ${dFatti}/${docs.length} · ${m.giorni}</span></div>
+      <div class="desc">${m.desc}</div>
+      <div class="sez">I flussi del banco</div>
+      <div class="flussi"></div>
+      <div class="aggiungi af"><input type="text" placeholder="Aggiungi un flusso…"
+        aria-label="Nuovo flusso ${m.id}"><button type="button">Aggiungi</button></div>
+      <div class="sez">I documenti</div>
+      <div class="docs"></div>
+      <div class="aggiungi ad"><input type="text" placeholder="Aggiungi un documento…"
+        aria-label="Nuovo documento ${m.id}"><button type="button">Aggiungi</button></div>
+      <textarea class="appunti" placeholder="Appunti del modulo…"
+        aria-label="Appunti ${m.id}">${stato.note[m.id]||""}</textarea>
+    </div>`;
+    const boxF = li.querySelector(".flussi");
+    for (const f of flussi){
+      const s = statoFlu(f.id);
+      const r = document.createElement("div");
+      r.className = "flusso" + ((stato.fluNote[f.id]||"").trim() ? " aperta" : "");
+      r.dataset.s = s;
+      r.innerHTML = `<button type="button" class="chip" data-s="${s}"
+          title="da raccontare → raccontato → sigillato" aria-label="Stato ${f.t}">${SIMBOLI[s]}</button>
+        <div class="corpo"><div class="titolo">${f.t}</div>
+        <textarea class="nota" placeholder="Varianti, casi limite, appunti…">${stato.fluNote[f.id]||""}</textarea></div>
+        ${f.aggiunto?'<button type="button" class="via" title="Togli" aria-label="Togli">×</button>':''}`;
+      r.querySelector(".chip").addEventListener("click", ()=>{
+        stato.flu[f.id] = (statoFlu(f.id)+1)%3; salva(); rendi();
+      });
+      r.querySelector(".titolo").addEventListener("click", ()=>{ r.classList.toggle("aperta"); });
+      r.querySelector(".nota").addEventListener("input", ev=>{ stato.fluNote[f.id]=ev.target.value; salva(); });
+      const via = r.querySelector(".via");
+      if (via) via.addEventListener("click", ()=>{
+        const i = Number(f.id.split("-fx")[1]);
+        stato.fluExtra[m.id].splice(i,1); delete stato.flu[f.id]; delete stato.fluNote[f.id]; salva(); rendi();
+      });
+      boxF.appendChild(r);
+    }
+    const boxD = li.querySelector(".docs");
+    for (const d of docs){
+      const r = document.createElement("label");
+      r.className = "doc" + (spuntato(d) ? " spuntato" : "");
+      r.innerHTML = `<input type="checkbox" ${spuntato(d)?"checked":""}>
+        <span>${d.t}${d.casa?'<span class="badge casa">in casa</span>':''}${d.dec?'<span class="badge dec">decisione</span>':''}</span>
+        ${d.aggiunto?'<button type="button" class="via" title="Togli" aria-label="Togli">×</button>':''}`;
+      r.querySelector("input").addEventListener("change", ev=>{
+        stato.spunte[d.id] = ev.target.checked; salva(); rendi();
+      });
+      const via = r.querySelector(".via");
+      if (via) via.addEventListener("click", ev=>{
+        ev.preventDefault();
+        const i = Number(d.id.split("-x")[1]);
+        stato.extra[m.id].splice(i,1); delete stato.spunte[d.id]; salva(); rendi();
+      });
+      boxD.appendChild(r);
+    }
+    li.querySelector(".af button").addEventListener("click", ()=>{
+      const inp = li.querySelector(".af input"); const t = inp.value.trim(); if (!t) return;
+      (stato.fluExtra[m.id] = stato.fluExtra[m.id] || []).push(t);
+      inp.value = ""; salva(); rendi();
+    });
+    li.querySelector(".ad button").addEventListener("click", ()=>{
+      const inp = li.querySelector(".ad input"); const t = inp.value.trim(); if (!t) return;
+      (stato.extra[m.id] = stato.extra[m.id] || []).push(t);
+      inp.value = ""; salva(); rendi();
+    });
+    li.querySelector(".appunti").addEventListener("input", ev=>{
+      stato.note[m.id] = ev.target.value; salva();
+    });
+    $moduli.appendChild(li);
+  }
+  totale();
+}
+function totale(){
+  let tF=0,fF=0,tD=0,fD=0;
+  for (const m of MODULI){
+    const exF = stato.fluExtra[m.id] || [];
+    const flussi = [...m.flussi, ...exF.map((t,i)=>({id:m.id+"-fx"+i}))];
+    tF += flussi.length; fF += flussi.filter(f=>statoFlu(f.id)>=1).length;
+    const exD = stato.extra[m.id] || [];
+    const docs = [...m.docs, ...exD.map((t,i)=>({id:m.id+"-x"+i}))];
+    tD += docs.length; fD += docs.filter(d=>spuntato(d)).length;
+  }
+  document.getElementById("tot-f").textContent = `${fF} / ${tF} flussi raccontati`;
+  document.getElementById("bar-f").style.width = tF? (100*fF/tF)+"%":"0%";
+  document.getElementById("tot-d").textContent = `${fD} / ${tD} documenti recuperati`;
+  document.getElementById("bar-d").style.width = tD? (100*fD/tD)+"%":"0%";
+}
+
+document.getElementById("esporta").addEventListener("click", ()=>{
+  const oggi = new Date().toLocaleDateString("it-IT");
+  let r = `CAMPAGNA limpidia — stato al ${oggi}\n`;
+  for (const m of MODULI){
+    const exF = stato.fluExtra[m.id] || [];
+    const flussi = [...m.flussi, ...exF.map((t,i)=>({id:m.id+"-fx"+i, t, aggiunto:true}))];
+    const exD = stato.extra[m.id] || [];
+    const docs = [...m.docs.map(d=>({...d})), ...exD.map((t,i)=>({id:m.id+"-x"+i, t, aggiunto:true}))];
+    r += `\n${m.id} · ${m.nome}\n`;
+    r += ` Flussi:\n`;
+    for (const f of flussi){
+      r += `  ${SIMBOLI[statoFlu(f.id)]} ${f.t}${f.aggiunto?"  (+aggiunto)":""}\n`;
+      const n = (stato.fluNote[f.id]||"").trim();
+      if (n) r += `     nota: ${n}\n`;
+    }
+    r += ` Documenti (${docs.filter(d=>spuntato(d)).length}/${docs.length}):\n`;
+    for (const d of docs)
+      r += `  [${spuntato(d)?"x":" "}] ${d.t}${d.aggiunto?"  (+aggiunto)":""}\n`;
+    if ((stato.note[m.id]||"").trim()) r += ` Note modulo: ${stato.note[m.id].trim()}\n`;
+  }
+  const out = document.getElementById("uscita");
+  out.value = r; out.style.display = "block";
+  document.getElementById("copia").style.display = "inline-block";
+  out.scrollIntoView({behavior:"smooth", block:"nearest"});
+});
+document.getElementById("copia").addEventListener("click", async ()=>{
+  const out = document.getElementById("uscita");
+  try { await navigator.clipboard.writeText(out.value);
+        document.getElementById("eco").textContent = "Copiato — incollalo in chat a Claude."; }
+  catch(e){ out.select(); document.getElementById("eco").textContent = "Seleziona e copia dal riquadro."; }
+});
+document.getElementById("azzera").addEventListener("click", ()=>{
+  if (!confirm("Azzero flussi, spunte, aggiunte e appunti su questo dispositivo?")) return;
+  stato = {spunte:{}, extra:{}, note:{}, flu:{}, fluExtra:{}, fluNote:{}}; salva(); rendi();
+  document.getElementById("eco").textContent = "Azzerato.";
+});
+
+rendi();
+</script>
+</body>
+</html>

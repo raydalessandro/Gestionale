@@ -9,7 +9,10 @@ toccano.
 > proprio a quel pezzo (cassa, wizard ordini, onboarding). Guardarle prima evita
 > di ricostruire un problema a memoria o di ricrearne uno già noto.
 
-## 1 · Secret del progetto Supabase di test (per la CI GitHub) — DA FARE
+## 1 · Secret del progetto Supabase di test (per la CI GitHub) — ✅ CHIUSO (28/07)
+
+> Verificato la sera del 28/07: progetto di test on, CI attiva e girante sul DB
+> di test (conferma Ray; `ci.yml` e `docs/ambienti.md` a riscontro).
 
 La CI (`.github/workflows/ci.yml`, curata dall'agente Test) esegue i test di
 **contratto** ed **E2E** contro un **progetto Supabase dedicato ai test**, mai
@@ -70,7 +73,7 @@ esce senza icona e con anteprima social vuota.
 - **Commento stale `schema.sql:431`.** Dice ancora che il sito pubblico scrive
   ordini con `fonte='sito'`; dopo la migrazione 009 il valore è `sito_negozio`.
   È **solo un commento** (nessun DDL). Da correggere quando si riordina lo schema
-  (portale on). Vedi `docs/fasi/fase-g3bis-fonte-ordini.md`.
+  (portale on). Vedi `docs/fasi/archivio/fase-g3bis-fonte-ordini.md`.
 - **Contrasto testata del portale → FATTO in G5.** Funzione deterministica
   `testoSuFondo` (luminanza WCAG di `brand.primary` → inchiostro o bianco, stessa
   logica su bordo e sfumature). Voce chiusa.
@@ -100,7 +103,7 @@ qualunque `prenotazione_id` valorizzato, il confronto fallisce con `23514`:
   che autorizza il passaggio sia dell'azienda **ricevente** (`a_azienda_id`), non
   un confronto con un `azienda_id` inesistente. Positivo/negativo (23514) verificati
   in dry-run e con la scrittura reale del registro (`prendi_persona_come_cliente`).
-  Vedi `docs/fasi/fase-g8-richieste-agenda.md`.
+  Vedi `docs/fasi/archivio/fase-g8-richieste-agenda.md`.
 
 ## 8 · Decisione (scritta) — il trigger di coerenza tenant inghiotte la superficie d'errore delle FK
 
@@ -149,6 +152,10 @@ metodi a render-time (`app/(app)/cassa/vendita/nuova/page.tsx`) spostandolo
 all'onboarding o a un'azione.
 
 ## 10 · INCOGNITA APERTA — `fase2 S4`: "Crea ordine" (wizard LAC «Da catalogo») in timeout, MAI diagnosticato
+
+> **04/08 · memoria di Ray**: bug d'epoca già diagnosticato — «mancavano
+> dei pezzi» nel catalogo piatto → timeout. Il ridisegno a scala di M5
+> (f5g) elimina la classe d'errore; verifica di conferma in S0.
 
 **Non è "modulo da finire": è un possibile difetto vero, mai guardato, oggi
 dietro un `test.fixme` con la CI verde sopra.** Va tenuto separato dagli altri
@@ -206,7 +213,7 @@ affrontati **insieme**, o si fa il lavoro due volte.
 - Nota: la 017 **non** rompe nulla nel frattempo — i due mondi convivono; è solo
   la *chiusura* del catalogo che dipende dalla tassonomia del gestionale.
 
-## 6 · Fuso orario preesistente in `lib/utils.ts` (TERMINE: prima di stampare date)
+## 6 · Fuso orario preesistente in `lib/utils.ts` — ✅ SALDATO in G8 (migrazione 019 + helper `TZ_ROMA`)
 
 Difetto **preesistente**, scoperto in G5. `lib/utils.ts` formatta le date con
 `Intl.DateTimeFormat("it-IT")` **senza `timeZone`**, quindi eredita il fuso del
@@ -226,7 +233,7 @@ gestionale (orari e date mostrati/stampati possono slittare di 1–2 ore).
   formattano in Europe/Rome; le finestre-giorno dell'agenda idem; **migrazione 019**
   riallinea le righe banco già scritte (mirata: `fonte='banco' AND note<>'seed-g6'`,
   idempotente). Sentinella a contratto: banco 10:00 e portale 10:00 → stesso
-  istante. Vedi `docs/fasi/fase-g8-richieste-agenda.md`.
+  istante. Vedi `docs/fasi/archivio/fase-g8-richieste-agenda.md`.
 - **Resta aperto: gli ALTRI formatter di `lib/utils.ts`.** `fmtData`/`fmtQuando`
   (e chi stampa date su buste/quietanze) formattano ancora **senza `timeZone`** →
   ereditano il fuso del processo. Riguardano **date**, non orari, quindi il rischio
