@@ -138,7 +138,63 @@ perimetro di chi fa design (consegna §2). La lascio scritta invece che applicat
 
 ---
 
-## 7 · Ritirate dalla revisione 1
+## 7 · La Scrivania (ramo 6)
+
+Tre blocchi su sei della Scrivania hanno un fondamento nello schema. Tre no, e
+sono elencati qui. Il dettaglio è in `RAMO-6-scrivania.md §3`.
+
+### 7.1 · La bolla del fornitore — è prodotto nuovo, non un campo
+
+**Dove si vede.** Il blocco «Arrivati oggi», e il cassetto «Controlla arrivi».
+
+**Cosa presuppone.** Che una consegna del fornitore sia **una cosa**: bolla
+n. 4471, quattro pezzi attesi, arrivata alle 07:40, dentro tre ordini di clienti
+più due pezzi da esposizione — e che si spunti riga per riga, lasciando in
+attesa quello che manca.
+
+**Cosa c'è oggi.** Niente di tutto questo. `ordini_lac` e `ordini_occhiali`
+hanno uno stato per ordine (`da_ordinare → ordinato → arrivato → consegnato`).
+Un ordine arriva o non arriva; non arriva **parzialmente dentro un pacco
+insieme ad altri tre**. Nello schema non esistono bolle, colli né DDT.
+
+**Perché lo segnalo così.** Non è un campo mancante: è **un pezzo di prodotto
+nuovo**, con una tabella, uno stato per riga e un flusso di verifica. Vale la
+pena farlo — «cosa è arrivato stamattina e per chi» è la domanda delle 8 del
+mattino in ogni negozio — ma è una fase, non una prop.
+
+**Nel frattempo** il blocco esiste nell'anteprima con dati finti dichiarati.
+
+### 7.2 · Il registro dei contatti
+
+**Dove si vede.** «sentito il 01/08», «non risponde», «scritto il 03/08».
+
+**Cosa c'è oggi.** `avvisato_il` su buste e ordini LAC: **un timestamp
+singolo**, che dice *se* e *quando* hai avvisato, non quante volte, con che
+mezzo, né se hanno risposto.
+
+**Forma minima.** Una riga per contatto: `{ documento, quando, canale, esito }`
+con esito fra `inviato · risposto · nessuna risposta`. Basta questo per
+«non risponde», che è l'informazione che cambia il gesto — se non risponde ai
+messaggi lo chiami, e non gli riscrivi.
+
+### 7.3 · Le durate e l'ordine dei suggerimenti
+
+**Dove si vede.** «Cosa puoi fare adesso»: «~4 min», e l'ordine delle cinque voci.
+
+**Non chiedo un dato: chiedo di togliere una stima inventata.** Non c'è niente
+nello schema da cui derivare «~4 min», e un tempo inventato è una promessa che
+il prodotto non mantiene. Sull'ordine vale il ragionamento del paletto 1: un
+punteggio invisibile che decide cosa conta di più, se sbaglia due volte, fa
+smettere l'ottico di guardare il blocco più importante della schermata.
+
+**La versione senza dati nuovi**, che secondo me è anche la migliore: niente
+punteggio, un criterio **scritto sotto il titolo** — «prima chi ti aspetta oggi,
+poi chi aspetta da più giorni». Una riga di testo vale più di qualunque
+euristica, perché si può contestare.
+
+---
+
+## 8 · Ritirate dalla revisione 1
 
 - **«Serve uno stato *da guardare* per le prenotazioni».** Esisteva dalla 013:
   `appuntamenti.stato` include `in_attesa`. Chiedevo una cosa già fatta.
@@ -149,7 +205,7 @@ perimetro di chi fa design (consegna §2). La lascio scritta invece che applicat
 
 ---
 
-## 8 · Cosa non ho chiesto, di proposito
+## 9 · Cosa non ho chiesto, di proposito
 
 - Nessuna coordinata, nessuna distanza — paletto 4.
 - Nessun punteggio né ordinamento per rilevanza — paletto 1.
