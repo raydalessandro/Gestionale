@@ -31,7 +31,15 @@ FASE X (dedicata, dopo): qui non si spreca contesto a girare.*
   Ray): i test del CONTESTO — ambiente, integrazioni, produzione — si
   aggiungeranno col tempo; per ora il perimetro è il nostro software.*
 
-## Il template della CONSEGNA (ogni busta a Opus è fatta così)
+## Chi scrive le consegne (deciso il 05/08)
+La S0+B1 la scrive Claude (i contratti sono appena nati). **Da B2 in
+poi la consegna la ASSEMBLA L'ESECUTORE** dal template qui sotto,
+usando piano+spec: è il PRIMO file della PR (in `docs/fasi/consegne/`),
+prima del codice — così la regia la vede dal telefono. Claude fa
+revisione ai checkpoint. Valvola: se il rito segnala differenze due
+volte nella stessa busta, quella consegna torna a Claude.
+
+## Il template della CONSEGNA (ogni busta è fatta così)
 0. **RITO D'APERTURA — il cancello di Opus (proposta di Ray,
    04/08)**: PRIMA di scrivere codice, Opus legge le spec citate al
    punto 2 e verifica la consegna contro di esse; ogni mancanza o

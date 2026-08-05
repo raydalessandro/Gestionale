@@ -1,6 +1,153 @@
 # Report — Agente Test & CI
 
-Aggiornato: 2026-07-28 · Fasi coperte: 1, 2, 3, 4 (v0.1–v0.5) + interfasi
+Aggiornato: 2026-08-05 · Ultima consegna coperta: **Era 2 · S0 · Bonifica**
+(branch `era2/S0-bonifica`, migrazione **020**) — sezione qui sotto. I giri
+precedenti restano più in basso.
+
+## Era 2 · S0 · Bonifica (branch `era2/S0-bonifica`, migrazione 020)
+
+La 020 non aggiunge funzioni: **toglie privilegi**. È il tipo di migrazione che
+non si vede finché non rompe qualcosa — e la cosa che poteva rompere è il
+**portale pubblico** (`revoke ... on all tables in schema public` comprende
+anche le viste). Quindi la rete si è allargata dove serve: una suite di
+contratto che prova la revoca dal lato del client vero, e sei guardie statiche
+che leggono l'SQL e difendono VP-01 per sempre. Nessun file dell'app toccato.
+
+### L2 · Contratto — nuovo `tests/contratto/bonifica-020.test.ts` (20 test, in CI)
+Un negozio **nato dopo la 020** (è la prova che i trigger scattano ancora),
+pubblicato con orari 09–17 su tutti i giorni, servizio `visita` 30' e una
+chiusura; più un secondo tenant per il cross-tenant. Copre:
+1. **igiene grant** — `clienti`/`vendite`/`prodotti` da anon danno **42501**
+   (permesso negato), *non* «zero righe»: è esattamente la differenza fra «la RLS
+   salva» e «anon non arriva alla porta». Poi il giro completo: **tutte e 30 le
+   tabelle** di `public` (elencate dallo schema + migrazioni) respingono anon in
+   lettura, e l'`insert` su `clienti` è respinta dal privilegio.
+2. **`_riparazioni_dati`** — anon non legge; **nemmeno il negozio autenticato**
+   legge o **cancella** il marker (cancellarlo ri-armerebbe lo slittamento di 2h
+   della 019); col service role la riga `019_fuso_appuntamenti_banco` è ancora lì.
+3. **VP-01, i test che salvano il prodotto** — le quattro viste rispondono ad
+   anon senza errore **e restituiscono i dati** (vetrina, 7 fasce d'orario, il
+   servizio, la chiusura): «200 vuoto» non basta, perché una vista girata a
+   `security_invoker = true` risponderebbe 200-vuoto con il grant ancora al suo
+   posto. `slot_liberi` resta invocabile; **`crea_prenotazione` scrive ancora da
+   anon** dentro `persone`/`prenotazioni`/`appuntamenti` — tabelle su cui anon
+   ora non ha nulla: è la prova più severa che la strada definer regge.
+4. **funzioni-trigger** — `crea_sala_default` dà la 'Sala 1' al negozio nato dopo
+   la 020; `assegna_sala_appuntamento` riempie `risorsa_id` su un insert che non
+   la passa; `assicura_coerenza_tenant` continua a dare **23514** (asserito
+   esatto: mai 23503 — regola del patto) sulla FK cross-tenant.
+5. **policy `risorse`** — il drop+create su `authenticated` non ha chiuso fuori
+   il negozio (vede la sua sala, non quelle del vicino) e anon resta fuori.
+6. **`_infra_migrazioni`** — contiene tutte le 20 righe attese (001→020,
+   `020_bonifica` compresa), ogni riga con `applied_at` e nel formato `NNN_nome`;
+   ed è **chiuso ad anon** (prova che è stato creato PRIMA del ciclo di revoca).
+   *Trade-off:* non si fissa il conto ESATTO a 20 (le migrazioni future si
+   registrano da sé e il test diventerebbe rosso a ogni 021).
+
+### L4 · Guardie statiche — `tests/unit/guardie.test.ts` (nuovo blocco L4o, +6 → 55)
+Gated con `skipIf(!existsSync(020))` come L4i/L4l/L4m/L4n. Leggono l'SQL **senza
+i commenti** (`spoglio()`): la 020 descrive a parole proprio le scorciatoie che
+vieta, e una guardia ingenua l'accuserebbe di sé stessa.
+- **G21**: la 020 attiva la RLS su `_riparazioni_dati`, revoca ad anon **e** ad
+  authenticated, e **nessun file** dello schema crea una policy su quella tabella
+  (RLS *senza* policy: una policy la renderebbe di nuovo toccabile).
+- **G21b · VP-01, la più importante**: il filtro `relkind in ('r','p')` e la
+  revoca stanno nello **stesso blocco** (non basta che il file nomini `relkind`);
+  **nessuna** migrazione contiene `revoke … on all tables in schema public …
+  from anon`; nessuna revoca le quattro viste ad anon; ognuna conserva il suo
+  `grant select … to anon`; **nessuna vista è `security_invoker = true`**; e la
+  020 tiene la sua guardia rumorosa (`VP-01 VIOLATA`) che le nomina tutte e
+  quattro.
+- **G21c**: le tre funzioni-trigger sono revocate **anche a PUBLIC** (il solo
+  `from anon` è inefficace: EXECUTE è di PUBLIC per default e anon lo eredita) e
+  la revoca **non** nomina `authenticated` (che conserva il proprio grant).
+- **G21d**: **nessuna policy dello schema resta su PUBLIC**. Vale l'ULTIMA
+  definizione per (tabella, nome): quella di `risorse` nella 014 era su PUBLIC,
+  la 020 la ricrea `to authenticated` → è quella che conta. Trade-off: una
+  policy futura volutamente su PUBLIC farebbe scattare la guardia (ed è giusto
+  che qualcuno debba scriverlo a mano).
+- **G21e**: il registro nasce **prima** del ciclo di revoca (altrimenti anon se
+  lo terrebbe leggibile), ha la struttura dello script di provisioning, e il
+  backfill copre `001_schema_base` + **ogni migrazione presente sul filesystem
+  fino alla 020** (confronto vero con `supabase/migrazioni/`, non una lista
+  ricopiata). Trade-off: le migrazioni **> 020** non sono richieste nel backfill —
+  le registra la strada che registra (`scripts/applica-migrazioni.ts`).
+- **G21f · l'altra metà di VP-01**: `lib/portale/**` e `app/(portale)/**` possono
+  usare **solo** le quattro viste in `.from(...)` e **solo** `slot_liberi` /
+  `crea_prenotazione` in `.rpc(...)`. Dopo la 020 un `.from("aziende")` nel
+  portale sarebbe un 42501 in faccia al cliente; qui è un rosso immediato.
+  Verificato oggi: il portale tocca esattamente quelle sei cose.
+- Non-falsa-positiva verificata su copie mutate della 020 (fuori dal repo): con
+  `relkind in ('r','p','v')`, con `revoke … on all tables … from anon`, con una
+  revoca esplicita di `orari_pubblici` ad anon, senza `enable row level
+  security`, con la revoca EXECUTE solo ad anon, e col registro creato dopo il
+  ciclo → la guardia corrispondente diventa rossa in ogni caso.
+
+### Niente E2E per S0
+Non c'è UI: la 020 è tutta contratto. Gli E2E esistenti **non** vanno toccati —
+i loro client «anon» si autenticano subito (ruolo `authenticated`, invariato) e
+gli unici usi davvero anonimi sono `slot_liberi`/`crea_prenotazione`, coperte da
+VP-01. Nessun test esistente è stato modificato: quelli che asserivano «anon non
+legge X» chiedevano *errore oppure zero righe*, e restano verdi con il 42501.
+
+### Il buco del catalogo (limite reale, non pigrizia)
+Due invarianti si vedono **solo** nel catalogo di sistema: `pg_class.relrowsecurity`
+su `_riparazioni_dati` e `has_function_privilege('anon', …)` sulle tre funzioni-
+trigger. **PostgREST non espone `pg_catalog`, nemmeno col service role**, e non
+esiste una RPC che lo interroghi (la consegna dava per scontato che altri test di
+contratto ispezionassero il catalogo: non è così — nessuno lo fa, e non lo può
+fare). I due test sono scritti e usano una connessione Postgres diretta (`pg`, già
+devDependency degli script) gated su **`TEST_SUPABASE_DB_URL`**: senza il segreto
+skippano puliti, e `.github/workflows/ci.yml` lo passa già al job `contratto-e2e`
+così si accendono da soli il giorno in cui esiste. Nel frattempo le stesse
+invarianti sono coperte *funzionalmente* (anon e authenticated respinti; i tre
+trigger che scattano lo stesso) e *staticamente* (G21, G21c). Vedi *Ganci* §6.
+
+### Cosa la 020 dichiara ma non garantisce (rilievi, non bug)
+1. **L'igiene dei grant è una fotografia, non un invariante.** La 020 revoca ad
+   anon i privilegi sulle tabelle **esistenti**, ma non tocca le *default
+   privileges*: su Supabase `alter default privileges … grant all on tables to
+   anon` è attiva, quindi **ogni tabella creata da qui in poi rinasce leggibile
+   da anon** e la frase «anon non ha più alcun privilegio su NESSUNA tabella»
+   torna falsa alla prossima `create table`. Il test «tutte e 30 le tabelle»
+   difende quelle di oggi ma **non** conosce quelle di domani. *Richiesta (non
+   applicabile dall'agente test, tocca `supabase/`)*: una migrazione che faccia
+   `alter default privileges in schema public revoke all on tables from anon`,
+   oppure la regola scritta che ogni nuova tabella porti la sua revoca.
+2. **La guardia (f) della 020 controlla il GRANT, non la LEGGIBILITÀ.**
+   `has_table_privilege('anon', vista, 'SELECT')` resta true anche se la vista
+   diventasse `security_invoker = true`: il grant c'è, ma anon — che non ha più
+   le tabelle sotto — leggerebbe zero righe. Il portale si spegnerebbe **in
+   silenzio** con la migrazione verde. Coperto qui dal test VP-01 che pretende
+   il DATO e dalla guardia G21b (`security_invoker = true` vietato ovunque).
+3. **«`authenticated` conserva il grant esplicito»** sulle tre funzioni-trigger è
+   vero *grazie alle default privileges di Supabase*, non grazie alla 020: se le
+   funzioni fossero create da un ruolo senza quelle default, il `revoke … from
+   public` porterebbe via anche il suo EXECUTE. Innocuo (i trigger non
+   controllano EXECUTE), ma è un'assunzione sull'ambiente, non una garanzia della
+   migrazione. Il test lo verifica davvero (`auth_exec = true`), quando c'è il
+   DB URL.
+4. Verificato invece **corretto** ciò che si poteva sbagliare in silenzio: il
+   nome della policy droppata nella (d) coincide **esattamente** con quello della
+   014 (`"risorse: della propria azienda"` → il drop morde davvero, non restano
+   due policy sovrapposte), `risorse` era davvero **l'unica** policy su PUBLIC di
+   tutto lo schema (G21d lo prova su schema.sql + 19 migrazioni), le quattro
+   viste sono tutte `security_invoker = false` (quindi la revoca alle tabelle non
+   le tocca), il backfill elenca **esattamente** i 19 file di migrazione presenti
+   + `001_schema_base`, e `_infra_migrazioni` è creato prima del ciclo di revoca.
+
+### Esito auto-verifica (locale) — S0
+`npm test` (L1+L4): **147 passed** (9 file), guardie 49 → **55**. `npx tsc
+--noEmit` sul progetto → exit 0; typecheck mirato di `tests/**` + `e2e/**` (che
+il tsconfig dell'app esclude) → exit 0. `npx vitest run tests/contratto` senza le
+env → **156 skippati puliti**, di cui i **20** nuovi di `bonifica-020`. L2 resta
+alla CI (qui mancano i segreti e il DB di test). `package.json` invariato (script
+glob, nessuna nuova devDep: `pg` era già lì per gli script); `ci.yml` toccato solo
+per passare l'opzionale `TEST_SUPABASE_DB_URL`.
+
+## Giri precedenti
+
+Fasi coperte: 1, 2, 3, 4 (v0.1–v0.5) + interfasi
 **4b/4c/4d**; portale **G3–G7** (vocabolario fonte, pagina negozio, orari/servizi,
 slot, percorso di prenotazione), **G7-bis · l'agenda unica** (migrazione **013**),
 **G-014 · le sale** (migrazione **014**), **017 · i servizi di tipo richiesta**
@@ -711,10 +858,45 @@ fuso del runner (l'action ancora a `T12:00:00`, margine ampio).
    `getByRole("textbox").nth(0|1)` (posizionale, più fragile). Azione richiesta al
    codice app: associare label e input (id/for o wrapping) — migliora accessibilità
    e rende gli E2E robusti a `getByLabel`. Non applicato (proprietà del codice app).
+6. **(S0/020) Il catalogo di sistema non è raggiungibile dal contratto — gancio
+   infrastruttura.** `pg_class.relrowsecurity` e `has_function_privilege` non
+   passano da PostgREST (espone solo `public`), nemmeno col service role: senza
+   un canale SQL diretto due invarianti della 020 restano verificabili solo di
+   riflesso. Azione richiesta (a scelta, una basta):
+   **(a)** aggiungere il segreto GitHub **`TEST_SUPABASE_DB_URL`** (stringa di
+   connessione postgres del *solo* progetto di test) — `ci.yml` lo passa già al
+   job `contratto-e2e` e i due test gated si accendono da soli; oppure
+   **(b)** una RPC diagnostica `security definer` sul progetto (stile
+   `diag_intervallo_immutabile` / `diag_normalizza_telefono`, riservata al
+   service role) che ritorni `relrowsecurity` di una tabella e
+   `has_function_privilege` di una funzione. La (b) tocca `supabase/`: non
+   applicabile dall'agente test.
+7. **(S0/020) Le default privileges rendono l'igiene reversibile — gancio DB.**
+   Vedi *Cosa la 020 dichiara ma non garantisce* §1: serve
+   `alter default privileges in schema public revoke all on tables from anon`
+   (o la regola scritta «ogni nuova tabella porta la sua revoca»), altrimenti la
+   prossima `create table` riapre ad anon senza che nessuno se ne accorga.
 
 ## Cosa resta a Ray / CI
 Vedi `docs/agenti/TODO-ray.md`: creare `gestionale-test`, impostare i 3 secret,
 primo `workflow_dispatch` per far girare L2+L3 e rifinire i selettori E2E.
+
+## File creati / aggiornati (Era 2 · S0 · branch `era2/S0-bonifica`)
+Creati:
+- `tests/contratto/bonifica-020.test.ts` — L2 migrazione 020 (20 test, in CI;
+  2 di essi gated su `TEST_SUPABASE_DB_URL`).
+
+Aggiornati:
+- `tests/unit/guardie.test.ts` — +L4o (G21/G21b/G21c/G21d/G21e/G21f). +6 test →
+  `guardie` a **55**, totale L1+L4 a **147**.
+- `.github/workflows/ci.yml` — solo la env opzionale `TEST_SUPABASE_DB_URL` sul
+  job `contratto-e2e` (assente = i due test del catalogo skippano puliti).
+- `docs/agenti/report-test.md`.
+
+Nessun E2E (S0 non ha UI). `package.json` invariato: gli script sono glob e
+raccolgono il file nuovo da soli; nessuna nuova devDep (`pg` era già presente per
+`scripts/applica-migrazioni.ts`, importata dinamicamente e solo nei due test
+gated). Nessun file di `app/`, `components/`, `lib/`, `supabase/` toccato.
 
 ## File creati / aggiornati (giro G7 · branch `portale/prenota`)
 Creati:

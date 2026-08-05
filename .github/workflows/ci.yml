@@ -68,6 +68,12 @@ jobs:
       TEST_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
       TEST_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
       TEST_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.TEST_SUPABASE_SERVICE_ROLE_KEY }}
+      # OPZIONALE (S0/020): connessione Postgres diretta al progetto di TEST.
+      # Serve solo ai due test che ispezionano il CATALOGO (pg_class.relrowsecurity
+      # su _riparazioni_dati, has_function_privilege sulle funzioni-trigger):
+      # PostgREST non espone pg_catalog, nemmeno col service role. Se il segreto
+      # non c'è, quei due test skippano puliti e tutto il resto gira lo stesso.
+      TEST_SUPABASE_DB_URL: ${{ secrets.TEST_SUPABASE_DB_URL }}
       # L'app E2E parla col progetto di TEST (mai produzione).
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.TEST_SUPABASE_ANON_KEY }}
