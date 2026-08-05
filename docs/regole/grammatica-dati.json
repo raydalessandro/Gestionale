@@ -3,63 +3,166 @@
   "_natura": "DESCRITTIVO: fotografa il contratto per consultazione rapida (agenti, AI layer, revisioni). Non comanda: in caso di conflitto vincono il database e docs/mappa-db.md. Σ de La Chiave non entra mai qui né nel DB.",
   "_fonte": "docs/grammatica-dati.md · classificazione verificata su docs/mappa-db.md (catena 000→019) la notte del 28/07/2026",
   "_aggiornamento": "ogni spec di modulo dell'Era 1 (sezione 4) raffina la classificazione del suo perimetro; scripts/mappa-db.py verifica che le tabelle citate esistano davvero",
-
   "classi": {
-    "FATTO":         "si scrive e rimane; si contro-scrive (annullo tracciato, rettifica con segno), mai si riscrive; il tempo del fatto è il tempo di business",
+    "FATTO": "si scrive e rimane; si contro-scrive (annullo tracciato, rettifica con segno), mai si riscrive; il tempo del fatto è il tempo di business",
     "STATO_GUIDATO": "cambia solo lungo binari dichiarati; stato riletto prima di scrivere; righe modificate verificate",
-    "ANAGRAFE":      "descrive il presente, si modifica liberamente; nessun fatto può puntarle un valore volatile (si fotografa)",
-    "REGISTRO":      "vocabolario lento; le voci si spengono, non si cancellano né si rinominano",
-    "PROIEZIONE":    "derivato ricostruibile dai fatti; mai sorgente di verità; formula unica condivisa; le operative si sigillano col flusso, le analitiche aspettano",
-    "ISTANTANEA":    "valore copiato dentro un fatto al momento in cui accade; si decide nel racconto, mai dopo"
+    "ANAGRAFE": "descrive il presente, si modifica liberamente; nessun fatto può puntarle un valore volatile (si fotografa)",
+    "REGISTRO": "vocabolario lento; le voci si spengono, non si cancellano né si rinominano",
+    "PROIEZIONE": "derivato ricostruibile dai fatti; mai sorgente di verità; formula unica condivisa; le operative si sigillano col flusso, le analitiche aspettano",
+    "ISTANTANEA": "valore copiato dentro un fatto al momento in cui accade; si decide nel racconto, mai dopo"
   },
-
   "tabelle": {
-    "movimenti_magazzino": {"classe": "FATTO", "nota": "quantità con segno; la giacenza la fa il trigger"},
-    "movimenti_cassa":     {"classe": "FATTO"},
-    "vendite":             {"classe": "FATTO", "nota": "stato emessa/annullata = contro-scrittura guardata (solo oggi, giornata aperta)"},
-    "resi":                {"classe": "FATTO"},
-    "chiusure_cassa":      {"classe": "FATTO", "nota": "riepilogo congelato: non si riconcilia col passato vivo"},
-    "prescrizioni":        {"classe": "FATTO", "nota": "fatto clinico datato; eventuali flag di comodo sono proiezioni"},
-    "richiami":            {"classe": "FATTO", "nota": "nasce per registrare l'esito della proposta lavorata; le code si calcolano live (proiezione)"},
-    "_riparazioni_dati":   {"classe": "FATTO", "nota": "audit tecnico delle riparazioni"},
-
-    "ordini_occhiali": {"classe": "STATO_GUIDATO", "binari": "preventivo→lavorazione→arrivata→pronta→consegnata | →annullata", "nota": "acconto_metodo/acconto_incassato_il e DNP sono istantanee incastonate"},
-    "ordini_lac":      {"classe": "STATO_GUIDATO", "binari": "da_ordinare→ordinato→arrivato→consegnato | →annullato", "nota": "alla consegna: scarico via movimenti (fatto)"},
-    "appuntamenti":    {"classe": "STATO_GUIDATO", "binari": "in_attesa→prenotato→(completato|mancato|annullato)", "nota": "in_attesa arriva dal portale"},
-    "prenotazioni":    {"classe": "STATO_GUIDATO", "binari": "in_attesa→(accettata|rifiutata) · accettata→annullata", "nota": "la RICEZIONE è il fatto; la vita è guidata"},
-    "fermi":           {"classe": "STATO_GUIDATO", "binari": "attivo→(ritirato|annullato)", "nota": "impegna il disponibile (proiezione)"},
-    "lista_attesa":    {"classe": "STATO_GUIDATO", "binari": "in_attesa→avvisata→chiusa"},
-
-    "clienti":         {"classe": "ANAGRAFE", "nota": "i consensi (timestamptz) sono FATTI incastonati: la data È il consenso"},
-    "prodotti":        {"classe": "ANAGRAFE", "nota": "giacenza = PROIEZIONE-cache (trigger); il prezzo di listino si fotografa nei fatti"},
-    "persone":         {"classe": "ANAGRAFE", "nota": "identità del portale"},
-    "aziende":         {"classe": "ANAGRAFE"},
-    "utenti":          {"classe": "ANAGRAFE", "nota": "il ruolo è vocabolario (registro) dentro un'anagrafe"},
-    "orari_apertura":  {"classe": "ANAGRAFE"},
-    "chiusure":        {"classe": "ANAGRAFE", "nota": "calendario dei giorni di chiusura del negozio"},
-    "blocchi_slot":    {"classe": "ANAGRAFE", "nota": "agenda: indisponibilità dichiarate"},
-    "risorse":         {"classe": "ANAGRAFE", "nota": "sale e postazioni"},
-    "negozi_servizi":  {"classe": "ANAGRAFE", "nota": "l'offerta del negozio sul portale"},
-
-    "metodi_pagamento":            {"classe": "REGISTRO"},
-    "servizi":                     {"classe": "REGISTRO", "nota": "catalogo servizi del portale"},
-    "contatori":                   {"classe": "REGISTRO", "nota": "speciale: monotono, avanza soltanto, solo via RPC"},
-    "ambiente":                    {"classe": "REGISTRO", "nota": "configurazione tecnica (test/produzione)"},
-    "persone_riferimento_registro":{"classe": "REGISTRO", "nota": "ponte identità portale↔clienti (018 prendi-come-cliente)"}
+    "movimenti_magazzino": {
+      "classe": "FATTO",
+      "nota": "quantità con segno; la giacenza la fa il trigger"
+    },
+    "movimenti_cassa": {
+      "classe": "FATTO"
+    },
+    "vendite": {
+      "classe": "FATTO",
+      "nota": "stato emessa/annullata = contro-scrittura guardata (solo oggi, giornata aperta)"
+    },
+    "resi": {
+      "classe": "FATTO"
+    },
+    "chiusure_cassa": {
+      "classe": "FATTO",
+      "nota": "riepilogo congelato: non si riconcilia col passato vivo"
+    },
+    "prescrizioni": {
+      "classe": "FATTO",
+      "nota": "fatto clinico datato; eventuali flag di comodo sono proiezioni"
+    },
+    "richiami": {
+      "classe": "FATTO",
+      "nota": "nasce per registrare l'esito della proposta lavorata; le code si calcolano live (proiezione)"
+    },
+    "_riparazioni_dati": {
+      "classe": "FATTO",
+      "nota": "audit tecnico delle riparazioni"
+    },
+    "_infra_migrazioni": {
+      "classe": "FATTO",
+      "nota": "audit tecnico delle migrazioni applicate (020): append-only, la strada che registra"
+    },
+    "ordini_occhiali": {
+      "classe": "STATO_GUIDATO",
+      "binari": "preventivo→lavorazione→arrivata→pronta→consegnata | →annullata",
+      "nota": "acconto_metodo/acconto_incassato_il e DNP sono istantanee incastonate"
+    },
+    "ordini_lac": {
+      "classe": "STATO_GUIDATO",
+      "binari": "da_ordinare→ordinato→arrivato→consegnato | →annullato",
+      "nota": "alla consegna: scarico via movimenti (fatto)"
+    },
+    "appuntamenti": {
+      "classe": "STATO_GUIDATO",
+      "binari": "in_attesa→prenotato→(completato|mancato|annullato)",
+      "nota": "in_attesa arriva dal portale"
+    },
+    "prenotazioni": {
+      "classe": "STATO_GUIDATO",
+      "binari": "in_attesa→(accettata|rifiutata) · accettata→annullata",
+      "nota": "la RICEZIONE è il fatto; la vita è guidata"
+    },
+    "fermi": {
+      "classe": "STATO_GUIDATO",
+      "binari": "attivo→(ritirato|annullato)",
+      "nota": "impegna il disponibile (proiezione)"
+    },
+    "lista_attesa": {
+      "classe": "STATO_GUIDATO",
+      "binari": "in_attesa→avvisata→chiusa"
+    },
+    "clienti": {
+      "classe": "ANAGRAFE",
+      "nota": "i consensi (timestamptz) sono FATTI incastonati: la data È il consenso"
+    },
+    "prodotti": {
+      "classe": "ANAGRAFE",
+      "nota": "giacenza = PROIEZIONE-cache (trigger); il prezzo di listino si fotografa nei fatti"
+    },
+    "persone": {
+      "classe": "ANAGRAFE",
+      "nota": "identità del portale"
+    },
+    "aziende": {
+      "classe": "ANAGRAFE"
+    },
+    "utenti": {
+      "classe": "ANAGRAFE",
+      "nota": "il ruolo è vocabolario (registro) dentro un'anagrafe"
+    },
+    "orari_apertura": {
+      "classe": "ANAGRAFE"
+    },
+    "chiusure": {
+      "classe": "ANAGRAFE",
+      "nota": "calendario dei giorni di chiusura del negozio"
+    },
+    "blocchi_slot": {
+      "classe": "ANAGRAFE",
+      "nota": "agenda: indisponibilità dichiarate"
+    },
+    "risorse": {
+      "classe": "ANAGRAFE",
+      "nota": "sale e postazioni"
+    },
+    "negozi_servizi": {
+      "classe": "ANAGRAFE",
+      "nota": "l'offerta del negozio sul portale"
+    },
+    "metodi_pagamento": {
+      "classe": "REGISTRO"
+    },
+    "servizi": {
+      "classe": "REGISTRO",
+      "nota": "catalogo servizi del portale"
+    },
+    "contatori": {
+      "classe": "REGISTRO",
+      "nota": "speciale: monotono, avanza soltanto, solo via RPC"
+    },
+    "ambiente": {
+      "classe": "REGISTRO",
+      "nota": "configurazione tecnica (test/produzione)"
+    },
+    "persone_riferimento_registro": {
+      "classe": "REGISTRO",
+      "nota": "ponte identità portale↔clienti (018 prendi-come-cliente)"
+    }
   },
-
   "proiezioni": {
     "operative": [
-      {"nome": "giacenza", "da": "movimenti_magazzino", "dove": "prodotti.giacenza (cache a trigger)"},
-      {"nome": "disponibile", "da": "giacenza − fermi attivi", "regola": "si sigilla col flusso fermi"},
-      {"nome": "contanti attesi / sistema per metodo", "da": "vendite.pagamenti + acconti del giorno − resi denaro", "dove": "lib/cassa-calcoli.ts — FORMULA UNICA"},
-      {"nome": "code richiami", "da": "ordini, appuntamenti, fermi, clienti", "dove": "lib/richiami-proposte.ts, calcolo live"}
+      {
+        "nome": "giacenza",
+        "da": "movimenti_magazzino",
+        "dove": "prodotti.giacenza (cache a trigger)"
+      },
+      {
+        "nome": "disponibile",
+        "da": "giacenza − fermi attivi",
+        "regola": "si sigilla col flusso fermi"
+      },
+      {
+        "nome": "contanti attesi / sistema per metodo",
+        "da": "vendite.pagamenti + acconti del giorno − resi denaro",
+        "dove": "lib/cassa-calcoli.ts — FORMULA UNICA"
+      },
+      {
+        "nome": "code richiami",
+        "da": "ordini, appuntamenti, fermi, clienti",
+        "dove": "lib/richiami-proposte.ts, calcolo live"
+      }
     ],
     "analitiche": [
-      {"nome": "dashboard / KPI", "regola": "si costruiscono quando si vuole, al NETTO d'IVA (FI-01); il fabbisogno di fatti si dichiara nelle spec"}
+      {
+        "nome": "dashboard / KPI",
+        "regola": "si costruiscono quando si vuole, al NETTO d'IVA (FI-01); il fabbisogno di fatti si dichiara nelle spec"
+      }
     ]
   },
-
   "istantanee": [
     "vendite.righe[]: prezzo_unitario, sconto, aliquota, dm",
     "vendite.pagamenti[]: nome metodo, importo",
