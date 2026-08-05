@@ -111,6 +111,65 @@ e non perdono nulla. Verificato in dry-run che i tre trigger
 respinta con `23514`): PostgreSQL non controlla `EXECUTE` quando un
 trigger parte.
 
+## 5-bis · ⚠️ DECISIONE PER RAY — la 020 è una fotografia, non un invariante
+
+**Il fatto, misurato.** La 020 azzera i grant di `anon` sulle **30 tabelle
+di oggi**. Ma Supabase ha *default privileges* che concedono **tutto** ad
+`anon` su ogni tabella futura:
+
+```
+postgres → anon=arwdDxtm/postgres  ;  supabase_admin → anon=arwdDxtm/supabase_admin
+```
+
+Prova sul DB di test (in transazione, poi rollback): creata una tabella
+nuova **dopo** la 020 → nasce con **7 grant ad `anon`** e
+`has_table_privilege('anon', …, 'SELECT')` = **true**.
+
+**Perché è urgente e non teorico.** La busta successiva, **B1, crea
+cinque tabelle** (`consensi`, `clienti_relazioni`, `oculisti`,
+`parametri`, `assicurazioni`). Con le default privileges così, **nascono
+tutte leggibili da `anon`** — e l'igiene appena fatta si disfa alla PR
+dopo. La RLS le proteggerebbe (come oggi), ma è esattamente la
+«politica distratta dal buco» che S0 doveva chiudere.
+
+**Cosa NON ho fatto, e perché.** Non ho toccato le default privileges:
+è una decisione di piattaforma (vale per *ogni* oggetto futuro, anche
+creato da altri strumenti), più larga del punto (b) della consegna.
+Regola sovrana: non si colma un'ambiguità da soli.
+
+**La correzione, pronta** (additiva, idempotente, due righe):
+
+```sql
+alter default privileges in schema public revoke all on tables from anon;
+alter default privileges for role supabase_admin in schema public
+  revoke all on tables from anon;
+```
+
+**Raccomandazione**: metterla **in testa a B1**, prima del DDL delle
+cinque tabelle — così nascono già pulite e il test di contratto «anon
+non legge le tabelle nuove» diventa un invariante, non una fotografia.
+Serve il tuo via: è l'unico punto di S0 lasciato aperto di proposito.
+
+## 5-ter · Altri limiti noti (dal collaudo cieco)
+
+- **La guardia (f) della 020 controlla il *grant*, non la
+  *leggibilità*.** `has_table_privilege` resterebbe true anche se una
+  vista diventasse `security_invoker = true`: grant a posto, portale
+  spento in silenzio. Coperto lato test: il contratto pretende **il
+  dato** dalle quattro viste, e una guardia statica vieta
+  `security_invoker = true`.
+- **«`authenticated` conserva il grant esplicito»** sulle tre
+  funzioni-trigger è vero *grazie alle default privileges di Supabase*,
+  non grazie alla migrazione: assunzione sull'ambiente, innocua ma da
+  sapere.
+- **Ispezione del catalogo dai test**: PostgREST non espone `pg_catalog`
+  nemmeno col service role. I due test che leggono
+  `pg_class.relrowsecurity` e `has_function_privilege` usano una
+  connessione Postgres diretta, **gated** su `TEST_SUPABASE_DB_URL`:
+  senza quel segreto **skippano puliti** e il resto gira lo stesso. Se
+  vuoi accenderli, aggiungi il segreto; l'alternativa è una RPC
+  diagnostica `definer` (come `diag_normalizza_telefono` della 011).
+
 ## 6 · Baseline e strumenti
 
 - **Catena migrazioni da zero**: `scripts/db-locale.sh` applica

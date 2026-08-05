@@ -1148,3 +1148,255 @@ describe.skipIf(!existsSync(join(ROOT, M019)))("L4n · guardie fuso Europe/Rome 
     ).toBe(true);
   });
 });
+
+// ────────────────────────────────────────────────────────────────────────────
+// L4o · S0 · Bonifica (Era 2, migrazione 020)
+//
+// La 020 toglie privilegi: il suo rischio non è «non funziona», è «funziona
+// troppo» e spegne il portale pubblico. Queste guardie leggono l'SQL vero e
+// difendono le quattro invarianti che non devono più muoversi:
+//   • VP-01 · le viste del portale non si revocano MAI ad anon (e restano
+//     definer: una vista security_invoker romperebbe il portale col grant
+//     ancora al suo posto — cioè in silenzio);
+//   • il marker della 019 resta irraggiungibile (RLS senza policy, zero grant);
+//   • le funzioni-trigger sono tolte anche a PUBLIC (il solo revoke ad anon non
+//     bastava: EXECUTE è di PUBLIC per default e anon lo ereditava);
+//   • nessuna policy dello schema resta su PUBLIC;
+//   • il registro delle migrazioni copre TUTTA la storia fino alla 020 (confronto
+//     col filesystem: se qualcuno aggiunge una migrazione ≤ 020 senza registrarla,
+//     il riapplico smette di essere idempotente).
+// Gated con `skipIf(!existsSync(020))` come L4i/L4l/L4m/L4n: enforca sul branch
+// della consegna e in CI dopo il merge, salta pulita sui checkpoint paralleli.
+// ────────────────────────────────────────────────────────────────────────────
+const M020 = "supabase/migrazioni/020_bonifica.sql";
+describe.skipIf(!existsSync(join(ROOT, M020)))("L4o · guardie bonifica S0 (020)", () => {
+  const VISTE_PORTALE = [
+    "negozi_pubblici",
+    "orari_pubblici",
+    "chiusure_pubbliche",
+    "servizi_pubblici",
+  ];
+  const FUNZIONI_TRIGGER = [
+    "assicura_coerenza_tenant",
+    "crea_sala_default",
+    "assegna_sala_appuntamento",
+  ];
+
+  /**
+   * Via i commenti `--`: queste guardie devono leggere il CODICE, non la prosa.
+   * La 020 spiega a parole proprio le scorciatoie che vieta (es. «revoke … on all
+   * tables in schema public»): scandire i commenti la farebbe accusare di sé stessa.
+   */
+  function spoglio(sql: string): string {
+    return sql.replace(/--[^\n]*/g, "");
+  }
+
+  /** schema.sql + tutte le migrazioni, come coppie (path relativo, SQL senza commenti). */
+  function tuttoSQL(): { file: string; sql: string }[] {
+    const files = [
+      "supabase/schema.sql",
+      ...readdirSync(join(ROOT, "supabase/migrazioni"))
+        .filter((n) => n.endsWith(".sql"))
+        .sort()
+        .map((n) => `supabase/migrazioni/${n}`),
+    ];
+    return files.map((f) => ({ file: f, sql: spoglio(leggi(f)) }));
+  }
+
+  /** Il corpo eseguibile della 020 (senza commenti). */
+  function sql020(): string {
+    return spoglio(leggi(M020));
+  }
+
+  it("G21 · la 020 blinda `_riparazioni_dati`: RLS attiva, zero grant, nessuna policy", () => {
+    const sql = sql020();
+    expect(
+      /alter table public\._riparazioni_dati\s+enable row level security/i.test(sql),
+      "senza RLS attiva il marker resterebbe raggiungibile"
+    ).toBe(true);
+    expect(
+      /revoke all on public\._riparazioni_dati from anon/i.test(sql),
+      "il marker non va lasciato ad anon"
+    ).toBe(true);
+    expect(
+      /revoke all on public\._riparazioni_dati from authenticated/i.test(sql),
+      "nemmeno il negozio deve poterlo cancellare (ri-armerebbe la 019)"
+    ).toBe(true);
+    // RLS SENZA policy: se qualcuno gliene scrive una, il marker torna toccabile.
+    for (const { file, sql: s } of tuttoSQL()) {
+      expect(
+        /create policy[^;]*on public\._riparazioni_dati/i.test(s),
+        `${file}: nessuna policy deve esistere su _riparazioni_dati (solo il service role)`
+      ).toBe(false);
+    }
+  });
+
+  it("G21b · VP-01 · la revoca ad anon non tocca MAI le quattro viste del portale", () => {
+    const sql = sql020();
+
+    // 1) il ciclo di revoca è ristretto alle sole tabelle ordinarie/partizionate:
+    //    il filtro e la revoca devono stare nello STESSO blocco (non basta che il
+    //    file nomini relkind da qualche parte).
+    expect(
+      /relkind in \('r','p'\)[\s\S]{0,300}revoke all on public\.%I from anon/i.test(sql),
+      "il ciclo deve filtrare relkind in ('r','p'): in PostgreSQL «all tables» comprende le viste"
+    ).toBe(true);
+
+    // 2) la scorciatoia che spegnerebbe il portale non deve comparire in NESSUNA
+    //    migrazione: `revoke ... on all tables in schema public ... from anon`.
+    for (const { file, sql: s } of tuttoSQL()) {
+      expect(
+        /revoke[\s\S]{0,80}on all tables in schema public[\s\S]{0,60}from[^;]*\banon\b/i.test(s),
+        `${file}: «revoke on all tables in schema public from anon» porterebbe via anche le viste del portale (VP-01)`
+      ).toBe(false);
+    }
+
+    // 3) nessuna migrazione revoca esplicitamente le viste ad anon…
+    for (const { file, sql: s } of tuttoSQL()) {
+      for (const v of VISTE_PORTALE) {
+        expect(
+          new RegExp(`revoke[^;]*\\bpublic\\.${v}\\b[^;]*from[^;]*\\banon\\b`, "i").test(s),
+          `${file}: ${v} deve restare leggibile da anon (VP-01)`
+        ).toBe(false);
+      }
+    }
+
+    // 4) …e ognuna conserva il proprio grant ad anon da qualche parte.
+    const tutto = tuttoSQL()
+      .map((x) => x.sql)
+      .join("\n");
+    for (const v of VISTE_PORTALE) {
+      expect(
+        new RegExp(`grant select on public\\.${v}\\s+to anon`, "i").test(tutto),
+        `manca il grant select ad anon su ${v} (VP-01)`
+      ).toBe(true);
+    }
+
+    // 5) le viste restano DEFINER. Con security_invoker=true il grant resterebbe
+    //    al suo posto (la guardia (f) della 020 passerebbe) ma anon, che non ha
+    //    più le tabelle sotto, vedrebbe zero righe: portale spento in silenzio.
+    for (const { file, sql: s } of tuttoSQL()) {
+      expect(
+        /security_invoker\s*=\s*true/i.test(s),
+        `${file}: le viste del portale devono restare security_invoker = false (definer)`
+      ).toBe(false);
+    }
+
+    // 6) la 020 tiene la propria guardia rumorosa sulle quattro viste.
+    for (const v of VISTE_PORTALE) {
+      expect(sql.includes(`'${v}'`), `la guardia VP-01 della 020 deve nominare ${v}`).toBe(true);
+    }
+    expect(/VP-01 VIOLATA/.test(sql), "la guardia VP-01 deve fallire rumorosamente").toBe(true);
+  });
+
+  it("G21c · le funzioni-trigger sono revocate anche a PUBLIC (non solo ad anon)", () => {
+    const sql = sql020();
+    for (const f of FUNZIONI_TRIGGER) {
+      const re = new RegExp(
+        `revoke execute on function public\\.${f}\\(\\)\\s*from[^;]*;`,
+        "i"
+      );
+      const m = sql.match(re);
+      expect(m, `manca la revoca di EXECUTE su ${f}`).toBeTruthy();
+      // Il punto verbalizzato in PR: senza `public` la revoca è INEFFICACE
+      // (EXECUTE è concesso a PUBLIC per default e anon lo eredita).
+      expect(
+        /\bpublic\b/.test(m![0].split("from")[1]),
+        `${f}: revocare solo ad anon non basta — EXECUTE va tolto anche a PUBLIC`
+      ).toBe(true);
+      expect(
+        /\banon\b/.test(m![0].split("from")[1]),
+        `${f}: la revoca deve nominare esplicitamente anon`
+      ).toBe(true);
+      // authenticated NON va revocato qui (conserva il suo grant esplicito).
+      expect(
+        /\bauthenticated\b/.test(m![0].split("from")[1]),
+        `${f}: authenticated conserva il proprio grant (la revoca non lo nomina)`
+      ).toBe(false);
+    }
+  });
+
+  it("G21d · nessuna policy dello schema resta su PUBLIC (tutte `to authenticated`)", () => {
+    // Vale l'ULTIMA definizione di ogni policy (file in ordine): la `risorse` della
+    // 014 era su PUBLIC, la 020 la ricrea su authenticated → è quella che conta.
+    const ultima = new Map<string, { file: string; corpo: string }>();
+    for (const { file, sql } of tuttoSQL()) {
+      const re = /create policy\s+"([^"]+)"\s+on\s+(public\.\w+)([\s\S]*?);/gi;
+      let m: RegExpExecArray | null;
+      while ((m = re.exec(sql)) !== null) {
+        ultima.set(`${m[2]}|${m[1]}`, { file, corpo: m[3] });
+      }
+    }
+    expect(ultima.size, "lo schema deve avere delle policy").toBeGreaterThan(20);
+    for (const [chiave, { file, corpo }] of ultima) {
+      expect(
+        /\bto\s+authenticated\b/i.test(corpo),
+        `${file}: la policy ${chiave} non è ristretta a authenticated (resterebbe su PUBLIC)`
+      ).toBe(true);
+    }
+  });
+
+  it("G21f · VP-01 · il codice del portale tocca SOLO le quattro viste e le due RPC", () => {
+    // L'altra metà di VP-01: dopo la 020 `anon` non ha NIENTE sulle tabelle. Se
+    // qualcuno aggiungesse un `.from("aziende")` nel portale, il marciapiede
+    // prenderebbe un 42501 in produzione. Qui diventa rosso subito.
+    const RPC_AMMESSE = new Set(["slot_liberi", "crea_prenotazione"]);
+    const file = [...sorgenti("lib/portale"), ...sorgenti("app/(portale)")];
+    expect(file.length, "il portale deve avere dei sorgenti da ispezionare").toBeGreaterThan(0);
+
+    for (const f of file) {
+      const src = readFileSync(f, "utf8");
+      const rel = f.slice(ROOT.length);
+      for (const m of src.matchAll(/\.from\(\s*["'`]([^"'`]+)["'`]\s*\)/g)) {
+        expect(
+          VISTE_PORTALE.includes(m[1]),
+          `${rel}: il portale legge \`${m[1]}\` — dopo la 020 anon non ha privilegi sulle tabelle, si possono usare solo le quattro viste`
+        ).toBe(true);
+      }
+      for (const m of src.matchAll(/\.rpc\(\s*["'`]([^"'`]+)["'`]/g)) {
+        expect(
+          RPC_AMMESSE.has(m[1]),
+          `${rel}: il portale invoca la RPC \`${m[1]}\` — anon esegue solo slot_liberi e crea_prenotazione (security definer)`
+        ).toBe(true);
+      }
+    }
+  });
+
+  it("G21e · il registro `_infra_migrazioni` nasce prima della revoca e copre tutta la storia ≤ 020", () => {
+    const sql = sql020();
+
+    // 1) creato PRIMA del ciclo (b): altrimenti anon se lo terrebbe leggibile.
+    const creazione = sql.search(/create table if not exists public\._infra_migrazioni/i);
+    const ciclo = sql.search(/revoke all on public\.%I from anon/i);
+    expect(creazione, "la 020 deve creare il registro").toBeGreaterThanOrEqual(0);
+    expect(ciclo, "la 020 deve contenere il ciclo di revoca").toBeGreaterThanOrEqual(0);
+    expect(
+      creazione < ciclo,
+      "il registro va creato PRIMA del ciclo di revoca, così anche lui perde anon"
+    ).toBe(true);
+
+    // 2) struttura attesa (la stessa dello script di provisioning).
+    expect(/nome\s+text\s+primary key/i.test(sql), "il registro ha `nome` come chiave").toBe(true);
+    expect(/applied_at\s+timestamptz/i.test(sql), "il registro timbra `applied_at`").toBe(true);
+
+    // 3) il backfill copre 001 + OGNI migrazione presente sul filesystem fino
+    //    alla 020 inclusa. Le migrazioni successive si registrano da sé (la
+    //    strada che registra: scripts/applica-migrazioni.ts) e non sono richieste
+    //    qui — trade-off documentato nel report.
+    const registrate = new Set(
+      Array.from(sql.matchAll(/\('(\d{3}_[a-z0-9_]+)'\)/g)).map((m) => m[1])
+    );
+    expect(registrate.has("001_schema_base"), "manca 001_schema_base nel backfill").toBe(true);
+    const attese = readdirSync(join(ROOT, "supabase/migrazioni"))
+      .filter((n) => n.endsWith(".sql"))
+      .map((n) => n.replace(/\.sql$/, ""))
+      .filter((n) => n <= "020_bonifica")
+      .sort();
+    for (const n of attese) {
+      expect(registrate.has(n), `il backfill della 020 non registra ${n}`).toBe(true);
+    }
+    expect(registrate.size, "il backfill deve valere 20 righe (001 + 002…020)").toBe(
+      attese.length + 1
+    );
+  });
+});
