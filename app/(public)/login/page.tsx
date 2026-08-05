@@ -82,7 +82,7 @@ function LoginForm() {
       </form>
       <p className="mt-4 text-center text-sm text-soft">
         Prima volta qui?{" "}
-        <Link href="/registrati" className="font-semibold text-ottone-scuro hover:underline">
+        <Link href="/registrati" className="font-semibold text-ambra-700 hover:underline">
           Crea il tuo negozio
         </Link>
       </p>

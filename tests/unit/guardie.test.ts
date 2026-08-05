@@ -584,39 +584,55 @@ describe("L4e · guardie portale pubblico", () => {
     ).toBe(true);
   });
 
-  it("G13c · i token Tailwind preesistenti sono invariati e lo spazio `lim` esiste", () => {
+  it("G13c · i token Limpidia sono quelli di DS-01 e lo spazio `lim` è allineato", () => {
+    // Riscritta col ramo `design/token-e-icone`. Prima pinnava la palette ottone
+    // e vietava di toccarla «nemmeno una virgola»: era giusto finché non c'era
+    // una decisione di design. Ora c'è (docs/design/DS-01-sistema-visivo.md) e i
+    // valori pinnati sono quelli. L'intento della guardia non cambia: la palette
+    // non deve poter derivare per sbaglio, un token alla volta, senza decisione.
     const src = leggi("tailwind.config.ts");
     const compatta = src.replace(/\s+/g, "");
-    // Ogni token del gestionale, valore per valore: se qualcuno ne cambia uno,
-    // rompe qui (la consegna vieta di toccarli «nemmeno una virgola»).
+
     const attesi: [string, string][] = [
-      ["carta", "#FAF7F2"],
-      ["inchiostro", "#1C1714"],
-      ["linea", "#E7DFD2"],
-      ["soft", "#6B5D50"],
-      ["faint", "#B9AA97"],
+      ["carta", "#F9EFEA"],
+      ["inchiostro", "#1D1511"],
+      ["linea", "#D7D4D2"],
+      ["soft", "#625B58"],
+      ["faint", "#9D9693"],
     ];
     for (const [nome, val] of attesi) {
       expect(compatta.includes(`${nome}:"${val}"`), `token ${nome} cambiato o mancante`).toBe(true);
     }
-    // ottone e gli stati (oggetti con DEFAULT/soft/scuro)
+
+    // Il seme: `ambra-500` DEVE essere il colore del marchio, non un valore vicino.
+    expect(compatta.includes('500:"#B4551A"'), "ambra-500 non è più il colore del marchio").toBe(true);
+    // I passi su cui poggiano i contrasti verificati in DS-01 §1.
     for (const frag of [
-      'ottone:{DEFAULT:"#A67C42"',
-      'soft:"#EFE4D3"',
-      'scuro:"#8A6533"',
-      'verde:{DEFAULT:"#127E7A",soft:"#E2F0EE"}',
-      'ambra:{DEFAULT:"#C98A2B",soft:"#F7EEDD"}',
-      'blu:{DEFAULT:"#5B6DA8",soft:"#E7EAF6"}',
-      'rosso:{DEFAULT:"#B0483F",soft:"#F6E4E2"}',
+      '600:"#963F00"', // ambra-600 su carta: 6.17 — l'ambra che può portare testo piccolo
+      '300:"#EFA783"', // ambra-300 su inchiostro: 9.51 — l'unica ambra ammessa sul fondo scuro
+    ]) {
+      expect(compatta.includes(frag), `passo della rampa ambra mancante: ${frag}`).toBe(true);
+    }
+    // Gli stati: rampa completa più gli alias DEFAULT/soft, che 50 file usano ancora.
+    for (const frag of [
+      'verde:{50:"#EFF7F3",100:"#DBEDE4",200:"#BFDFD1"',
+      'blu:{50:"#F1F6FB",100:"#DEE9F5",200:"#C2D7EB"',
+      'rosso:{50:"#FEF1F2",100:"#FCE0E2",200:"#F5C3C8"',
     ]) {
       expect(compatta.includes(frag), `frammento token cambiato o mancante: ${frag}`).toBe(true);
     }
-    // Lo spazio di nomi separato del portale esiste e ha valori Limpidia (diversi).
-    expect(compatta.includes('lim:{'), "manca lo spazio colori `lim` del portale").toBe(true);
-    expect(compatta.includes('carta:"#F2F2F0"'), "lim.carta (Limpidia) mancante").toBe(true);
-    expect(compatta.includes('inchiostro:"#171512"'), "lim.inchiostro (Limpidia) mancante").toBe(true);
-    // Prova che i due spazi NON collidono: carta gestionale ≠ carta Limpidia.
-    expect("#FAF7F2").not.toBe("#F2F2F0");
+
+    // L'ottone è uscito: era l'accento di un prodotto che non esiste più.
+    // Se rientra, rientra una seconda identità visiva — e questa guardia lo dice.
+    expect(compatta.includes("ottone:{"), "l'ottone è tornato nella palette").toBe(false);
+
+    // Lo spazio `lim` resta (le pagine negozio lo usano) ma NON è più un secondo
+    // marchio: a marchio unico i due spazi devono portare gli stessi valori.
+    expect(compatta.includes("lim:{"), "manca lo spazio colori `lim` del portale").toBe(true);
+    expect(compatta.includes('ambra:"#B4551A"'), "lim.ambra non è il colore del marchio").toBe(true);
+    const val = (n: string) => compatta.match(new RegExp(`${n}:"(#[0-9A-Fa-f]{6})"`))?.[1];
+    expect(val("carta"), "lim.carta ha divergato da carta").toBe("#F9EFEA");
+    expect(val("inchiostro"), "lim.inchiostro ha divergato da inchiostro").toBe("#1D1511");
   });
 });
 

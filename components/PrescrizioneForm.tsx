@@ -114,8 +114,8 @@ export default function PrescrizioneForm({
 
       {/* Gate consenso dati sanitari (A6): obbligatorio se il cliente non l'ha ancora dato */}
       {!consensoSanitario && (
-        <Card className="space-y-2 border-ottone/40 bg-ottone-soft">
-          <p className="text-xs font-semibold uppercase tracking-wide text-ottone-scuro">
+        <Card className="space-y-2 border-ambra-500/40 bg-ambra-50">
+          <p className="text-xs font-semibold uppercase tracking-wide text-ambra-700">
             Consenso dati sanitari
           </p>
           <label className="flex items-start gap-3 text-sm text-inchiostro">
@@ -208,7 +208,7 @@ export default function PrescrizioneForm({
                 key={t.nome}
                 type="button"
                 onClick={() => applicaTemplate(t)}
-                className="rounded-full border border-linea bg-carta px-3 py-1 text-xs font-medium text-soft transition-colors hover:border-ottone hover:text-ottone-scuro"
+                className="rounded-full border border-linea bg-carta px-3 py-1 text-xs font-medium text-soft transition-colors hover:border-ambra-500 hover:text-ambra-700"
               >
                 {t.nome}
               </button>

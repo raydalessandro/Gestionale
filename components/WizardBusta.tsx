@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { Search } from "lucide-react";
+import { Icona } from "@/components/Icone";
 import { creaBusta } from "@/lib/actions";
 import { createClient } from "@/lib/supabase/client";
 import type { PrescrizioneRow } from "@/lib/database.types";
@@ -161,7 +161,7 @@ export default function WizardBusta({
         {!cliente ? (
           <Card className="space-y-4">
             <div className="relative">
-              <Search
+              <Icona nome="cerca"
                 size={16}
                 className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-faint"
               />
@@ -225,7 +225,7 @@ export default function WizardBusta({
                 key={t}
                 className={`flex cursor-pointer flex-col gap-0.5 rounded-xl border px-4 py-3 transition-colors ${
                   tipoLavoro === t
-                    ? "border-ottone bg-ottone-soft"
+                    ? "border-ambra-500 bg-ambra-50"
                     : "border-linea bg-white hover:border-faint"
                 }`}
               >
@@ -591,7 +591,7 @@ export default function WizardBusta({
               name="stato"
               value="lavorazione"
               disabled={inCorso || !cliente || centraturaErr}
-              className="rounded-xl bg-ottone px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-ottone-scuro disabled:opacity-50"
+              className="rounded-xl bg-ambra-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-ambra-700 disabled:opacity-50"
             >
               {inCorso ? "Creo…" : "Crea busta"}
             </button>

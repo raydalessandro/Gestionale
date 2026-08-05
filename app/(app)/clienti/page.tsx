@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Search, UserPlus, ChevronRight } from "lucide-react";
+import { FiguraVuota } from "@/components/FigureVuote";
+import { Icona } from "@/components/Icone";
 import { createClient } from "@/lib/supabase/server";
 import {
   Card,
@@ -43,13 +44,13 @@ export default async function ClientiPage({
         sotto="L'anagrafica del negozio: da qui partono prescrizioni e ordini."
         azione={
           <ButtonLink href="/clienti/nuovo" variante="accent">
-            <UserPlus size={16} /> Nuovo cliente
+            <Icona nome="cliente-nuovo" size={16} /> Nuovo cliente
           </ButtonLink>
         }
       />
 
       <form className="relative mb-4" action="/clienti" method="get">
-        <Search
+        <Icona nome="cerca"
           size={16}
           className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-faint"
         />
@@ -82,27 +83,29 @@ export default async function ClientiPage({
               <Badge tinta={tintaFonte(c.fonte)}>
                 {ETICHETTE_FONTE[c.fonte] ?? c.fonte}
               </Badge>
-              <ChevronRight size={16} className="shrink-0 text-faint" />
+              <Icona nome="freccia-dx" size={16} className="shrink-0 text-faint" />
             </Link>
           ))}
         </Card>
       ) : q ? (
         <Vuoto
-          titolo="Nessun risultato"
-          testo={`Nessun cliente corrisponde a "${q}". Prova con meno lettere, o crealo al volo.`}
+          figura={<FiguraVuota nome="cerca" />}
+          titolo="Nessuno con questo nome"
+          testo={`In archivio non c'è nessun «${q}». Prova con meno lettere — la ricerca prende anche pezzi di cognome — oppure crealo adesso.`}
           azione={
             <ButtonLink href="/clienti/nuovo" variante="ghost">
-              <UserPlus size={16} /> Nuovo cliente
+              <Icona nome="cliente-nuovo" size={16} /> Nuovo cliente
             </ButtonLink>
           }
         />
       ) : (
         <Vuoto
+          figura={<FiguraVuota nome="clienti" />}
           titolo="Ancora nessun cliente"
-          testo="Aggiungi il primo: bastano nome e cognome, il resto si completa strada facendo."
+          testo="Aggiungi il primo: bastano nome e cognome. Da lì partono prescrizioni, buste e richiami — il resto si completa strada facendo."
           azione={
             <ButtonLink href="/clienti/nuovo" variante="ghost">
-              <UserPlus size={16} /> Aggiungi il primo cliente
+              <Icona nome="cliente-nuovo" size={16} /> Aggiungi il primo cliente
             </ButtonLink>
           }
         />

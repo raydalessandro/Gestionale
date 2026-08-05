@@ -29,7 +29,7 @@ export function BannerConsensi({
   ].filter(Boolean);
 
   return (
-    <div className="mb-4 rounded-xl border border-ottone/40 bg-ottone-soft px-4 py-3">
+    <div className="mb-4 rounded-xl border border-ambra-500/40 bg-ambra-50 px-4 py-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="text-sm text-inchiostro">
           {mancanti.map((m, i) => (
@@ -37,7 +37,7 @@ export function BannerConsensi({
           ))}
         </div>
         {!aperto && (
-          <button type="button" onClick={() => setAperto(true)} className={`${btn} bg-ottone text-white hover:bg-ottone-scuro`}>
+          <button type="button" onClick={() => setAperto(true)} className={`${btn} bg-ambra-500 text-white hover:bg-ambra-700`}>
             Registra consensi
           </button>
         )}

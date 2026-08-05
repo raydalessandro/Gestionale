@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Phone, MessageCircle } from "lucide-react";
+import { FiguraVuota } from "@/components/FigureVuote";
+import { Icona } from "@/components/Icone";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader, Card, Badge, Vuoto } from "@/components/ui";
 import { normalizzaTelefono, waLink } from "@/components/OrdiniUI";
@@ -39,10 +40,10 @@ function Contatti({ telefono, messaggio }: { telefono: string | null; messaggio:
   return (
     <div className="flex gap-1.5">
       <a href={`tel:${normalizzaTelefono(telefono)}`} className="inline-flex items-center gap-1 rounded-lg border border-linea bg-white px-2.5 py-1 text-xs font-semibold text-inchiostro hover:bg-carta">
-        <Phone size={12} /> Chiama
+        <Icona nome="telefono" size={12} /> Chiama
       </a>
       <a href={waLink(telefono, messaggio)} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 rounded-lg border border-linea bg-white px-2.5 py-1 text-xs font-semibold text-inchiostro hover:bg-carta">
-        <MessageCircle size={12} /> WhatsApp
+        <Icona nome="messaggio" size={12} /> WhatsApp
       </a>
     </div>
   );
@@ -111,7 +112,7 @@ export default async function RichiamiPage() {
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <Badge tinta="ottone">{etichettaTipoRichiamo(r.tipo)}</Badge>
+                      <Badge tinta="neutro">{etichettaTipoRichiamo(r.tipo)}</Badge>
                       {c && r.cliente_id && (
                         <Link href={`/clienti/${r.cliente_id}`} className="text-sm font-semibold text-inchiostro hover:underline">
                           {c.cognome} {c.nome}
@@ -144,7 +145,7 @@ export default async function RichiamiPage() {
               <div key={r.id} className="flex items-center justify-between gap-2 px-5 py-3">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <Badge tinta="ottone">{etichettaTipoRichiamo(r.tipo)}</Badge>
+                    <Badge tinta="neutro">{etichettaTipoRichiamo(r.tipo)}</Badge>
                     {c && r.cliente_id && (
                       <Link href={`/clienti/${r.cliente_id}`} className="text-sm font-semibold text-inchiostro hover:underline">{c.cognome} {c.nome}</Link>
                     )}
@@ -157,7 +158,15 @@ export default async function RichiamiPage() {
           })}
         </Card>
       ) : (
-        <Card className="mb-6"><p className="text-sm text-faint">Niente da richiamare oggi. Buon lavoro.</p></Card>
+        <div className="mb-6">
+          {/* Tono «conferma»: questo elenco vuoto è una buona notizia e non
+              deve sembrare un guasto. Vedi DS-01 §5.3. */}
+          <Vuoto
+            figura={<FiguraVuota nome="fatto" />}
+            titolo="Niente da richiamare oggi"
+            testo="I controlli a dodici mesi entrano in lista da soli: quando ne matura uno lo trovi qui, senza doverlo cercare."
+          />
+        </div>
       )}
 
       {/* 2 · Proposte */}
@@ -174,7 +183,7 @@ export default async function RichiamiPage() {
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-1.5">
-                    <Badge tinta="ottone">{etichettaTipoRichiamo(p.tipo)}</Badge>
+                    <Badge tinta="neutro">{etichettaTipoRichiamo(p.tipo)}</Badge>
                     <Link href={`/clienti/${p.cliente_id}`} className="text-sm font-semibold text-inchiostro hover:underline">{p.clienteNome}</Link>
                     {p.nonContattare && <Badge tinta="neutro">Non contattare</Badge>}
                   </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { Search, Trash2, Plus, Wand2, PackageSearch } from "lucide-react";
+import { Icona } from "@/components/Icone";
 import { creaOrdineLac } from "@/lib/actions";
 import { createClient } from "@/lib/supabase/client";
 import type { PrescrizioneRow } from "@/lib/database.types";
@@ -210,7 +210,7 @@ export default function WizardOrdineLac({
       {passo === 1 && (
         <Card className="space-y-4">
           <div className="relative">
-            <Search
+            <Icona nome="cerca"
               size={16}
               className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-faint"
             />
@@ -275,9 +275,9 @@ export default function WizardOrdineLac({
                   <button
                     type="button"
                     onClick={daPrescrizione}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-ottone bg-ottone-soft px-3 py-1 text-xs font-semibold text-ottone-scuro"
+                    className="inline-flex items-center gap-1.5 rounded-full border border-ambra-500 bg-ambra-50 px-3 py-1 text-xs font-semibold text-ambra-700"
                   >
-                    <Wand2 size={13} /> Da prescrizione
+                    <Icona nome="bacchetta" size={13} /> Da prescrizione
                   </button>
                 )}
                 <button
@@ -286,17 +286,17 @@ export default function WizardOrdineLac({
                   className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${
                     catAperto
                       ? "border-inchiostro bg-inchiostro text-carta"
-                      : "border-ottone bg-ottone-soft text-ottone-scuro"
+                      : "border-ambra-500 bg-ambra-50 text-ambra-700"
                   }`}
                 >
-                  <PackageSearch size={13} /> Da catalogo
+                  <Icona nome="scatola-cerca" size={13} /> Da catalogo
                 </button>
                 <button
                   type="button"
                   onClick={() => setRighe((r) => [...r, { ...rigaVuota }])}
                   className="inline-flex items-center gap-1.5 rounded-full border border-linea bg-white px-3 py-1 text-xs font-medium text-soft hover:border-faint hover:text-inchiostro"
                 >
-                  <Plus size={13} /> Aggiungi riga
+                  <Icona nome="piu" size={13} /> Aggiungi riga
                 </button>
               </div>
             </div>
@@ -304,7 +304,7 @@ export default function WizardOrdineLac({
             {catAperto && (
               <div className="rounded-xl border border-linea bg-carta p-3">
                 <div className="relative">
-                  <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
+                  <Icona nome="cerca" size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
                   <input
                     value={catTerm}
                     onChange={(e) => setCatTerm(e.target.value)}
@@ -440,7 +440,7 @@ export default function WizardOrdineLac({
           <button
             type="submit"
             disabled={inCorso || !righeValide}
-            className="rounded-xl bg-ottone px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-ottone-scuro disabled:opacity-50"
+            className="rounded-xl bg-ambra-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-ambra-700 disabled:opacity-50"
           >
             {inCorso ? "Creo…" : "Crea ordine"}
           </button>
@@ -472,7 +472,7 @@ export function Passi({
                 attivo
                   ? "bg-inchiostro text-carta"
                   : fatto
-                    ? "bg-ottone text-white"
+                    ? "bg-ambra-500 text-white"
                     : "bg-carta text-faint"
               }`}
             >
@@ -515,7 +515,7 @@ export function SchedaClienteMini({
       <button
         type="button"
         onClick={onCambia}
-        className="text-xs font-semibold text-ottone-scuro hover:underline"
+        className="text-xs font-semibold text-ambra-700 hover:underline"
       >
         Cambia
       </button>
@@ -568,7 +568,7 @@ export function SelettoreRx({
               }}
               className={`block w-full rounded-xl border px-4 py-2.5 text-left transition-colors ${
                 sel
-                  ? "border-ottone bg-ottone-soft"
+                  ? "border-ambra-500 bg-ambra-50"
                   : "border-linea bg-white hover:border-faint"
               }`}
             >
@@ -630,7 +630,7 @@ function RigaEditor({
             className="mt-1 shrink-0 text-faint transition-colors hover:text-rosso"
             aria-label="Rimuovi riga"
           >
-            <Trash2 size={16} />
+            <Icona nome="cestino" size={16} />
           </button>
         )}
       </div>

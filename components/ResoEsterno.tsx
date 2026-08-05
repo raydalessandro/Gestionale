@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { Search } from "lucide-react";
+import { Icona } from "@/components/Icone";
 import { creaReso } from "@/lib/actions";
 import { createClient } from "@/lib/supabase/client";
 import { inputCls, Errore } from "@/components/ui";
@@ -29,7 +29,7 @@ export default function ResoEsterno({ metodi }: { metodi: { id: string; nome: st
   }, [term, cliente, supabase]);
 
   if (!aperto) {
-    return <button type="button" onClick={() => setAperto(true)} className="inline-flex items-center gap-2 rounded-xl bg-ottone px-4 py-2.5 text-sm font-semibold text-white hover:bg-ottone-scuro">Nuovo reso</button>;
+    return <button type="button" onClick={() => setAperto(true)} className="inline-flex items-center gap-2 rounded-xl bg-ambra-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-ambra-700">Nuovo reso</button>;
   }
   return (
     <form action={run} className="space-y-3 rounded-xl border border-linea bg-white p-4">
@@ -39,11 +39,11 @@ export default function ResoEsterno({ metodi }: { metodi: { id: string; nome: st
       {cliente ? (
         <div className="flex items-center justify-between rounded-xl border border-linea bg-carta px-3 py-2">
           <span className="text-sm font-semibold text-inchiostro">{cliente.cognome} {cliente.nome}</span>
-          <button type="button" onClick={() => setCliente(null)} className="text-xs font-semibold text-ottone-scuro hover:underline">Cambia</button>
+          <button type="button" onClick={() => setCliente(null)} className="text-xs font-semibold text-ambra-700 hover:underline">Cambia</button>
         </div>
       ) : (
         <div className="relative">
-          <Search size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
+          <Icona nome="cerca" size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
           <input value={term} onChange={(e) => setTerm(e.target.value)} placeholder="Cliente (facoltativo)…" className={`${inputCls} !pl-9`} />
           {risultati.length > 0 && (
             <div className="mt-1 divide-y divide-linea rounded-xl border border-linea bg-white">

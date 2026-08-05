@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useState } from "react";
-import { Search, Trash2, Plus, PackageSearch } from "lucide-react";
+import { Icona } from "@/components/Icone";
 import { creaVendita, incassaConsegna } from "@/lib/actions";
 import { createClient } from "@/lib/supabase/client";
 import { Card, Field, inputCls, Errore } from "@/components/ui";
@@ -122,11 +122,11 @@ export default function WizardVendita({
         {cliente ? (
           <div className="flex items-center justify-between rounded-xl border border-linea bg-white px-3 py-2">
             <span className="text-sm font-semibold text-inchiostro">{cliente.cognome} {cliente.nome}</span>
-            {!consegna && <button type="button" onClick={() => setCliente(null)} className="text-xs font-semibold text-ottone-scuro hover:underline">Cambia</button>}
+            {!consegna && <button type="button" onClick={() => setCliente(null)} className="text-xs font-semibold text-ambra-700 hover:underline">Cambia</button>}
           </div>
         ) : (
           <div className="relative">
-            <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-faint" />
+            <Icona nome="cerca" size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-faint" />
             <input value={term} onChange={(e) => setTerm(e.target.value)} placeholder="Cerca cliente (facoltativo — vuoto = Non associato)…" className={`${inputCls} !pl-10`} />
             {risultati.length > 0 && (
               <div className="mt-1 divide-y divide-linea rounded-xl border border-linea bg-white">
@@ -144,11 +144,11 @@ export default function WizardVendita({
         <div className="flex flex-wrap items-center justify-between gap-2">
           <p className="text-xs font-semibold uppercase tracking-wide text-faint">Righe</p>
           <div className="flex flex-wrap gap-1.5">
-            <button type="button" onClick={() => setCatAperto((v) => !v)} className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${catAperto ? "border-inchiostro bg-inchiostro text-carta" : "border-ottone bg-ottone-soft text-ottone-scuro"}`}>
-              <PackageSearch size={13} /> Da catalogo
+            <button type="button" onClick={() => setCatAperto((v) => !v)} className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold ${catAperto ? "border-inchiostro bg-inchiostro text-carta" : "border-ambra-500 bg-ambra-50 text-ambra-700"}`}>
+              <Icona nome="scatola-cerca" size={13} /> Da catalogo
             </button>
             <button type="button" onClick={() => setRighe((r) => [...r, { ...rigaVuota }])} className="inline-flex items-center gap-1.5 rounded-full border border-linea bg-white px-3 py-1 text-xs font-medium text-soft hover:border-faint hover:text-inchiostro">
-              <Plus size={13} /> Aggiungi riga
+              <Icona nome="piu" size={13} /> Aggiungi riga
             </button>
           </div>
         </div>
@@ -174,7 +174,7 @@ export default function WizardVendita({
             <div className="flex items-start gap-2">
               <input value={r.descrizione} onChange={(e) => setRiga(i, { descrizione: e.target.value })} placeholder="Descrizione" className={`${inputCls} flex-1`} aria-label="descrizione riga" />
               {righe.length > 1 && (
-                <button type="button" onClick={() => setRighe((rr) => rr.filter((_, j) => j !== i))} className="mt-1 shrink-0 text-faint hover:text-rosso" aria-label="Rimuovi riga"><Trash2 size={16} /></button>
+                <button type="button" onClick={() => setRighe((rr) => rr.filter((_, j) => j !== i))} className="mt-1 shrink-0 text-faint hover:text-rosso" aria-label="Rimuovi riga"><Icona nome="cestino" size={16} /></button>
               )}
             </div>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -202,7 +202,7 @@ export default function WizardVendita({
         <div className="flex items-center justify-between">
           <p className="text-xs font-semibold uppercase tracking-wide text-faint">Pagamenti</p>
           <button type="button" onClick={() => setPagamenti((p) => [...p, { metodo_id: null, nome: "", importo: "0", consegnato: "" }])} className="inline-flex items-center gap-1.5 rounded-full border border-linea bg-white px-3 py-1 text-xs font-medium text-soft hover:border-faint hover:text-inchiostro">
-            <Plus size={13} /> Aggiungi
+            <Icona nome="piu" size={13} /> Aggiungi
           </button>
         </div>
         {pagamenti.map((p, i) => {
@@ -226,7 +226,7 @@ export default function WizardVendita({
                 </select>
                 <input type="number" min={0} step="0.01" value={p.importo} onChange={(e) => setPag(i, { importo: e.target.value })} placeholder="importo" className={`${inputCls} diottria w-28`} aria-label="importo" />
                 {pagamenti.length > 1 && (
-                  <button type="button" onClick={() => setPagamenti((pp) => pp.filter((_, j) => j !== i))} className="shrink-0 text-faint hover:text-rosso" aria-label="Rimuovi pagamento"><Trash2 size={16} /></button>
+                  <button type="button" onClick={() => setPagamenti((pp) => pp.filter((_, j) => j !== i))} className="shrink-0 text-faint hover:text-rosso" aria-label="Rimuovi pagamento"><Icona nome="cestino" size={16} /></button>
                 )}
               </div>
               {isContanti && (
@@ -269,7 +269,7 @@ export default function WizardVendita({
                 <>
                   <Field label="Data vendita (passata)" className="mt-2"><input name="data_vendita" type="date" value={dataVendita} onChange={(e) => setDataVendita(e.target.value)} className={inputCls} /></Field>
                   {giornoChiuso && (
-                    <p className="mt-2 rounded-lg border border-ambra/40 bg-ambra-soft px-3 py-2 text-xs text-ambra">
+                    <p className="mt-2 rounded border-l-[3px] border-blu-600 bg-blu-50 px-3 py-2 text-xs text-inchiostro">
                       Questa giornata è già chiusa: la vendita resterà fuori dalle quadrature (comparirà nella lista, non nella chiusura).
                     </p>
                   )}
@@ -282,7 +282,7 @@ export default function WizardVendita({
       </details>
 
       <div className="flex justify-end">
-        <button type="submit" disabled={inCorso || !righeValide || !quadra} className="rounded-xl bg-ottone px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-ottone-scuro disabled:opacity-50">
+        <button type="submit" disabled={inCorso || !righeValide || !quadra} className="rounded-xl bg-ambra-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-ambra-700 disabled:opacity-50">
           {inCorso ? "Registro…" : consegna ? "Consegna e incassa" : "Registra vendita"}
         </button>
       </div>

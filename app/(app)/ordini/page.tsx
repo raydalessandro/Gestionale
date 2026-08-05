@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Search, Plus, ChevronRight } from "lucide-react";
+import { FiguraVuota } from "@/components/FigureVuote";
+import { Icona } from "@/components/Icone";
 import { createClient } from "@/lib/supabase/server";
 import {
   PageHeader,
@@ -100,11 +101,11 @@ export default async function OrdiniPage({
         azione={
           vista === "lac" ? (
             <ButtonLink href="/ordini/lac/nuovo" variante="accent">
-              <Plus size={16} /> Nuovo ordine LAC
+              <Icona nome="piu" size={16} /> Nuovo ordine LAC
             </ButtonLink>
           ) : (
             <ButtonLink href="/ordini/buste/nuova" variante="accent">
-              <Plus size={16} /> Nuova busta
+              <Icona nome="piu" size={16} /> Nuova busta
             </ButtonLink>
           )
         }
@@ -133,7 +134,7 @@ export default async function OrdiniPage({
       <form className="relative mb-3" action="/ordini" method="get">
         <input type="hidden" name="vista" value={vista} />
         {stato && <input type="hidden" name="stato" value={stato} />}
-        <Search
+        <Icona nome="cerca"
           size={16}
           className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-faint"
         />
@@ -201,27 +202,28 @@ export default async function OrdiniPage({
                     )}
                   </span>
                 </div>
-                <ChevronRight size={16} className="shrink-0 text-faint" />
+                <Icona nome="freccia-dx" size={16} className="shrink-0 text-faint" />
               </Link>
             );
           })}
         </Card>
       ) : (
         <Vuoto
-          titolo={q || stato ? "Nessun ordine trovato" : "Ancora nessun ordine"}
+          figura={<FiguraVuota nome={q || stato ? "cerca" : "ordini"} />}
+          titolo={q || stato ? "Nessun ordine così" : "Ancora nessun ordine"}
           testo={
             q || stato
-              ? "Cambia filtro o ricerca per vedere altri ordini."
+              ? "Degli ordini ci sono, ma nessuno che corrisponda. Togli un filtro o cerca con meno lettere."
               : vista === "lac"
-                ? "Crea il primo ordine di lenti a contatto dal banco."
-                : "Apri la prima busta lavoro: dalla Rx alla consegna."
+                ? "Crea il primo ordine di lenti a contatto dal banco: da qui segui da_ordinare → ordinato → arrivato → consegnato senza rincorrere nessuno."
+                : "Apri la prima busta lavoro: dalla Rx alla consegna, con la numerazione che si assegna da sé."
           }
           azione={
             <ButtonLink
               href={vista === "lac" ? "/ordini/lac/nuovo" : "/ordini/buste/nuova"}
               variante="ghost"
             >
-              <Plus size={16} /> {vista === "lac" ? "Nuovo ordine LAC" : "Nuova busta"}
+              <Icona nome="piu" size={16} /> {vista === "lac" ? "Nuovo ordine LAC" : "Nuova busta"}
             </ButtonLink>
           }
         />

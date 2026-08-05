@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Printer } from "lucide-react";
+import { Icona } from "@/components/Icone";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader, Card, Badge, ButtonLink } from "@/components/ui";
 import { etichettaCausaleReso } from "@/components/CassaUI";
@@ -22,12 +22,12 @@ export default async function ResoPage({ params }: { params: Promise<{ id: strin
     <>
       <PageHeader
         titolo=""
-        azione={r.tipo === "denaro" ? <ButtonLink href={`/cassa/resi/${r.id}/quietanza`} variante="ghost"><Printer size={15} /> Quietanza</ButtonLink> : undefined}
+        azione={r.tipo === "denaro" ? <ButtonLink href={`/cassa/resi/${r.id}/quietanza`} variante="ghost"><Icona nome="stampa" size={15} /> Quietanza</ButtonLink> : undefined}
       />
       <div className="-mt-2 mb-6">
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="f-mono text-3xl font-semibold text-inchiostro">{r.numero}</h1>
-          <Badge tinta={r.tipo === "denaro" ? "ambra" : "neutro"}>{r.tipo === "denaro" ? "Rimborso" : "Gestionale"}</Badge>
+          <Badge tinta={r.tipo === "denaro" ? "blu" : "neutro"}>{r.tipo === "denaro" ? "Rimborso" : "Gestionale"}</Badge>
         </div>
         <p className="mt-1 text-sm text-soft">{fmtQuando(r.created_at)}{cliente ? <> · <Link href={`/clienti/${cliente.id}`} className="hover:underline">{cliente.cognome} {cliente.nome}</Link></> : ""}</p>
       </div>

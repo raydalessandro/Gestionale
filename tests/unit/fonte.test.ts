@@ -14,17 +14,30 @@ import { tintaFonte } from "@/components/ui";
 
 describe("tintaFonte (components/ui.tsx)", () => {
   it("mappa ogni fonte alla tinta attesa del badge", () => {
+    // Riassegnate col ramo `design/componenti-base`. La regola (DS-01 §1.3):
+    // le fonti sono PROVENIENZE, non stati — in un elenco di trenta buste
+    // trenta pastiglie colorate sono rumore. Restano neutre, e portano l'ambra
+    // solo quelle che arrivano dal canale Limpidia, dove la pastiglia dice
+    // «questa te l'abbiamo portata noi».
     const attese: Record<string, string> = {
       banco: "neutro",
-      app: "verde",
-      convenzione: "ottone",
+      app: "ambra",
+      convenzione: "neutro",
       import: "neutro",
       qr_vetrina: "ambra",
-      sito_negozio: "blu",
+      sito_negozio: "ambra",
       portale: "ambra",
     };
     for (const [fonte, tinta] of Object.entries(attese)) {
       expect(tintaFonte(fonte), `tinta errata per ${fonte}`).toBe(tinta);
+    }
+  });
+
+  it("solo il canale Limpidia porta l'ambra: le altre fonti restano neutre", () => {
+    // La guardia vera del §: se domani qualcuno colora `banco` o `import`,
+    // l'ambra smette di voler dire qualcosa e la regola muore in silenzio.
+    for (const f of ["banco", "convenzione", "import"]) {
+      expect(tintaFonte(f), `${f} non arriva da Limpidia: non può essere ambra`).toBe("neutro");
     }
   });
 

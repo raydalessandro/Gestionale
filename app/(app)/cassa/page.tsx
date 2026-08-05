@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus, Settings, ChevronRight } from "lucide-react";
+import { Icona } from "@/components/Icone";
 import { createClient } from "@/lib/supabase/server";
 import { PageHeader, Card, ButtonLink, Vuoto } from "@/components/ui";
 import { PillStatoVendita } from "@/components/CassaUI";
@@ -62,13 +62,13 @@ export default async function CassaPage() {
         sotto="La giornata, a colpo d'occhio."
         azione={
           <div className="flex flex-wrap gap-2">
-            <ButtonLink href="/cassa/vendita/nuova" variante="accent"><Plus size={16} /> Vendita veloce</ButtonLink>
+            <ButtonLink href="/cassa/vendita/nuova" variante="accent"><Icona nome="piu" size={16} /> Vendita veloce</ButtonLink>
             {chiusuraOggi ? (
               <ButtonLink href={`/cassa/chiusure/${chiusuraOggi.id}`} variante="ghost">Chiusura di oggi ✓</ButtonLink>
             ) : (
               <ButtonLink href="/cassa/chiusura" variante="ghost">Chiudi la giornata</ButtonLink>
             )}
-            <ButtonLink href="/cassa/impostazioni" variante="ghost"><Settings size={15} /></ButtonLink>
+            <ButtonLink href="/cassa/impostazioni" variante="ghost"><Icona nome="impostazioni" size={15} /></ButtonLink>
           </div>
         }
       />
@@ -108,12 +108,12 @@ export default async function CassaPage() {
                   </div>
                   <span className="f-mono text-sm tabular-nums text-inchiostro">{fmtEuro(v.totale)}</span>
                   <PillStatoVendita stato={v.stato} />
-                  <ChevronRight size={15} className="shrink-0 text-faint" />
+                  <Icona nome="freccia-dx" size={15} className="shrink-0 text-faint" />
                 </Link>
               ))}
             </div>
           ) : (
-            <div className="p-5"><Vuoto titolo="Ancora niente" testo="La prima vendita di oggi comparirà qui." azione={<ButtonLink href="/cassa/vendita/nuova" variante="ghost"><Plus size={16} /> Vendita veloce</ButtonLink>} /></div>
+            <div className="p-5"><Vuoto titolo="Ancora niente" testo="La prima vendita di oggi comparirà qui." azione={<ButtonLink href="/cassa/vendita/nuova" variante="ghost"><Icona nome="piu" size={16} /> Vendita veloce</ButtonLink>} /></div>
           )}
         </Card>
 

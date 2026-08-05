@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { MessageCircle, CalendarPlus, Banknote } from "lucide-react";
+import { Icona } from "@/components/Icone";
 import {
   eventoOrdineLac,
   eventoBusta,
@@ -24,7 +24,7 @@ const btn =
   "inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-50";
 const stili = {
   primary: "bg-inchiostro text-carta hover:bg-black",
-  accent: "bg-ottone text-white hover:bg-ottone-scuro",
+  accent: "bg-ambra-500 text-white hover:bg-ambra-700",
   ghost: "border border-linea bg-white text-inchiostro hover:border-faint hover:bg-carta",
   danger: "border border-rosso/40 bg-white text-rosso hover:bg-rosso-soft",
 } as const;
@@ -320,7 +320,7 @@ function BottoneConsegna({
     );
   }
   return (
-    <form action={run} className="w-full space-y-2 rounded-xl border border-ottone bg-ottone-soft p-3">
+    <form action={run} className="w-full space-y-2 rounded-xl border border-ambra-500 bg-ambra-50 p-3">
       <p className="text-sm text-inchiostro">
         Saldo da incassare:{" "}
         <span className="f-mono font-semibold">{fmtEuro(saldo)}</span> — confermi la
@@ -351,7 +351,7 @@ function BottoneWhatsApp({ href }: { href: string }) {
       rel="noopener noreferrer"
       className={`${btn} ${stili.ghost}`}
     >
-      <MessageCircle size={16} /> Apri WhatsApp
+      <Icona nome="messaggio" size={16} /> Apri WhatsApp
     </a>
   );
 }
@@ -359,7 +359,7 @@ function BottoneWhatsApp({ href }: { href: string }) {
 function LinkFissaRitiro({ href }: { href: string }) {
   return (
     <a href={href} className={`${btn} ${stili.ghost}`}>
-      <CalendarPlus size={16} /> Fissa ritiro
+      <Icona nome="agenda-piu" size={16} /> Fissa ritiro
     </a>
   );
 }
@@ -367,7 +367,7 @@ function LinkFissaRitiro({ href }: { href: string }) {
 function LinkConsegnaIncassa({ href }: { href: string }) {
   return (
     <a href={href} className={`${btn} ${stili.accent}`}>
-      <Banknote size={16} /> Consegna e incassa
+      <Icona nome="contanti" size={16} /> Consegna e incassa
     </a>
   );
 }
