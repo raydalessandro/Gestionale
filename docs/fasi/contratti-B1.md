@@ -24,7 +24,11 @@ fermarsi e segnalare):**
   nazione (+ scala/appartamento) → NULL · note → NULL ·
   dati_fatturazione → NULL · canale_preferito → NULL ·
   assicurazione_id, azienda_convenzionata_id → NULL · cache consensi
-  (consenso_marketing, consenso_canali…) → false / NULL ·
+  (consenso_marketing, consenso_canali, consenso_dati_sanitari,
+  consenso_sanitario_il) → false / NULL · secondo_nome → NULL ·
+  tutore_legale (testo legacy, deprecato) → NULL (identifica un TERZO
+  per nome) · lingua → NULL · tags → vuoto · **non_contattare → TRUE**
+  · **fonte → RESTA** (statistica aziendale, non identifica) ·
   **anonimizzato_il → now()** (colonna additive B1: esclude da
   ricerche, code, letture clienti).
 - `consensi` (mastro): le righe SI CONSERVANO (fatti storici su
@@ -37,8 +41,12 @@ fermarsi e segnalare):**
   tutti i campi note/testo libero → NULL (possono contenere
   riferimenti personali).
 - `appuntamenti`, `prenotazioni`, `richiami`: si conservano · note →
-  NULL · nelle prenotazioni-portale collegate: la riga `persone` →
-  email → 'anon-'+id+'@invalid', nome/cognome → NULL.
+  NULL · la riga `persone` collegata: email → 'anon-'+id+'@invalid' ·
+  nome → **'Anonimo'** (costante: il NOT NULL si rispetta, l'identità
+  sparisce; «cognome» non esiste su questa tabella — voce corretta il
+  05/08) · **telefono_grezzo → NULL** (l'anonimo ESCE dalla dedup: il
+  NULL non partecipa all'indice unico; se il vincolo è NOT NULL, la
+  migrazione lo ALLENTA — modifica di vincolo, lecita, non è un drop).
 - `ordini_occhiali` / `ordini_lac`: SI CONSERVANO (fatti + istantanee
   Rx) · note → NULL · canale_contatto → NULL (è un recapito).
 - `beni_in_custodia`: si conserva; descrizione resta (è dell'oggetto).
@@ -51,6 +59,11 @@ fermarsi e segnalare):**
   oltre i riferimenti, che ora puntano a un anonimo).
 - `utenti`: FUORI SCOPE (operatori, non clienti).
 
+**Regola generale (05/08, per i campi che emergeranno)**: i
+quasi-identificatori e i testi liberi → NULL · le cache di consenso →
+false/NULL · i flag operativi si spengono IN SENSO RESTRITTIVO
+(non_contattare→true) · i dati statistici non personali (fonte,
+timestamps di sistema) → restano. Il dubbio resta dubbio: ci si ferma.
 **Test richiesti**: unit sulla mappa (ogni campo della lista, prima/
 dopo) · E2E = M1 S6 («anonimizzato, fatti fiscali intatti») + query di
 controllo: nessun campo personale ≠ NULL sul cliente anonimo, vendite
