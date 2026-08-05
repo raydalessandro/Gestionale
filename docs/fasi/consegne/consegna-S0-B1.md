@@ -37,7 +37,11 @@ sulle tre funzioni trigger (`assicura_coerenza_tenant`,
 `_infra_migrazioni`: `create table if not exists` (stessa struttura
 di test) + backfill 001→020 `on conflict do nothing` — così la
 stessa migrazione allinea test E produzione.
-**`021_fondamenta.sql`** — DDL dai §4 di M1/M2/M10 + contratti:
+**`021_fondamenta.sql`** — **IN TESTA (decisione §5-bis, 05/08)**:
+`ALTER DEFAULT PRIVILEGES` — revoke ad `anon` sulle TABELLE future e
+a `PUBLIC`/`anon` sulle FUNZIONI future (l'invariante che rende
+permanente l'igiene della 020; le viste-portale prendono grant
+esplicito, VP-01). Poi il DDL dai §4 di M1/M2/M10 + contratti:
 `consensi` (con `prescrizione_id` e i CHECK del contratto C3) ·
 `clienti_relazioni` (check anti-self + **unique index funzionale**
 `least/greatest` sui tipi familiari — C4) · `oculisti` (M2 §4) ·

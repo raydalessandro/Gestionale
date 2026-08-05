@@ -216,6 +216,12 @@ Sigillo apposto il 04/08 (camminate chiuse); il filone Applicazione è
 innesto Y della collega.
 
 ## 10 · Congelamento
+**Annotazione 2 · 05/08 (esito S0)** — l'ipotesi «pezzi mancanti nel
+catalogo piatto» come causa del timeout è stata SMENTITA dalla
+diagnosi (tabella riga-per-riga in S0-verita.md): la causa vera è nel
+trace e si chiude in B3. Il ridisegno a scala di f5g resta valido per
+le sue ragioni proprie (niente esplosione combinatoria), non come fix
+del bug.
 **Annotazione 1 · 04/08 (audit)** — refusi di patch: il bullet
 «Variante» compariva due volte (fa fede «Variante-prodotto»); S6 punta
 a «§11.3» che ora è 11-bis.3.
