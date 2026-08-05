@@ -12,6 +12,10 @@ FASE X (dedicata, dopo): qui non si spreca contesto a girare.*
   **la CI è il cancello** — verde o non si entra.
 - **Le spec sono il contratto**: congelate; ogni deroga è
   un'annotazione §10 datata, mai una riapertura.
+- **Le default privileges sono CHIUSE (dalla 021, decisione 05/08)**:
+  tabelle E funzioni nuove nascono senza grant ad anon/PUBLIC; le
+  viste-portale ricevono grant ESPLICITO (VP-01). La 020 era la
+  fotografia, questa è l'invariante.
 - **Errori di tenant**: sulle tabelle con `trg_tenant` il codice si
   aspetta SEMPRE `23514` (mai `23503`): il trigger parla prima delle
   FK, che restano rete di fondo. Nessun ramo di gestione su 23503.
@@ -95,7 +99,11 @@ relazioni lette nei due versi, proposta-tutore da CF minorenne,
 revoca dal tasto (cache spenta, operativi leciti), **eliminazione
 definitiva protetta** (anonimizzazione che preserva i fatti fiscali —
 «possibile, non comodissima»).
-**`docs/fasi/contratti-B1.md` è PARTE della busta** (si copia dentro):
+**In TESTA alla 021 (esito S0, sì di Ray+Claude 05/08)**: `ALTER
+DEFAULT PRIVILEGES` — revoke ad anon sulle TABELLE future e a
+PUBLIC/anon sulle FUNZIONI future (la gemella del buco EXECUTE
+trovato dal rito). **`docs/fasi/contratti-B1.md` è PARTE della
+busta** (si copia dentro):
 C1 anonimizzazione con mappa campo→trasformazione · C2 helper
 fail-closed (tabella esaustiva) · C3 invarianti consensi (CHECK +
 lock transazionale: la cache è l'ultimo commit, mai gare) · C4
@@ -164,8 +172,8 @@ la politica esce dal codice). E2E: M8 S1-S7. (RT/fiscale profondo: NO — è MF.
 **B6 · Agenda evoluta** ⚡ *PARALLELIZZABILE dopo B1 (dipendenze
 minime) — ed è la PRIMA ERA del portale: priorità di lancio.* —
 migrazioni: `servizi.tipo_visita` · `appuntamenti.riprogrammato_da` ·
-`prenotazioni.riprogramma_di` · (`negozi_servizi.attivo` se S0 dice
-che manca). Azioni: riprogramma dal banco, **link firmati** (disdetta
+`prenotazioni.riprogramma_di` · (`negozi_servizi.attivo` ESISTE — verificato in S0: niente da
+aggiungere). Azioni: riprogramma dal banco, **link firmati** (disdetta
 libera + richiesta cambio), **visita eliminata visibile in giornata**
 (l'effetto wow), «Apri Rx» (colonna+bottone), lista d'attesa che
 propone, tassonomia nel seed, `slot_liberi` che legge passo/anticipo/
@@ -175,7 +183,10 @@ rilievo: politica di negozio scritta nel database). E2E: M6 S1-S6.
 **B7 · Richiami** — migrazione: `tarature_richiami` (+ voce esito
 `da_spostare` additive). Il motore = CODE come proiezioni (query/
 viste): controllo_vista (gerarchia Rx→prenotazione, gate consenso
-marketing, solo la DATA), lac_esaurimento (copertura ÷2 + anticipo),
+marketing, solo la DATA), lac_esaurimento (copertura ÷2 + anticipo — **esito S0**: gli occhi
+vivono nel JSONB delle righe, da spacchettare; le righe legacy con
+occhio NULLO si trattano da BILATERALI, ÷2, il caso peggiore
+prudente),
 win-back (copertura superata + mancati), sollecito ritiro, fermi.
 Gesto del richiamo con esiti. TDD: copertura (i due occhi!), gate
 consenso. E2E: M7 S1-S7.
