@@ -116,7 +116,12 @@ export function PermessiCliente({
         anonimizzato={anonimizzato}
       />
 
-      <Relazioni clienteId={clienteId} relazioni={relazioni} candidati={candidati} />
+      <Relazioni
+        clienteId={clienteId}
+        relazioni={relazioni}
+        candidati={candidati}
+        anonimizzato={anonimizzato}
+      />
 
       {!anonimizzato && <EliminazioneDefinitiva clienteId={clienteId} />}
     </Card>
@@ -289,10 +294,12 @@ function Relazioni({
   clienteId,
   relazioni,
   candidati,
+  anonimizzato,
 }: {
   clienteId: string;
   relazioni: RigaRelazione[];
   candidati: ClienteMini[];
+  anonimizzato: boolean;
 }) {
   const router = useRouter();
   const [aperto, setAperto] = useState(false);
@@ -327,12 +334,17 @@ function Relazioni({
     <div className="space-y-2 border-t border-linea pt-4">
       <div className="flex items-center justify-between gap-2">
         <p className="text-sm font-semibold text-inchiostro">Famiglia e tutela</p>
-        <button type="button" className={BTN_CHIARO} onClick={() => setAperto((v) => !v)}>
-          Aggiungi relazione
-        </button>
+        {/* Su un cliente anonimizzato non si ricollega nessuno: l'anonimizzazione
+            cancella le relazioni apposta, perché de-anonimizzano per prossimità
+            (C1). Ridarne una qui rimetterebbe in piedi ciò che è stato tolto. */}
+        {!anonimizzato && (
+          <button type="button" className={BTN_CHIARO} onClick={() => setAperto((v) => !v)}>
+            Aggiungi relazione
+          </button>
+        )}
       </div>
 
-      {aperto && (
+      {aperto && !anonimizzato && (
         <div className="space-y-3 rounded-xl border border-linea bg-carta p-3">
           <SceltaPersona candidati={candidati} onScegli={setRelativo} />
           <Field label="Tipo di relazione">
