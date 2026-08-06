@@ -57,10 +57,16 @@ coupon aziendali. Quando saranno pronte, questo capitolo si aggiornerà.
   correggere un recapito non spegne più il consenso senza che te ne accorga.
   Nella stessa sezione nascono **"Famiglia e tutela"** (collegare due schede:
   genitori, figli, fratelli, tutore anche ente) e l'**eliminazione definitiva**
-  dei dati di una persona, che lascia intatti vendite e ordini. Nel form del
-  cliente arriva **"Sconti e fatturazione"**: assicurazione, ragione sociale,
-  partita IVA e codice SDI. Il riquadro giallo in scheda resta per il solo
-  **consenso ai dati sanitari**.
+  dei dati di una persona, che lascia intatti vendite e ordini. Anche il
+  **tutore legale non si scrive più a mano**: il campo di testo dell'Identità
+  è sparito e la tutela si registra come collegamento in "Famiglia e tutela";
+  dove quel nome c'era già, resta da leggere come **"Tutore legale
+  (storico)"**. L'eliminazione definitiva tocca ora anche le **prenotazioni
+  arrivate dal sito** (restano, ma senza nome né telefono) e resta un fatto del
+  **tuo** negozio: se la stessa persona ha prenotato altrove, quei dati li
+  cancella quel negozio. Nel form del cliente arriva **"Sconti e
+  fatturazione"**: assicurazione, ragione sociale, partita IVA e codice SDI. Il
+  riquadro giallo in scheda resta per il solo **consenso ai dati sanitari**.
 - **Luglio 2026 — v0.5.1** — Rifiniture prima del collaudo. La **scheda
   cliente** si completa (secondo nome, tre telefoni, canale preferito,
   indirizzo, tutore per i minori, "Non contattare"); arrivano i **consensi**

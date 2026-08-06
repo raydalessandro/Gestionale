@@ -58,6 +58,14 @@ scheda vedi in alto un riquadro: premi **"Consenso sanitario"**, spunta la
 casella, controlla la data (la puoi arretrare per le informative firmate su
 carta tempo fa) e premi **"Salva il consenso sanitario"**.
 
+**Dove scrivo il nome di chi risponde per un minorenne?**
+Non lo scrivi più a mano: nel form del cliente quel campo non c'è più. Lo
+**colleghi**, dalla sezione **"Permessi"**, riquadro **"Famiglia e tutela"**,
+scegliendo il tipo **Tutore legale**. Così il legame vive fra due schede vere e
+si legge da tutte e due. Sulle schede vecchie il nome che c'era scritto resta
+visibile come **"Tutore legale (storico)"**, in sola lettura: non si compila e
+non si corregge, serve solo a non perdere quello che avevi annotato.
+
 **Come collego un minorenne al genitore, o un assistito al centro che lo
 segue?**
 Dalla scheda, sezione **"Permessi"**, riquadro **"Famiglia e tutela"**: premi
@@ -69,9 +77,22 @@ scrive una volta sola e si legge da tutte e due le schede.
 **Un cliente mi chiede di cancellare i suoi dati: si può?**
 Sì, dalla sezione **"Permessi"**: **"Eliminazione definitiva"**, scrivi
 **ELIMINA** a mano e premi **"Anonimizza definitivamente"**. Nome, recapiti,
-indirizzo, codice fiscale, note e dati di fatturazione spariscono per sempre.
+indirizzo, codice fiscale, note e dati di fatturazione spariscono per sempre,
+insieme alle note libere su prescrizioni, appuntamenti, richiami e ordini.
 Vendite, ordini e movimenti restano: sono fatti aziendali. Lo può fare solo il
 titolare o il responsabile.
+
+**E le prenotazioni che quel cliente aveva fatto dal sito?**
+Restano, ma senza il suo nome. L'appuntamento è un fatto della tua giornata e
+non si cancella; il nome e il telefono di contatto scritti sulla prenotazione
+si spengono, e al posto del nome leggi **"Anonimo"**.
+
+**Ho anonimizzato un cliente: sparisce anche dagli altri negozi?**
+No, e non è un errore. Se quella persona ha prenotato anche da un altro negozio
+che lavora con VISTA, quel negozio continua a vedere il suo nome e il suo
+numero: quei dati sono suoi, e sarà lui a doverli cancellare se il cliente
+glielo chiede. Tu cancelli quello che il **tuo** negozio sa della persona — e
+dal tuo negozio, da quel momento, a lei non ci si arriva più da nessuna parte.
 
 **Che cosa vuol dire "NESSUNA" nella casella Assicurazione?**
 Che gliel'hai chiesto e non ne ha. Lasciarla vuota ("— da rilevare") vuol dire

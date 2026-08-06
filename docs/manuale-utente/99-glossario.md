@@ -19,7 +19,9 @@ modificabile a mano.
 
 **Anonimizzato.** Il segnalino sulla scheda di un cliente di cui hai eliminato
 i dati personali (vedi *Eliminazione definitiva*). Sulla sua scheda non si
-registra più niente; le vendite e gli ordini di prima restano leggibili.
+registra più niente; le vendite e gli ordini di prima restano leggibili, e le
+prenotazioni che aveva fatto dal sito restano ma senza nome ("Anonimo") e senza
+telefono.
 
 **Appuntamento.** Una voce dell'agenda. Nasce **prenotato**; poi diventa
 **completato**, **non presentato** (il cliente non si è presentato) o
@@ -114,9 +116,13 @@ Non si modifica e non si cancella: è la prova di quello che hai raccolto.
 
 **Eliminazione definitiva.** Il gesto con cui, su richiesta del cliente, fai
 sparire i suoi dati personali: si scrive **ELIMINA** a mano e si preme
-**"Anonimizza definitivamente"**. Vendite, ordini e movimenti restano (sono
-fatti aziendali); i collegamenti di famiglia si sciolgono. Solo titolare o
-responsabile.
+**"Anonimizza definitivamente"**. Spariscono nome, recapiti, indirizzo, codice
+fiscale, dati di fatturazione e le note libere su prescrizioni, appuntamenti,
+richiami e ordini; sulle prenotazioni fatte dal sito restano la data e l'orario,
+non il nome né il telefono. Vendite, ordini e movimenti restano (sono fatti
+aziendali); i collegamenti di famiglia si sciolgono. Vale per il **tuo** negozio:
+quello che un altro negozio sa della stessa persona non si tocca. Solo titolare
+o responsabile.
 
 **Famiglia e tutela.** Il riquadro dei "Permessi" dove colleghi la scheda di un
 cliente a un'altra: **Tutore legale** (anche un ente, come un centro sociale),
@@ -133,7 +139,8 @@ resta impegnata finché il cliente la ritira (**"Segna ritirato"**) o rinuncia
 (**"Annulla"**).
 
 **Fonte.** Da dove arriva un cliente o un ordine: Banco, Dal sito, Dall'app,
-Convenzione, Import.
+Convenzione, Import. Resta scritta anche dopo un'eliminazione definitiva: dice
+da dove è arrivato un cliente, non chi era.
 
 **Garanzia (tipo).** Nella busta scegli se la garanzia è un **Servizio del
 negozio** (alla consegna nasce al 22%) o una **Polizza di compagnia** (nasce
@@ -273,7 +280,9 @@ tutela", che lega davvero due schede — anche quella di un ente — e si legge 
 due lati. C'era anche un campo di testo nell'Identità, che scriveva solo un
 nome: non si compila più. Dove qualcuno l'aveva riempito, il nome resta
 visibile come **"Tutore legale (storico)"** e in scheda compare ancora il
-segnalino "Tutore: <nome>" — da leggere, non da correggere.
+segnalino "Tutore: <nome>" — da leggere, non da correggere. Quel segnalino
+arriva **solo** dal vecchio campo: un collegamento nuovo non lo accende, si
+legge nell'elenco dei "Permessi".
 
 **Vendita.** L'incasso registrato in cassa, con un numero suo (`VE-…`). È
 sempre per l'intero valore; i pagamenti (uno o più metodi) devono farne la

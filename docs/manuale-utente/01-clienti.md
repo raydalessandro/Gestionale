@@ -60,7 +60,9 @@ azienda, la riga *"Fattura a …"* con partita IVA e codice SDI.
 In testa alla scheda, sotto il nome, trovi i "vitali": l'**età** (se hai messo
 la data di nascita), la **fonte** e — quando servono — dei segnalini:
 
-- **"Tutore: <nome>"** per i clienti minorenni, così sai subito chi firma;
+- **"Tutore: <nome>"**, solo per le schede vecchie in cui quel nome era stato
+  scritto a mano (vedi *Casi particolari*). Chi hai collegato dopo, con
+  "Famiglia e tutela", lo leggi nell'elenco dei "Permessi", non qui;
 - **"Non contattare"** se hai chiesto di tenerlo fuori dalle promozioni;
 - **"Anonimizzato"** se di quella persona i dati sono stati eliminati.
 
@@ -107,9 +109,10 @@ Per registrarlo, quando Laura Bianchi firma l'informativa:
    firmato e archiviato) o **Digitale**.
 4. Premi **"Salva consenso"**.
 
-La riga in alto si aggiorna e sotto compare una riga nell'elenco delle firme:
-*"Consenso marketing dato il"* con la data di oggi, la modalità e i canali che
-hai spuntato.
+La riga in alto si aggiorna e sotto compare una riga nell'elenco delle firme,
+scritta così:
+
+> Consenso marketing dato il 06/08/2026 · penna · email, cellulare
 
 Se più avanti Laura ti dice «l'email sì, ma non chiamatemi», rifai lo stesso
 gesto spuntando solo **Email**: vale l'ultima firma, e nell'elenco restano
@@ -152,9 +155,13 @@ ricorda ("Consenso dati sanitari: non raccolto"). Per registrarlo:
 4. Premi **"Salva il consenso sanitario"** (oppure **"Chiudi"** per lasciar
    perdere).
 
-Il riquadro sparisce e nel riquadro **Privacy** della scheda leggi *"Dati
-sanitari: sì, dal …"* con la data che hai messo. Lo stesso consenso te lo
-chiede il form della prima prescrizione: vedi il capitolo *Prescrizioni*.
+Il riquadro sparisce e nel riquadro **Privacy** della scheda leggi la data che
+hai messo:
+
+> Dati sanitari: sì, dal 12 mar 2026
+
+Lo stesso consenso te lo chiede il form della prima prescrizione: vedi il
+capitolo *Prescrizioni*.
 
 ### Famiglia e tutela
 
@@ -192,12 +199,31 @@ sezione "Permessi", ed è volutamente scomoda:
 
 Da quel momento nome, recapiti, indirizzo, codice fiscale, note e dati di
 fatturazione spariscono per sempre e i collegamenti di famiglia si sciolgono.
-Restano invece **vendite, ordini e movimenti di magazzino**: sono fatti
+Si svuotano anche le note libere che avevi scritto su prescrizioni,
+appuntamenti, richiami e ordini di quella persona: lì dentro può esserci il suo
+nome. Restano invece **vendite, ordini e movimenti di magazzino**: sono fatti
 aziendali, con i loro numeri e i loro importi, e non si toccano. In testa alla
 scheda compare il segnalino "Anonimizzato" e quella scheda resta fuori dalle
 promozioni per sempre.
 
 Questa operazione la può fare solo il titolare o il responsabile.
+
+### Che fine fanno le prenotazioni dal sito
+
+Se quella persona aveva prenotato un appuntamento dal sito del tuo negozio,
+**la prenotazione resta**: l'appuntamento c'è stato, è un fatto della tua
+giornata e non si cancella. Quello che si spegne è il nome: al posto di "Laura
+Bianchi" leggi **"Anonimo"**, e il telefono di contatto della prenotazione
+resta vuoto.
+
+E qui c'è la cosa che sorprende, quindi vale la pena dirla chiara: se **la
+stessa persona ha prenotato anche da un altro negozio** che lavora con VISTA,
+quell'altro negozio continua a vedere il suo nome e il suo numero. Non è un
+errore. Non stai cancellando quella persona dal mondo: stai cancellando quello
+che **il tuo** negozio sa di lei. Ognuno risponde dei propri dati e ognuno
+anonimizza i propri; dal tuo negozio, da quel momento, a quella persona non ci
+si arriva più da nessuna parte. Se il cliente vuole sparire anche dall'altro
+negozio, deve chiederlo a quel negozio.
 
 ## Casi particolari
 
@@ -215,15 +241,27 @@ Questa operazione la può fare solo il titolare o il responsabile.
   esiste più da compilare, e dove c'era resta in sola lettura come
   **"Tutore legale (storico)"**. Il collegamento di **"Famiglia e tutela"**
   lega davvero due schede e si legge dai due lati.
-- **Il cliente anonimizzato esce dall'elenco.** Non lo trovi più cercandolo
-  in Clienti, e non compare più in nessuna proposta di richiamo. Le sue
-  vendite e i suoi ordini invece restano dove sono, coi numeri e gli importi
-  di sempre: li apri dai registri Cassa e Ordini. Se da lì entri nella sua
-  scheda, la trovi col cognome "Anonimizzato-" seguito da una sigla, e su
-  quella scheda non si registra più niente.
+- **Il segnalino "Tutore: <nome>" e il collegamento non sono la stessa cosa.**
+  Il segnalino in testa alla scheda arriva solo dal vecchio campo di testo:
+  finché su una scheda c'è quel nome, il segnalino resta. Un collegamento nuovo
+  fatto in "Famiglia e tutela" non accende nessun segnalino: lo leggi
+  nell'elenco dei "Permessi", da tutte e due le schede. Se una scheda vecchia
+  ti serve in ordine, collega il tutore vero in "Famiglia e tutela" e lascia
+  stare la riga storica: è lì per non perdere quello che c'era scritto.
+- **Il cliente anonimizzato esce dall'elenco.** Non lo trovi più cercandolo in
+  Clienti, non lo puoi collegare a nessuna famiglia e non riceverai più
+  proposte commerciali per lui. Se però aveva lasciato qualcosa di aperto — una
+  busta pronta e mai ritirata, un fermo in scadenza — il richiamo operativo può
+  ancora comparire: lì lo vedi col nome anonimo. Le sue vendite e i suoi ordini
+  restano dove sono, coi numeri e gli importi di sempre: li apri dai registri
+  Cassa e Ordini. Se da lì entri nella sua scheda, la trovi col cognome
+  "Anonimizzato-" seguito da una sigla, e su quella scheda non si registra più
+  niente.
 - **Da dove arriva il cliente (Fonte).** Le scelte sono **Banco**, **Dal
   sito**, **Dall'app**, **Convenzione**, **Import**. Al banco lasci "Banco".
-  Questa voce serve a capire più avanti quali canali ti portano clienti.
+  Questa voce serve a capire più avanti quali canali ti portano clienti. La
+  fonte non sparisce con l'eliminazione definitiva: dice da dove è arrivato un
+  cliente, non chi era.
 - **Codice fiscale, provincia e codice SDI in maiuscolo.** Li puoi scrivere
   come vuoi: VISTA li sistema in maiuscolo da solo.
 
