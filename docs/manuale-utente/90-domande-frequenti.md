@@ -1,4 +1,4 @@
-*Aggiornato a: v0.5.1 (Fasi 4b–4d)*
+*Aggiornato a: v0.5.2 (Era 2 · busta B1)*
 
 # Domande frequenti
 
@@ -25,12 +25,58 @@ caparra rientra come un pagamento già coperto, e batti alla stampante il totale
 pieno. Quando prendi l'acconto scegli il **metodo della caparra**: così quel
 denaro entra subito nella cassa di oggi.
 
-**Come registro i consensi di un cliente?**
-Il **consenso marketing** lo spunti sulla scheda cliente (subito o dopo). Il
-**consenso ai dati sanitari** te lo chiede il form alla prima prescrizione, con
-una spunta obbligatoria. Se manca qualcosa, aprendo la scheda vedi un riquadro
-con **"Registra consensi"** e puoi metterlo anche con una data del passato (per
-i consensi raccolti su carta).
+**Dove si registra il consenso alle comunicazioni?**
+Nella scheda del cliente, sezione **"Permessi"**. Premi **"Registra
+consenso"**, spunta i canali che il cliente ti concede (Email, Cellulare,
+Cartaceo), scegli la **Modalità** con cui hai raccolto la firma (Penna o
+Digitale) e premi **"Salva consenso"**. Nel form del cliente non c'è più
+nessuna spunta: al suo posto trovi una riga che ti rimanda alla scheda.
+
+**Come tolgo il consenso a un cliente che me lo chiede?**
+Sempre dai **"Permessi"**: **"Revoca comunicazioni"**, poi **"Conferma
+revoca"**. Da quel momento niente promozioni; gli avvisi di servizio ("i suoi
+occhiali sono pronti") restano leciti. Se domani ci ripensa, registri un nuovo
+consenso: la revoca non si cancella, resta nell'elenco delle firme con la sua
+data.
+
+**Ho corretto un numero di telefono: ho perso il consenso?**
+No. Modificare la scheda non tocca più i consensi. Prima era una spunta dentro
+il form e bastava salvare per spegnerla senza accorgersene; adesso il consenso
+è un fatto datato che si registra e si revoca solo dai "Permessi", e ogni
+passaggio resta scritto.
+
+**Che differenza c'è tra "Marketing: no" e "Marketing: non raccolto"?**
+"Non raccolto" vuol dire che non gliel'hai mai chiesto. "No" vuol dire che il
+consenso c'era e il cliente l'ha revocato. In tutti e due i casi le proposte
+commerciali dei Richiami non compaiono, ma la storia è diversa — e nell'elenco
+delle firme la leggi.
+
+**Come registro il consenso ai dati sanitari?**
+È un consenso a parte, per le misure della vista. Te lo chiede il form della
+prima prescrizione con una spunta obbligatoria; oppure, se manca, aprendo la
+scheda vedi in alto un riquadro: premi **"Consenso sanitario"**, spunta la
+casella, controlla la data (la puoi arretrare per le informative firmate su
+carta tempo fa) e premi **"Salva il consenso sanitario"**.
+
+**Come collego un minorenne al genitore, o un assistito al centro che lo
+segue?**
+Dalla scheda, sezione **"Permessi"**, riquadro **"Famiglia e tutela"**: premi
+**"Aggiungi relazione"**, cerca la persona (dev'essere già una scheda cliente:
+se è un ente, creagli prima la sua), scegli il tipo (Tutore legale, Padre,
+Madre, Figlio, Fratello, Sorella) e premi **"Collega"**. Il collegamento si
+scrive una volta sola e si legge da tutte e due le schede.
+
+**Un cliente mi chiede di cancellare i suoi dati: si può?**
+Sì, dalla sezione **"Permessi"**: **"Eliminazione definitiva"**, scrivi
+**ELIMINA** a mano e premi **"Anonimizza definitivamente"**. Nome, recapiti,
+indirizzo, codice fiscale, note e dati di fatturazione spariscono per sempre.
+Vendite, ordini e movimenti restano: sono fatti aziendali. Lo può fare solo il
+titolare o il responsabile.
+
+**Che cosa vuol dire "NESSUNA" nella casella Assicurazione?**
+Che gliel'hai chiesto e non ne ha. Lasciarla vuota ("— da rilevare") vuol dire
+un'altra cosa: che non gliel'hai ancora chiesto. La differenza ti evita di
+richiedere due volte la stessa informazione.
 
 **Il cliente paga gli occhiali in contanti: perde la detrazione?**
 No. Gli occhiali, le lenti e le lenti a contatto graduate sono dispositivi

@@ -1,4 +1,4 @@
-*Aggiornato a: v0.5.1 (Fase 4b)*
+*Aggiornato a: v0.5.2 (Era 2 · busta B1)*
 
 # Agenda e Richiami
 
@@ -158,15 +158,25 @@ resta tutta.
 
 ## Casi particolari
 
-- **Chi non vuole essere disturbato resta fuori dalle offerte.** Sollecito
-  ritiro, Promessa in ritardo e Fermo in scadenza sono contatti operativi: il
-  cliente aspetta la sua merce, quindi te li proponiamo sempre. **LAC in
-  esaurimento** e **Controllo vista** sono invece contatti commerciali:
-  compaiono **solo** per i clienti che hanno dato il consenso marketing e che
-  non hanno la spunta **"Non contattare per promozioni"**. Se qualcuno resta
+- **Chi non ha dato il permesso resta fuori dalle offerte.** Sollecito ritiro,
+  Promessa in ritardo e Fermo in scadenza sono contatti operativi: il cliente
+  aspetta la sua merce, quindi te li proponiamo sempre. **LAC in esaurimento**
+  e **Controllo vista** sono invece contatti commerciali: compaiono **solo**
+  per i clienti che hanno il consenso alle comunicazioni acceso e che non
+  hanno la spunta **"Non contattare per promozioni"**. Se qualcuno resta
   escluso, in testa alla sezione leggi una riga sobria che conta le proposte
-  commerciali nascoste. Togli o rimetti il consenso (o la spunta "Non
-  contattare") dalla scheda cliente e le proposte spariscono o ricompaiono.
+  commerciali nascoste.
+- **Dove si accende e si spegne quel consenso.** Nella scheda del cliente,
+  sezione **"Permessi"**: **"Registra consenso"** per darlo (spuntando i
+  canali e scegliendo la modalità della firma), **"Revoca comunicazioni"** e
+  poi **"Conferma revoca"** per toglierlo. L'effetto è immediato: appena
+  revochi, le proposte commerciali di quel cliente spariscono; appena
+  registri il consenso, tornano. La spunta "Non contattare per promozioni"
+  sta invece nei Recapiti della scheda ed è una tua decisione di banco: agisce
+  allo stesso modo, senza toccare le firme. Vedi il capitolo *Clienti*.
+- **Revocato non vuol dire irraggiungibile.** Anche dopo una revoca puoi
+  chiamare il cliente per dirgli che l'occhiale è pronto: è un avviso
+  operativo, non pubblicità. Sono le proposte commerciali a fermarsi.
 - **Il badge "Non contattare" sulle proposte operative.** Un cliente con "Non
   contattare" resta comunque tra le proposte operative (aspetta la sua merce),
   ma accanto vedi il segnalino "Non contattare": ti ricorda di tenere la
