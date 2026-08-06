@@ -63,6 +63,12 @@ volte nella stessa busta, quella consegna torna a Claude.
    della spec, per nome).
 6. **DoD**: rito d'apertura verbalizzato in PR · CI verde · `scripts/mappa-db.py` rigenerata e regole
    `docs/regole/` valide · zero modifiche fuori scope · §10 se deroga.
+7-bis. **La descrizione della PR = «i tre pezzi»** (il formato del
+   checkpoint, codificato il 05/08): (1) il verbale del rito con le
+   differenze MOTIVATE · (2) le verità MISURATE (mai supposte) · (3) i
+   punti caldi del diff, dove la revisione spende bene i token. La
+   chiusura di busta aggiunge l'allineamento finale: agente-test,
+   agente-manuali, doc di fase.
 7. **Divieti**: mai «risolvere» il lint sulle 4 viste-portale definer
    (decisione VP-01: sono il portale) · no rename/drop · no fix drive-by · no UI oltre lo
    scope · no npm nuovi senza nota.

@@ -53,6 +53,20 @@ fermarsi e segnalare):**
   **unicità PARZIALE** — l'indice morde solo sui telefoni veri —
   dentro la modifica-di-vincolo già sancita qui sopra. La dedup dei
   numeri reali resta identica. (Misurato, non supposto: è il metodo.)
+  **La persona CONDIVISA fra negozi (decisione 05/08, esito CI 128 —
+  «voce 6»)**: `persone` non ha azienda_id, la dedup è di PIATTAFORMA
+  — quindi l'anonimizzazione di un negozio agisce sul SUO grafo, mai
+  su quello altrui: (1) le prenotazioni del cliente anonimizzato
+  **sganciano** la persona (`persona_id → NULL`; se il vincolo è NOT
+  NULL si allenta — lecito come sopra) e azzerano i PROPRI
+  `contatto_nome/telefono/email` [ENTRANO IN MAPPA: istantanee
+  personali — il fatto resta, il nome no]; (2) la riga `persone` si
+  anonimizza SOLO SE ORFANA dopo lo sgancio (nessun legame residuo
+  verso altre aziende); altrove viva → resta INTATTA: il negozio B non
+  perde nulla, il negozio A non la raggiunge più da nessun suo dato;
+  (3) la definer è «sgancia-e-se-orfana-anonimizza»: tenant-safe per
+  costruzione. La cancellazione chiesta dal SOGGETTO su tutta la
+  piattaforma è un processo di regia (TODO-regia), non di busta.
   **Ratifica 06/08 (rilievo 1 dell'agente-test, chiuso)**: la mappa
   qui sopra non veniva eseguita affatto. `persone` ha RLS attiva
   **senza policy** (ID-01, 011) e `anonimizza_cliente` è `security

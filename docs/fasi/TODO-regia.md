@@ -10,7 +10,10 @@
    somma? (le altre: in coda alla PR #35). Nessun impatto-codice
    finché non decise: raffinano copy e, al più, additive.
 4. **Cinture dal dashboard** — default privileges di `supabase_admin`
-   · secret `TEST_SUPABASE_DB_URL` in CI. **Il secondo non è più
+   · secret `TEST_SUPABASE_DB_URL` in CI — **stasera (Ray)**: chiude il
+   buco di processo dei rossi 125-126 (repo↔DB); fino ad allora vale
+   la regola-toppa «migrazione applicata a mano al test prima del
+   verde». **Il secondo non è più
    facoltativo, ed è misurato**: nel job «L2 contratto» di CI 125
    `TEST_SUPABASE_DB_URL` è **vuoto** (URL e chiavi ci sono, l'accesso
    diretto al database no). Conseguenza pratica: la CI **non può
@@ -35,3 +38,7 @@
    NESSUN altro negozio ha prenotazioni vive con lei; (c) si scinde la
    riga per negozio, che è una migrazione e tocca la dedup. Ratificato
    in C1 come aperto; nessun codice si muove finché non è deciso.
+   → **RISOLTA 05/08**: decisione in C1 (sgancio + anonimizza-se-orfana).
+7. **Cancellazione lato-PIATTAFORMA su richiesta del soggetto** (la
+   persona che vuole sparire ovunque): processo di regia col legale —
+   futuro, fuori busta.
