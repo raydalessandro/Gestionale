@@ -60,12 +60,20 @@ fermarsi e segnalare):**
   **sganciano** la persona (`persona_id → NULL`; se il vincolo è NOT
   NULL si allenta — lecito come sopra) e azzerano i PROPRI
   `contatto_nome/telefono/email` [ENTRANO IN MAPPA: istantanee
-  personali — il fatto resta, il nome no]; (2) la riga `persone` si
+  personali — il fatto resta, il nome no] **e `per_conto_di` → NULL**
+  [in mappa dal 06/08, CI #131: testo libero che nomina un TERZO — la
+  regola generale già lo copriva, ora è esplicito]; (2) la riga `persone` si
   anonimizza SOLO SE ORFANA dopo lo sgancio (nessun legame residuo
   verso altre aziende); altrove viva → resta INTATTA: il negozio B non
   perde nulla, il negozio A non la raggiunge più da nessun suo dato;
   (3) la definer è «sgancia-e-se-orfana-anonimizza»: tenant-safe per
-  costruzione. La cancellazione chiesta dal SOGGETTO su tutta la
+  costruzione; (4) **l'anonimo esce anche dalla RICERCA, non solo
+  dall'indice** (06/08, CI #131): la dedup di `crea_prenotazione`
+  aggiunge `and telefono_normalizzato <> ''` — e a monte un telefono
+  SENZA CIFRE è rifiutato con `TELEFONO_NON_VALIDO` (è la chiave del
+  portale: un contatto irraggiungibile non è una prenotazione).
+  Doppia cintura, entrambe obbligatorie.
+  La cancellazione chiesta dal SOGGETTO su tutta la
   piattaforma è un processo di regia (TODO-regia), non di busta.
   **Ratifica 06/08 (rilievo 1 dell'agente-test, chiuso)**: la mappa
   qui sopra non veniva eseguita affatto. `persone` ha RLS attiva
@@ -135,6 +143,10 @@ nell'azione — la UI che nasconde bottoni è cortesia, MAI sicurezza).
 da fonti mutabili a runtime); cache in memoria lecita.
 **Comportamento — FAIL CLOSED, tabella esaustiva** (se qualcosa non
 torna: NEGATO, mai «provo»):
+- **L'ORDINE è quello della tabella: l'identità si verifica PRIMA di
+  qualunque lookup di risorsa** (06/08, CI #131 — un non-autenticato
+  non deve mai ricevere `CLIENTE_NON_TROVATO`: prima chi sei, poi cosa
+  cerchi).
 - non autenticato → NEGATO `non_autenticato`
 - autenticato ma senza riga in `utenti` → NEGATO `profilo_mancante`
 - `utenti.attivo = false` → NEGATO `utente_disattivato`
