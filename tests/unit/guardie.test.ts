@@ -252,6 +252,20 @@ describe("L4b · guardie di coerenza (codice morto, orfani, fantasmi)", () => {
   });
 
   it("G8 · nessuna server action fantasma in lib/actions.ts (ogni export è referenziato)", () => {
+    // Allowlist DOCUMENTATA e TEMPORANEA (consegna B1, Era 2). Le cinque azioni
+    // dei contratti C1/C3/C4 sono uscite dall'elenco: la «UI minima» del §4 è
+    // agganciata (sezione Permessi in scheda cliente, blocco assicurazione e
+    // P.IVA in ClienteForm) e ora le copre l'E2E di M1.
+    // Restano queste due, e per una ragione scritta nella consegna stessa: il
+    // §4 le chiede come FUNZIONI, il §7 vieta «UI oltre il minimo degli E2E».
+    // La loro schermata è di un altro modulo — oculisti = M2 (prima ricetta),
+    // parametri = M10 (impostazioni di negozio) — e arriverà con quello.
+    // La guardia resta severa su QUALSIASI altra action fantasma.
+    const IN_ATTESA_UI_B1 = new Set([
+      "creaOculistaAlVolo", // M2 · si aggancia alla prima ricetta
+      "scriviParametro", // M10 · si aggancia alle impostazioni di negozio
+    ]);
+
     const src = leggi("lib/actions.ts");
     const re = /export\s+async\s+function\s+([A-Za-z0-9_]+)/g;
     const actionsFile = join(ROOT, "lib/actions.ts");
@@ -259,9 +273,22 @@ describe("L4b · guardie di coerenza (codice morto, orfani, fantasmi)", () => {
     let m: RegExpExecArray | null;
     while ((m = re.exec(src))) {
       const nome = m[1];
+      if (IN_ATTESA_UI_B1.has(nome)) continue;
       if (!referencedElsewhere(nome, actionsFile, tuttoIlCodice)) fantasma.push(nome);
     }
-    expect(fantasma, `server action mai referenziate: ${fantasma.join(", ")}`).toEqual([]);
+    expect(
+      fantasma,
+      `server action mai referenziate (e non nell'allowlist B1): ${fantasma.join(", ")}`
+    ).toEqual([]);
+
+    // L'allowlist non deve diventare una discarica: ogni nome elencato deve
+    // ESISTERE davvero come export, altrimenti sta coprendo un refuso.
+    const esportate = new Set(Array.from(src.matchAll(/export\s+async\s+function\s+([A-Za-z0-9_]+)/g)).map((x) => x[1]));
+    const inesistenti = [...IN_ATTESA_UI_B1].filter((n) => !esportate.has(n));
+    expect(
+      inesistenti,
+      `nomi nell'allowlist B1 che non esistono più in lib/actions.ts: ${inesistenti.join(", ")}`
+    ).toEqual([]);
   });
 
   it("G9 · ogni modulo attivo ha un capitolo di manuale (allineamento con l'agente manuali)", () => {
@@ -1398,5 +1425,383 @@ describe.skipIf(!existsSync(join(ROOT, M020)))("L4o · guardie bonifica S0 (020)
     expect(registrate.size, "il backfill deve valere 20 righe (001 + 002…020)").toBe(
       attese.length + 1
     );
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * L4p · GUARDIE B1 · FONDAMENTA (021 + contratti C1-C4)
+ *
+ * La 021 è la migrazione più «di contratto» dell'Era 2: non aggiunge una
+ * schermata, aggiunge INVARIANTI. Quelli veri si collaudano contro il DB (L2,
+ * tests/contratto/b1-*.test.ts); qui restano i pezzi che, se si rompessero, lo
+ * farebbero **in silenzio** e nessun test di prodotto diventerebbe rosso:
+ *
+ *   • G22  — le colonne-CACHE dei consensi non si scrivono a mano (C3: «la cache
+ *            non si scrive MAI direttamente, solo l'azione del mastro»). È un
+ *            RATCHET: i punti legacy noti sono elencati, uno NUOVO è rosso;
+ *   • G22b — le azioni B1 chiamano `richiedi()` IN TESTA (C2: l'enforcement è
+ *            nell'azione, la UI che nasconde un bottone è cortesia);
+ *   • G22c — solo `lib/permessi.ts` legge `docs/regole/permessi.json` (C2: «le
+ *            azioni non leggono MAI permessi.json da sole»);
+ *   • G23  — i quattro CHECK di C3 esistono per nome nella 021;
+ *   • G23b — C4: il check anti-self + l'indice funzionale least/greatest
+ *            LIMITATO ai tipi familiari (se perdesse la `where`, il tutore non
+ *            potrebbe più coesistere; se perdesse least/greatest, l'inversa
+ *            passerebbe);
+ *   • G24  — le cinque tabelle nuove: RLS attiva, policy `to authenticated`,
+ *            revoke ad anon;
+ *   • G25  — ogni funzione della 021 è `security INVOKER` (una `definer` per
+ *            sbaglio scavalcherebbe la RLS e aprirebbe il tenant) e ha il suo
+ *            `grant execute to authenticated` esplicito (le default privileges
+ *            del punto 0 tolgono EXECUTE a PUBLIC: senza grant la funzione
+ *            nasce non chiamabile);
+ *   • G26  — `registra_consenso` prende il LOCK prima di inserire e riallinea la
+ *            cache nella stessa funzione (è tutto C3 in tre righe);
+ *   • G27  — la mappa C1 nomina ogni campo, e `fonte` NON è fra gli assegnati.
+ * ════════════════════════════════════════════════════════════════════════ */
+const M021 = "supabase/migrazioni/021_fondamenta.sql";
+describe.skipIf(!existsSync(join(ROOT, M021)))("L4p · guardie B1 fondamenta (021)", () => {
+  const sql021 = () => leggi(M021);
+
+  /** Il corpo di una funzione della 021, dal `create ... function` al `$$;`. */
+  function corpoFunzione(nome: string): string {
+    const sql = sql021();
+    const i = sql.indexOf(`create or replace function public.${nome}(`);
+    expect(i, `la 021 deve definire ${nome}`).toBeGreaterThanOrEqual(0);
+    const resto = sql.slice(i);
+    const fine = resto.indexOf("$$;");
+    expect(fine, `corpo di ${nome} non terminato`).toBeGreaterThan(0);
+    return resto.slice(0, fine);
+  }
+
+  const FUNZIONI_021 = [
+    "registra_consenso",
+    "revoca_marketing",
+    "crea_relazione",
+    "elimina_relazione",
+    "crea_oculista_al_volo",
+    "anonimizza_cliente",
+  ] as const;
+
+  const TABELLE_021 = [
+    "assicurazioni",
+    "oculisti",
+    "parametri",
+    "consensi",
+    "clienti_relazioni",
+  ] as const;
+
+  /* ── C3 · la cache non si scrive a mano ───────────────────────────────── */
+
+  it("G22 · le colonne-cache dei consensi si scrivono SOLO dai punti noti (ratchet)", () => {
+    // RATCHET DOCUMENTATO (vedi report-test.md §B1 · «ganci richiesti»).
+    // Oggi la cache marketing è ancora scritta a mano da TRE punti legacy della
+    // Fase 4b/4d, che C3 vieta: `clienteDaForm` (la spunta del form cliente, che
+    // su «aggiorna» può SPEGNERE il consenso senza nessun evento nel mastro),
+    // `registraConsensi` (il banner booleano) e `creaPrescrizione` (la cache
+    // sanitaria, che per C3 non dovrebbe nemmeno esistere: «per dati_sanitari
+    // NESSUNA cache»). Non è compito dei test rimuoverli: è compito di questa
+    // guardia impedire che ne nasca un QUARTO mentre si aspetta la migrazione
+    // del flusso sul mastro.
+    const NOTI = ["clienteDaForm", "registraConsensi", "creaPrescrizione"];
+    const CACHE = /\b(consenso_marketing|consenso_canali|data_consenso|consenso_dati_sanitari|consenso_sanitario_il)\s*[:=]/;
+
+    const src = leggi("lib/actions.ts");
+    // Spezzo il file in blocchi «una funzione ciascuno» sulle intestazioni.
+    const intestazioni = [...src.matchAll(/^(?:export\s+)?(?:async\s+)?function\s+([A-Za-z0-9_]+)/gm)];
+    expect(intestazioni.length, "lib/actions.ts deve contenere delle funzioni").toBeGreaterThan(10);
+
+    const scrittori: string[] = [];
+    for (const [i, m] of intestazioni.entries()) {
+      const da = m.index!;
+      const a = i + 1 < intestazioni.length ? intestazioni[i + 1].index! : src.length;
+      const blocco = src.slice(da, a);
+      // Solo le SCRITTURE: `x: valore` dentro un payload o un assegnamento.
+      // Le LETTURE (`.select("… consenso_marketing …")`, `cliente.consenso_marketing`)
+      // non hanno né `:` né `=` subito dopo il nome e non entrano.
+      if (CACHE.test(blocco)) scrittori.push(m[1]);
+    }
+
+    const nuovi = scrittori.filter((f) => !NOTI.includes(f));
+    expect(
+      nuovi,
+      `C3: la cache dei consensi si scrive SOLO dall'azione del mastro. ` +
+        `Nuovi punti di scrittura diretta: ${nuovi.join(", ")}`
+    ).toEqual([]);
+  });
+
+  it("G22b · ogni azione B1 chiama `richiedi()` in TESTA (C2: l'enforcement è nell'azione)", () => {
+    const AZIONI_B1 = [
+      "registraConsenso",
+      "revocaMarketing",
+      "creaRelazione",
+      "eliminaRelazione",
+      "anonimizzaCliente",
+      "creaOculistaAlVolo",
+      "scriviParametro",
+    ];
+    const src = leggi("lib/actions.ts");
+    const senzaGuardia: string[] = [];
+    const tardive: string[] = [];
+    for (const nome of AZIONI_B1) {
+      const i = src.indexOf(`export async function ${nome}`);
+      expect(i, `l'azione ${nome} deve esistere in lib/actions.ts`).toBeGreaterThanOrEqual(0);
+      const resto = src.slice(i);
+      const fine = resto.indexOf("\nexport ", 1);
+      const corpo = fine > 0 ? resto.slice(0, fine) : resto;
+
+      const posRichiedi = corpo.search(/await\s+richiedi\(/);
+      if (posRichiedi < 0) {
+        senzaGuardia.push(nome);
+        continue;
+      }
+      // «In testa» = prima di qualunque contatto col database.
+      const posDb = corpo.search(/await\s+createClient\(|\.rpc\(|\.from\(/);
+      if (posDb >= 0 && posDb < posRichiedi) tardive.push(nome);
+    }
+    expect(senzaGuardia, `azioni B1 senza richiedi(): ${senzaGuardia.join(", ")}`).toEqual([]);
+    expect(
+      tardive,
+      `azioni B1 che toccano il DB PRIMA di richiedi(): ${tardive.join(", ")}`
+    ).toEqual([]);
+  });
+
+  it("G22c · solo lib/permessi.ts legge `permessi.json` (le azioni non se lo leggono da sole)", () => {
+    const colpevoli: string[] = [];
+    for (const f of [...sorgenti("lib"), ...sorgenti("app"), ...sorgenti("components")]) {
+      if (rel(f) === "lib/permessi.ts") continue;
+      const src = readFileSync(f, "utf8");
+      if (/regole\/permessi\.json/.test(src)) colpevoli.push(rel(f));
+    }
+    expect(
+      colpevoli,
+      `C2: la policy si legge SOLO dall'helper. Letture dirette in: ${colpevoli.join(", ")}`
+    ).toEqual([]);
+  });
+
+  /* ── C3 · i CHECK a DB ─────────────────────────────────────────────────── */
+
+  it("G23 · i quattro CHECK di C3 esistono per nome nella 021", () => {
+    const sql = sql021();
+    for (const vincolo of [
+      "consensi_sanitario_per_rx",
+      "consensi_marketing_senza_rx",
+      "consensi_dato_marketing_canali",
+      "consensi_revoca_senza_canali",
+    ]) {
+      expect(
+        new RegExp(`constraint\\s+${vincolo}\\s+check`, "i").test(sql),
+        `manca il CHECK ${vincolo} (contratto C3)`
+      ).toBe(true);
+    }
+    // Il perimetro dei canali è quello del vocabolario M1 §2, non uno a piacere.
+    expect(
+      /canali\s*<@\s*array\['email','cellulare','cartaceo'\]/i.test(sql.replace(/\s+/g, " ")),
+      "il perimetro dei canali deve restare {email, cellulare, cartaceo}"
+    ).toBe(true);
+    // I due vocabolari chiusi del mastro.
+    expect(/tipo in \('marketing','dati_sanitari'\)/i.test(sql)).toBe(true);
+    expect(/azione in \('dato','revocato'\)/i.test(sql)).toBe(true);
+    expect(/modalita\s+text\s+check \(modalita in \('penna','digitale'\)\)/i.test(sql)).toBe(true);
+  });
+
+  it("G23b · C4: check anti-self + indice funzionale least/greatest LIMITATO ai familiari", () => {
+    const sql = sql021();
+    expect(
+      /check \(cliente_id <> relativo_id\)/i.test(sql),
+      "manca il check anti-self su clienti_relazioni (C4)"
+    ).toBe(true);
+
+    const m = sql.match(/create unique index if not exists uq_relazione_familiare_per_coppia[\s\S]*?;/i);
+    expect(m, "manca l'indice unico funzionale della coppia (C4)").toBeTruthy();
+    const blocco = m![0].replace(/\s+/g, " ");
+    expect(
+      /least\(cliente_id, relativo_id\)/i.test(blocco) && /greatest\(cliente_id, relativo_id\)/i.test(blocco),
+      "senza least/greatest la relazione INVERSA passerebbe: la doppia tornerebbe possibile"
+    ).toBe(true);
+    expect(
+      /azienda_id/i.test(blocco),
+      "l'indice deve restare per-negozio (azienda_id in testa)"
+    ).toBe(true);
+    // La `where` è ciò che rende il tutore_legale una categoria a parte.
+    expect(
+      /where tipo in \('padre','madre','figlio','fratello','sorella'\)/i.test(blocco),
+      "senza la `where` sui soli familiari, tutore_legale non potrebbe più coesistere (C4)"
+    ).toBe(true);
+    expect(
+      /tutore_legale/i.test(blocco),
+      "tutore_legale NON deve comparire fra i tipi dell'indice di coppia"
+    ).toBe(false);
+  });
+
+  /* ── Sicurezza delle tabelle e delle funzioni nuove ───────────────────── */
+
+  it("G24 · le 5 tabelle della 021 hanno RLS attiva, policy `to authenticated` e revoke ad anon", () => {
+    const sql = sql021();
+    const compatta = sql.replace(/\s+/g, " ").toLowerCase();
+    const senzaRls: string[] = [];
+    const senzaRevoke: string[] = [];
+    const senzaPolicy: string[] = [];
+    for (const t of TABELLE_021) {
+      if (!compatta.includes(`alter table public.${t} enable row level security`)) senzaRls.push(t);
+      if (!compatta.includes(`revoke all on public.${t}`) || !new RegExp(`revoke all on public\\.${t}\\s+from anon`, "i").test(sql)) {
+        senzaRevoke.push(t);
+      }
+      const p = sql.match(new RegExp(`create policy\\s+"[^"]+"\\s+on public\\.${t}([\\s\\S]*?);`, "i"));
+      if (!p || !/\bto authenticated\b/i.test(p[1])) senzaPolicy.push(t);
+    }
+    expect(senzaRls, `tabelle 021 senza RLS: ${senzaRls.join(", ")}`).toEqual([]);
+    expect(senzaRevoke, `tabelle 021 senza revoke ad anon: ${senzaRevoke.join(", ")}`).toEqual([]);
+    expect(
+      senzaPolicy,
+      `tabelle 021 senza policy ristretta ad authenticated: ${senzaPolicy.join(", ")}`
+    ).toEqual([]);
+  });
+
+  it("G24b · le `alter default privileges` del punto 0 chiudono tabelle e funzioni FUTURE", () => {
+    const sql = sql021().replace(/\s+/g, " ").toLowerCase();
+    expect(
+      sql.includes("alter default privileges in schema public revoke all on tables from anon"),
+      "senza questa riga ogni tabella futura nascerebbe leggibile da anon"
+    ).toBe(true);
+    expect(
+      /alter default privileges in schema public revoke all on functions from public, anon/.test(sql),
+      "le funzioni future devono perdere EXECUTE anche a PUBLIC (anon lo eredita)"
+    ).toBe(true);
+  });
+
+  it("G25 · ogni funzione della 021 è `security INVOKER` e ha il suo grant esplicito", () => {
+    const sql = sql021();
+    for (const f of FUNZIONI_021) {
+      const corpo = corpoFunzione(f);
+      expect(
+        /security\s+invoker/i.test(corpo),
+        `${f}: deve restare security INVOKER — una definer scavalcherebbe la RLS e con lei il tenant`
+      ).toBe(true);
+      expect(
+        /security\s+definer/i.test(corpo),
+        `${f}: è diventata security DEFINER: il tenant non sarebbe più protetto dalla RLS`
+      ).toBe(false);
+      expect(
+        new RegExp(`revoke execute on function public\\.${f}\\([^)]*\\) from public, anon`, "i").test(sql),
+        `${f}: manca la revoca di EXECUTE a public/anon`
+      ).toBe(true);
+      expect(
+        new RegExp(`grant\\s+execute on function public\\.${f}\\([^)]*\\) to authenticated`, "i").test(sql),
+        `${f}: manca il grant execute ad authenticated (con le default privileges del punto 0 sarebbe inchiamabile)`
+      ).toBe(true);
+    }
+  });
+
+  it("G26 · `registra_consenso`: LOCK, poi evento, poi cache — nella stessa funzione (C3)", () => {
+    const corpo = corpoFunzione("registra_consenso");
+    const lock = corpo.search(/from public\.clienti where id = p_cliente_id for update/i);
+    const insert = corpo.search(/insert into public\.consensi/i);
+    const cache = corpo.search(/update public\.clienti/i);
+    expect(lock, "manca il `select … for update` della riga cliente (C3)").toBeGreaterThanOrEqual(0);
+    expect(insert, "manca l'insert dell'evento").toBeGreaterThan(0);
+    expect(cache, "manca il riallineamento della cache").toBeGreaterThan(0);
+    expect(lock < insert, "il lock deve precedere l'evento").toBe(true);
+    expect(insert < cache, "la cache si aggiorna DOPO l'evento").toBe(true);
+    // La cache vale SOLO per il marketing: per i sanitari si legge il mastro.
+    expect(
+      /if p_tipo = 'marketing' then/i.test(corpo),
+      "la cache deve restare condizionata al marketing (per i dati sanitari nessuna cache)"
+    ).toBe(true);
+    // Nessun confronto di timestamp: la semantica dell'«ultima riga» è il lock.
+    expect(
+      /order by\s+avvenuto_il|max\(avvenuto_il\)/i.test(corpo),
+      "C3 vieta esplicitamente i confronti di timestamp: l'ordine lo dà il lock"
+    ).toBe(false);
+  });
+
+  it("G27 · la mappa C1 è completa e `fonte` NON viene toccata", () => {
+    const corpo = corpoFunzione("anonimizza_cliente");
+    // L'UPDATE su `clienti`: dal `update public.clienti set` al `where id =`.
+    const i = corpo.search(/update public\.clienti set/i);
+    expect(i, "anonimizza_cliente deve aggiornare clienti").toBeGreaterThanOrEqual(0);
+    const mappa = corpo.slice(i, corpo.indexOf("where id = p_cliente_id", i));
+
+    const CAMPI_C1 = [
+      "nome", "cognome", "secondo_nome", "codice_fiscale", "data_nascita", "sesso",
+      "email", "telefono", "telefono_casa", "telefono_lavoro",
+      "indirizzo", "indirizzo2", "cap", "citta", "provincia", "nazione",
+      "note", "dati_fatturazione", "canale_preferito",
+      "assicurazione_id", "azienda_convenzionata_id", "tutore_legale", "lingua",
+      "tags", "non_contattare", "consenso_marketing", "consenso_canali",
+      "consenso_dati_sanitari", "consenso_sanitario_il", "anonimizzato_il",
+    ];
+    const mancanti = CAMPI_C1.filter((c) => !new RegExp(`\\b${c}\\s*=`, "i").test(mappa));
+    expect(mancanti, `campi della mappa C1 non trattati: ${mancanti.join(", ")}`).toEqual([]);
+
+    // Le costanti dichiarate dal contratto, non un testo a piacere.
+    expect(/nome\s*=\s*'Cliente'/i.test(mappa), "nome → 'Cliente'").toBe(true);
+    expect(/cognome\s*=\s*'Anonimizzato-'/i.test(mappa), "cognome → 'Anonimizzato-' + id").toBe(true);
+    expect(/non_contattare\s*=\s*true/i.test(mappa), "i flag si spengono in senso RESTRITTIVO").toBe(true);
+    // `fonte` RESTA: se qualcuno la mettesse a null, si perderebbe la statistica.
+    expect(
+      /\bfonte\s*=/i.test(mappa),
+      "C1: `fonte` RESTA (statistica aziendale, non identifica): non va assegnata"
+    ).toBe(false);
+
+    // Le relazioni si CANCELLANO (de-anonimizzano per prossimità)…
+    expect(
+      /delete from public\.clienti_relazioni/i.test(corpo),
+      "C1: le relazioni si cancellano"
+    ).toBe(true);
+    // …ma i consensi NO: sono fatti storici su un'identità ormai anonima.
+    expect(
+      /delete from public\.consensi/i.test(corpo),
+      "C1: le righe del mastro SI CONSERVANO (solo documento_ref → NULL)"
+    ).toBe(false);
+    expect(/update public\.consensi set documento_ref = null/i.test(corpo)).toBe(true);
+    // E i FATTI non si cancellano mai.
+    for (const fatto of ["vendite", "ordini_occhiali", "ordini_lac", "movimenti_magazzino", "chiusure_cassa"]) {
+      expect(
+        new RegExp(`delete from public\\.${fatto}`, "i").test(corpo),
+        `C1: ${fatto} è un FATTO aziendale, non si cancella mai`
+      ).toBe(false);
+    }
+    // L'unico campo personale della vendita.
+    expect(/update public\.vendite set cf_cliente = null/i.test(corpo)).toBe(true);
+  });
+
+  it("G27b · l'unicità dei telefoni resta PARZIALE (l'anonimo esce dalla dedup)", () => {
+    const sql = sql021().replace(/\s+/g, " ");
+    expect(
+      /create unique index if not exists uq_persone_telefono_reale on public\.persone \(telefono_normalizzato\) where telefono_normalizzato <> ''/i.test(sql),
+      "senza l'unicità PARZIALE il SECONDO cliente anonimizzato collidere­bbe sul telefono vuoto"
+    ).toBe(true);
+    expect(
+      /alter table public\.persone alter column telefono_grezzo drop not null/i.test(sql),
+      "telefono_grezzo deve poter diventare NULL (C1: la riga esce dalla dedup)"
+    ).toBe(true);
+  });
+
+  it("G28 · la 021 registra sé stessa nel registro delle migrazioni", () => {
+    const sql = sql021();
+    expect(
+      /insert into public\._infra_migrazioni \(nome\) values \('021_fondamenta'\)/i.test(sql),
+      "regola permanente della 020: ogni migrazione registra sé stessa"
+    ).toBe(true);
+  });
+
+  it("G28b · la 021 resta ADDITIVA: nessun drop di tabella o di colonna", () => {
+    const sql = sql021();
+    expect(/drop table/i.test(sql), "nessun drop table").toBe(false);
+    expect(/drop column/i.test(sql), "nessun drop column").toBe(false);
+    expect(/\brename to\b/i.test(sql), "nessun rename").toBe(false);
+    // L'UNICA cancellazione fisica ammessa dalla 021 è quella delle RELAZIONI
+    // (anagrafe, non un fatto: C4 + C1). Se comparisse un `delete from` su
+    // qualunque altra tabella, sarebbe un fatto aziendale che se ne va.
+    const bersagli = new Set(
+      Array.from(sql.matchAll(/delete\s+from\s+public\.(\w+)/gi)).map((m) => m[1].toLowerCase())
+    );
+    expect(
+      [...bersagli].sort(),
+      `la 021 cancella righe da tabelle diverse da clienti_relazioni: ${[...bersagli].join(", ")}`
+    ).toEqual(["clienti_relazioni"]);
+    // I `drop policy if exists` / `drop trigger if exists` / `drop constraint` di
+    // ricreazione sono leciti (modifiche di vincolo, non perdita di dati).
   });
 });
