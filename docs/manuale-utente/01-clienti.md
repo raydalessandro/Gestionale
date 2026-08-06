@@ -60,9 +60,11 @@ azienda, la riga *"Fattura a …"* con partita IVA e codice SDI.
 In testa alla scheda, sotto il nome, trovi i "vitali": l'**età** (se hai messo
 la data di nascita), la **fonte** e — quando servono — dei segnalini:
 
-- **"Tutore: <nome>"**, solo per le schede vecchie in cui quel nome era stato
-  scritto a mano (vedi *Casi particolari*). Chi hai collegato dopo, con
-  "Famiglia e tutela", lo leggi nell'elenco dei "Permessi", non qui;
+- **"Tutore: <nome>"**, quando in "Famiglia e tutela" hai collegato un tutore
+  legale: il segnalino prende il nome da lì. Sulle schede vecchie in cui quel
+  nome era stato scritto a mano, e non è ancora stato collegato, leggi
+  **"Tutore: <nome> (storico)"** — stessa posizione, ma la parola *storico* ti
+  dice che è il campo vecchio e che quella tutela va ancora registrata bene;
 - **"Non contattare"** se hai chiesto di tenerlo fuori dalle promozioni;
 - **"Anonimizzato"** se di quella persona i dati sono stati eliminati.
 
@@ -112,7 +114,7 @@ Per registrarlo, quando Laura Bianchi firma l'informativa:
 La riga in alto si aggiorna e sotto compare una riga nell'elenco delle firme,
 scritta così:
 
-> Consenso marketing dato il 06/08/2026 · penna · email, cellulare
+> Consenso marketing dato il 6 ago 2026 · penna · email, cellulare
 
 Se più avanti Laura ti dice «l'email sì, ma non chiamatemi», rifai lo stesso
 gesto spuntando solo **Email**: vale l'ultima firma, e nell'elenco restano

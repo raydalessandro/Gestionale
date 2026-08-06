@@ -1730,6 +1730,60 @@ describe.skipIf(!existsSync(join(ROOT, M021)))("L4p · guardie B1 fondamenta (02
     }
   });
 
+  it("G25g · C2 · nella definer l'identità si verifica PRIMA della risorsa", () => {
+    const corpo = corpoFunzione("anonimizza_persone_del_cliente");
+    // A chi non è nessuno non si risponde `CLIENTE_NON_TROVATO`: quella frase
+    // vorrebbe dire che siamo andati a cercare quel cliente fra quelli di
+    // TUTTI, e che la risposta dipende dall'esistenza di una riga altrui.
+    const identita = corpo.search(/if v_az is null then raise exception 'NON_AUTENTICATO'/i);
+    const risorsa = corpo.search(/from public\.clienti c/i);
+    expect(identita, "manca la guardia d'identità con NON_AUTENTICATO").toBeGreaterThanOrEqual(0);
+    expect(risorsa, "manca il lookup del cliente").toBeGreaterThan(0);
+    expect(identita < risorsa, "l'identità va verificata PRIMA del lookup (C2, 06/08)").toBe(true);
+    expect(
+      /if v_az is null then raise exception 'CLIENTE_NON_TROVATO'/i.test(corpo),
+      "a un utente senza azienda nel JWT non si dice CLIENTE_NON_TROVATO"
+    ).toBe(false);
+  });
+
+  it("G25h · C1 voce 6 · `per_conto_di` entra nello sgancio (nomina un TERZO)", () => {
+    const corpo = corpoFunzione("anonimizza_persone_del_cliente");
+    const sgancio = corpo.slice(
+      corpo.search(/update public\.prenotazioni pr set/i),
+      corpo.search(/update public\.persone p set/i)
+    );
+    expect(
+      /per_conto_di\s*=\s*null/i.test(sgancio),
+      "`per_conto_di` è il «prenoto per un'altra persona»: testo libero che nomina un terzo, in mappa C1 dal 06/08"
+    ).toBe(true);
+  });
+
+  it("G15b · C1 voce 6 · la DOPPIA CINTURA della dedup di `crea_prenotazione`", () => {
+    const corpo = corpoFunzione("crea_prenotazione");
+    const compatto = corpo.replace(/\s+/g, " ");
+    // Cintura 1 · a monte: un telefono senza cifre non identifica nessuno e non
+    // permette di richiamare. `normalizza_telefono` lo riduce a '', che è la
+    // stessa chiave su cui si posano le righe anonimizzate.
+    expect(
+      /if v_tel = '' then raise exception 'TELEFONO_NON_VALIDO'/i.test(compatto),
+      "manca il rifiuto del telefono senza cifre (TELEFONO_NON_VALIDO)"
+    ).toBe(true);
+    // Cintura 2 · e comunque la ricerca non guarda mai le righe anonime.
+    expect(
+      /and persone\.telefono_normalizzato <> ''/i.test(compatto),
+      "la dedup deve escludere le persone anonimizzate: uscire dall'indice non basta, si esce anche dalla RICERCA"
+    ).toBe(true);
+    // Entrambe, per contratto: una sola lascia scoperta una strada.
+    const rifiuto = compatto.search(/TELEFONO_NON_VALIDO/i);
+    const ricerca = compatto.search(/select persone\.id into v_persona/i);
+    expect(rifiuto < ricerca, "il rifiuto sta A MONTE della ricerca").toBe(true);
+    // E resta la RPC del portale: se perdesse il grant ad anon, il portale muore.
+    expect(
+      /grant\s+execute on function public\.crea_prenotazione\([^)]*\) to anon, authenticated/i.test(sql021()),
+      "crea_prenotazione deve restare eseguibile da anon: è la RPC del portale"
+    ).toBe(true);
+  });
+
   it("G25b · le `security definer` della 021 sono SOLO le due dichiarate", () => {
     const sql = sql021();
     const definer = Array.from(
@@ -1745,8 +1799,12 @@ describe.skipIf(!existsSync(join(ROOT, M021)))("L4p · guardie B1 fondamenta (02
     //  · `prendi_persona_come_cliente` — ERA GIÀ definer nella 018: qui è solo
     //    rifatta per aggiungere la guardia sullo sganciato (C1 voce 6). Non è
     //    una definer in più nel sistema, è la stessa riscritta.
-    expect(definer, "la 021 ammette due sole security definer, entrambe motivate").toEqual([
+    //  · `crea_prenotazione` — ERA GIÀ definer dalla 012 (la chiama l'ANONIMO
+    //    dal portale, e deve scrivere su tabelle che l'anon non tocca): qui è
+    //    rifatta per la doppia cintura della dedup (C1 voce 6 punto 4).
+    expect(definer, "la 021 ammette tre sole security definer, tutte motivate").toEqual([
       "anonimizza_persone_del_cliente",
+      "crea_prenotazione",
       "prendi_persona_come_cliente",
     ]);
   });
@@ -1955,8 +2013,23 @@ describe.skipIf(!existsSync(join(ROOT, M021)))("L4p · guardie B1 fondamenta (02
     // L'UNICA cancellazione fisica ammessa dalla 021 è quella delle RELAZIONI
     // (anagrafe, non un fatto: C4 + C1). Se comparisse un `delete from` su
     // qualunque altra tabella, sarebbe un fatto aziendale che se ne va.
+    // Eccezione DICHIARATA: `crea_prenotazione` (rifatta qui dalla 017 per la
+    // doppia cintura) cancella l'appuntamento che ESSA STESSA ha appena
+    // inserito, quando la chiave d'idempotenza scopre che la prenotazione c'era
+    // già. Non è un fatto aziendale che se ne va: è la funzione che disfa la
+    // propria scrittura, nella stessa chiamata. Per questo la si ammette SOLO
+    // nella forma `where appuntamenti.id = v_appto` — cioè legata alla
+    // variabile locale, mai a un filtro che possa pescare righe altrui.
     const bersagli = new Set(
-      Array.from(sql.matchAll(/delete\s+from\s+public\.(\w+)/gi)).map((m) => m[1].toLowerCase())
+      Array.from(sql.matchAll(/delete\s+from\s+public\.(\w+)([^;]*);/gi))
+        .filter(
+          (m) =>
+            !(
+              m[1].toLowerCase() === "appuntamenti" &&
+              /where\s+appuntamenti\.id\s*=\s*v_appto/i.test(m[2])
+            )
+        )
+        .map((m) => m[1].toLowerCase())
     );
     expect(
       [...bersagli].sort(),

@@ -561,14 +561,20 @@ declare
   v_persone uuid[];
   v_n       integer := 0;
 begin
-  -- (1) l'azienda del CHIAMANTE, dal suo JWT
+  -- (1) CHI SEI, prima di COSA CERCHI (C2, ordine delle guardie — 06/08).
+  --     L'identità si verifica PRIMA di qualunque lookup di risorsa: a un
+  --     autenticato senza azienda nel JWT si risponde NON_AUTENTICATO, non
+  --     CLIENTE_NON_TROVATO. La differenza non è di garbo: `CLIENTE_NON_TROVATO`
+  --     a chi non è nessuno vorrebbe dire che siamo andati a cercare quel
+  --     cliente fra quelli di TUTTI, e che la risposta dipende dall'esistenza
+  --     di una riga altrui. Qui non si cerca affatto.
   v_az := public.get_azienda_id();
-  if v_az is null then raise exception 'CLIENTE_NON_TROVATO'; end if;
+  if v_az is null then raise exception 'NON_AUTENTICATO'; end if;
 
-  -- (2) il cliente dev'essere SUO. Dentro una definer la RLS non filtra più:
-  --     questo confronto è ciò che sta al posto della policy. Il messaggio è
-  --     lo stesso del cliente inesistente, apposta: da fuori non si distingue
-  --     «non è tuo» da «non c'è», che è quanto dice il tenant di sé.
+  -- (2) …e SOLO ORA la risorsa: il cliente dev'essere SUO. Dentro una definer
+  --     la RLS non filtra più: questo confronto è ciò che sta al posto della
+  --     policy. Il messaggio è lo stesso del cliente inesistente, apposta: fra
+  --     «non è tuo» e «non c'è» il tenant non deve poter distinguere.
   if not exists (
     select 1 from public.clienti c
      where c.id = p_cliente_id and c.azienda_id = v_az
@@ -590,11 +596,15 @@ begin
   --     già usata su `persone.nome` — «il NOT NULL si rispetta, l'identità
   --     sparisce». Il vincolo è una garanzia sulle prenotazioni NUOVE e non si
   --     allenta per ripulire le vecchie.
+  --     `per_conto_di` è in mappa dal 06/08 (CI #131): è il campo che il portale
+  --     riempie con «prenoto per un'altra persona», cioè un testo libero che
+  --     nomina un TERZO. La regola generale di C1 già lo copriva; ora è scritto.
   update public.prenotazioni pr set
     persona_id        = null,
     contatto_nome     = 'Anonimo',
     contatto_telefono = '',
     contatto_email    = null,
+    per_conto_di      = null,
     updated_at        = now()
   where pr.cliente_id = p_cliente_id
     and pr.azienda_id = v_az;
@@ -704,6 +714,190 @@ grant  execute on function public.anonimizza_cliente(uuid) to authenticated;
 -- ANAGRAFE (un legame), non un FATTO — e C1 stessa le cancella. Vive qui come
 -- RPC, non nell'azione, perché la guardia G1 vieta `.delete()` in
 -- `lib/actions.ts`: la regola di casa resta intatta e l'eccezione è esplicita.
+-- ⚠️ RIFATTA QUI (l'originale è nella 017): C1 voce 6 punto 4 chiede che
+-- l'anonimo esca anche dalla RICERCA della dedup, non solo dall'indice unico
+-- parziale. Il resto del corpo è quello della 017, invariato — stessa strada
+-- già percorsa da 013/014/016/017 su questa stessa funzione. Resta eseguibile
+-- da `anon`: è la RPC del portale.
+create or replace function public.crea_prenotazione(
+  p_slug text, p_servizio text, p_inizio timestamptz,
+  p_nome text, p_telefono text, p_email text,
+  p_per_conto_di text, p_note text, p_fonte text,
+  p_chiave_richiesta text, p_lista_attesa boolean
+) returns table (id uuid, codice text, inizio timestamptz, durata_minuti int)
+language plpgsql security definer set search_path = public, pg_catalog as $$
+declare
+  c_tz        constant text     := 'Europe/Rome';
+  c_anticipo  constant interval := interval '2 hours';
+  c_orizzonte constant int      := 90;
+  c_alfabeto  constant text     := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  v_az uuid; v_tipo text; v_dur int; v_giorno date; v_persona uuid; v_tel text;
+  v_fonte text; v_codice text; v_id uuid; v_appto uuid; v_risorsa uuid; r record;
+  v_oggi date := (now() at time zone c_tz)::date;
+begin
+  -- idempotenza (prima del lock): stessa chiave → stessa riga, entrambi i rami
+  select p.id, p.codice, p.inizio, p.durata_minuti into r
+  from public.prenotazioni p where p.chiave_richiesta = p_chiave_richiesta;
+  if found then
+    id := r.id; codice := r.codice; inizio := r.inizio; durata_minuti := r.durata_minuti;
+    return next; return;
+  end if;
+
+  select a.id into v_az from public.aziende a where a.slug = p_slug and a.portale_attivo = true;
+  if v_az is null then raise exception 'NEGOZIO_NON_TROVATO'; end if;
+
+  -- tipo + durata del servizio (dev'essere attivo sul negozio)
+  select s.tipo, coalesce(ns.durata_minuti, s.durata_predefinita_minuti)
+    into v_tipo, v_dur
+  from public.negozi_servizi ns join public.servizi s on s.codice = ns.servizio_codice
+  where ns.azienda_id = v_az and ns.servizio_codice = p_servizio and ns.attivo = true;
+  if v_tipo is null then raise exception 'SERVIZIO_NON_ATTIVO'; end if;
+
+  perform pg_advisory_xact_lock(hashtext(v_az::text));
+
+  -- idempotenza di nuovo, dopo il lock (concorrenza)
+  select p.id, p.codice, p.inizio, p.durata_minuti into r
+  from public.prenotazioni p where p.chiave_richiesta = p_chiave_richiesta;
+  if found then
+    id := r.id; codice := r.codice; inizio := r.inizio; durata_minuti := r.durata_minuti;
+    return next; return;
+  end if;
+
+  v_fonte := case when p_fonte in ('banco','app','convenzione','import','qr_vetrina','sito_negozio','portale')
+                  then p_fonte else 'portale' end;
+
+  -- codice univoco (entrambi i rami)
+  loop
+    select 'LMP-' || string_agg(substr(c_alfabeto, 1 + floor(random() * length(c_alfabeto))::int, 1), '')
+      into v_codice from generate_series(1, 4);
+    exit when not exists (select 1 from public.prenotazioni pp where pp.codice = v_codice);
+  end loop;
+
+  -- persona (find-or-create) — comune ai due rami; se poi si abortisce, rollback
+  --
+  -- ⚠️ DOPPIA CINTURA (C1 voce 6 punto 4 — 06/08, CI #131): l'anonimo deve
+  -- uscire anche dalla RICERCA, non solo dall'indice. Dopo l'anonimizzazione
+  -- `telefono_grezzo` è NULL e la colonna generata `telefono_normalizzato`
+  -- vale '' — che è esattamente ciò che `normalizza_telefono` restituisce per
+  -- un telefono SENZA CIFRE («-», «no», uno spazio). Senza le due difese qui
+  -- sotto, chi prenota senza lasciare il numero atterra DENTRO l'identità di
+  -- una persona anonimizzata: se ne riprende nome ed email, e la riga anonima
+  -- torna agganciata a una prenotazione viva — cioè smette di essere orfana, e
+  -- la mappa C1 non potrà più raggiungerla in nessun giro futuro.
+  v_tel := public.normalizza_telefono(p_telefono);
+
+  -- (1) a monte: un contatto irraggiungibile non è una prenotazione. Il telefono
+  --     è LA chiave del portale — senza cifre non identifica nessuno e non
+  --     permette di richiamare.
+  if v_tel = '' then raise exception 'TELEFONO_NON_VALIDO'; end if;
+
+  -- (2) e comunque la ricerca non guarda MAI le righe anonime. Oggi la (1)
+  --     basterebbe da sola; questa serve il giorno in cui '' arrivasse per
+  --     un'altra strada. Entrambe obbligatorie, per contratto.
+  select persone.id into v_persona
+    from public.persone
+   where persone.telefono_normalizzato = v_tel
+     and persone.telefono_normalizzato <> '';
+  if v_persona is null then
+    insert into public.persone (telefono_grezzo, nome, email)
+    values (p_telefono, p_nome, nullif(btrim(p_email), ''))
+    returning persone.id into v_persona;
+  else
+    update public.persone set nome = p_nome, updated_at = now()
+    where persone.id = v_persona and (nome is null or btrim(nome) = '');
+  end if;
+
+  -- ═══════════════ RAMO RICHIESTA — niente slot, niente appuntamento ═══════════
+  if v_tipo = 'richiesta' then
+    insert into public.prenotazioni (
+      azienda_id, persona_id, appuntamento_id, servizio_codice, inizio, durata_minuti, stato, fonte,
+      per_conto_di, contatto_nome, contatto_telefono, contatto_email, note,
+      codice, chiave_richiesta, informativa_accettata_at
+    ) values (
+      v_az, v_persona, null, p_servizio, null, null, 'in_attesa', v_fonte,
+      nullif(btrim(p_per_conto_di), ''), p_nome, p_telefono, nullif(btrim(p_email), ''), nullif(btrim(p_note), ''),
+      v_codice, p_chiave_richiesta, now()
+    ) returning prenotazioni.id into v_id;
+    id := v_id; codice := v_codice; inizio := null; durata_minuti := null;
+    return next; return;
+  end if;
+
+  -- ═══════════════ RAMO APPUNTAMENTO — comportamento pre-017 ══════════════════
+  if p_inizio is null then raise exception 'INIZIO_OBBLIGATORIO'; end if;
+  v_giorno := (p_inizio at time zone c_tz)::date;
+  if v_giorno < v_oggi or v_giorno > v_oggi + c_orizzonte then raise exception 'FUORI_ORIZZONTE'; end if;
+  if p_inizio < now() + c_anticipo then raise exception 'TROPPO_TARDI'; end if;
+  if exists (select 1 from public.chiusure where azienda_id = v_az and v_giorno between dal and al) then
+    raise exception 'FUORI_ORARIO';
+  end if;
+  if not exists (
+    select 1 from public.orari_apertura o
+    where o.azienda_id = v_az and o.giorno = extract(dow from v_giorno)::int
+      and (v_giorno + o.apre)   at time zone c_tz <= p_inizio
+      and p_inizio + (v_dur * interval '1 minute') <= (v_giorno + o.chiude) at time zone c_tz
+  ) then raise exception 'FUORI_ORARIO'; end if;
+  if exists (
+    select 1 from public.blocchi_slot b
+    where b.azienda_id = v_az
+      and tstzrange(b.inizio, b.fine) && public.appuntamento_intervallo(p_inizio, v_dur)
+  ) then raise exception 'SLOT_OCCUPATO'; end if;
+
+  select r2.id into v_risorsa
+  from public.risorse r2
+  where r2.azienda_id = v_az and r2.attiva
+    and not exists (
+      select 1 from public.appuntamenti a
+      where a.risorsa_id = r2.id and a.stato in ('in_attesa','prenotato','completato')
+        and public.appuntamento_intervallo(a.inizio, a.durata_minuti)
+         && public.appuntamento_intervallo(p_inizio, v_dur))
+  order by r2.ordine, r2.id
+  limit 1;
+  if v_risorsa is null then raise exception 'SLOT_OCCUPATO'; end if;
+
+  begin
+    insert into public.appuntamenti (
+      azienda_id, risorsa_id, inizio, durata_minuti, stato, fonte, tipo, riferimento
+    ) values (
+      v_az, v_risorsa, p_inizio, v_dur, 'in_attesa', v_fonte, 'controllo_vista', v_codice
+    ) returning appuntamenti.id into v_appto;
+  exception
+    when exclusion_violation then raise exception 'SLOT_OCCUPATO';
+  end;
+
+  begin
+    insert into public.prenotazioni (
+      azienda_id, persona_id, appuntamento_id, servizio_codice, inizio, durata_minuti, stato, fonte,
+      per_conto_di, contatto_nome, contatto_telefono, contatto_email, note,
+      codice, chiave_richiesta, informativa_accettata_at
+    ) values (
+      v_az, v_persona, v_appto, p_servizio, p_inizio, v_dur, 'in_attesa', v_fonte,
+      nullif(btrim(p_per_conto_di), ''), p_nome, p_telefono, nullif(btrim(p_email), ''), nullif(btrim(p_note), ''),
+      v_codice, p_chiave_richiesta, now()
+    ) returning prenotazioni.id into v_id;
+  exception
+    when unique_violation then
+      delete from public.appuntamenti where appuntamenti.id = v_appto;
+      select p.id, p.codice, p.inizio, p.durata_minuti into r
+      from public.prenotazioni p where p.chiave_richiesta = p_chiave_richiesta;
+      if found then
+        id := r.id; codice := r.codice; inizio := r.inizio; durata_minuti := r.durata_minuti;
+        return next; return;
+      end if;
+      raise;
+  end;
+
+  if coalesce(p_lista_attesa, false) then
+    insert into public.lista_attesa (persona_id, azienda_id, servizio_codice, giorno_preferito)
+    values (v_persona, v_az, p_servizio, v_giorno);
+  end if;
+
+  id := v_id; codice := v_codice; inizio := p_inizio; durata_minuti := v_dur; return next;
+end $$;
+comment on function public.crea_prenotazione(text,text,timestamptz,text,text,text,text,text,text,text,boolean) is
+  'Portale G7/G8: crea la prenotazione (ramo appuntamento o richiesta) in UNA transazione, idempotente su chiave_richiesta. C1 voce 6 punto 4: rifiuta un telefono senza cifre (TELEFONO_NON_VALIDO) e non cerca mai fra le persone anonimizzate.';
+revoke execute on function public.crea_prenotazione(text,text,timestamptz,text,text,text,text,text,text,text,boolean) from public;
+grant  execute on function public.crea_prenotazione(text,text,timestamptz,text,text,text,text,text,text,text,boolean) to anon, authenticated;
+
 -- ⚠️ RIFATTA QUI (l'originale è nella 018): da C1 voce 6 `prenotazioni.persona_id`
 -- può essere NULL — lo SGANCIO dell'anonimizzazione — e il passo (d) di questa
 -- funzione scrive `persona_id` nel registro, che è NOT NULL. Senza la guardia

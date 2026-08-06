@@ -185,10 +185,37 @@ describe.skipIf(!haEnv())("021 · C1 · l'anonimo esce dalla dedup (anche dalla 
     // «-» è ciò che scrive chi non vuole lasciare il numero: la UI del portale
     // lo accetta (chiede solo `trim().length > 0`) e `normalizza_telefono` lo
     // riduce a '' — la stessa chiave su cui si è posata la riga anonima.
+    //
+    // ⚠️ DOPPIA CINTURA (C1 voce 6 punto 4, 06/08): il contratto pretende
+    // ENTRAMBE le difese, non una a scelta. La PRIMA morde qui: un telefono
+    // senza cifre è rifiutato a monte, perché un contatto irraggiungibile non è
+    // una prenotazione. Se un domani la si togliesse lasciando solo l'altra, la
+    // prenotazione entrerebbe — su una persona nuova, sì, ma con un recapito
+    // che non richiama nessuno.
+    await expect(
+      prenotaComeAnonimo({ giornoOffset: 8, nome: "Ugo Nuovo", telefono: "-" }),
+      "un telefono senza cifre va rifiutato con TELEFONO_NON_VALIDO (prima cintura)"
+    ).rejects.toThrow(/TELEFONO_NON_VALIDO/);
+
+    // La SECONDA cintura si prova dove la prima non arriva: si scavalca la RPC
+    // e si chiede alla dedup, in proprio, quello che `crea_prenotazione` le
+    // chiede — «chi ha questo telefono normalizzato?». La risposta non deve mai
+    // essere una riga anonima, qualunque strada abbia portato lì una chiave ''.
+    const { data: pescate } = await svc
+      .from("persone")
+      .select("id, nome")
+      .eq("telefono_normalizzato", "");
+    expect(
+      (pescate ?? []).every((p) => p.nome === "Anonimo"),
+      "sulla chiave vuota stanno SOLO righe anonimizzate: è per questo che la ricerca deve escluderle"
+    ).toBe(true);
+
+    // …e da qui in poi il caso storico, con un telefono VERO ma nuovo: la
+    // prenotazione deve nascere su una persona sua, mai dentro un'anonima.
     const secondo = await prenotaComeAnonimo({
       giornoOffset: 8,
       nome: "Ugo Nuovo",
-      telefono: "-",
+      telefono: telefonoUnico(),
     });
 
     const { data: agganciata } = await svc

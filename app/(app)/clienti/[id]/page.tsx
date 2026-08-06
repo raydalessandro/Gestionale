@@ -116,6 +116,16 @@ export default async function ClientePage({
     : { data: [] as { id: string; nome: string; cognome: string }[] };
   const nomeDi = new Map((altri ?? []).map((c) => [c.id, `${c.nome} ${c.cognome}`]));
 
+  // Chi risponde per QUESTO cliente, dalla relazione vera. La riga è una sola e
+  // si legge dal verso giusto (C4): sulla scheda di X, «tutore_legale» in verso
+  // DRITTO (cliente_id = X) significa che l'altro capo è il suo tutore — è il
+  // gesto di «Aggiungi relazione», dove si sceglie la persona collegata.
+  const tutoreDaRelazione =
+    (relDirette ?? [])
+      .filter((r) => r.tipo === "tutore_legale")
+      .map((r) => nomeDi.get(r.relativo_id))
+      .find(Boolean) ?? null;
+
   const relazioni: RigaRelazione[] = righeRel.map((r) => {
     const altroId = r.cliente_id === id ? r.relativo_id : r.cliente_id;
     return {
@@ -214,8 +224,17 @@ export default async function ClientePage({
               {ETICHETTE_FONTE[cliente.fonte] ?? cliente.fonte}
             </Badge>
             {eta !== null && <Badge tinta="neutro">{eta} anni</Badge>}
-            {cliente.tutore_legale && (
-              <Badge tinta="ottone">Tutore: {cliente.tutore_legale}</Badge>
+            {/* Il segnalino nasce dalla RELAZIONE vera (C4), non più dal campo
+                di testo deprecato. Prima era rovesciato: la scheda vecchia e
+                sporca accendeva il badge, quella registrata bene no — cioè
+                premiava il dato peggiore. Il testo storico resta come ripiego,
+                dichiarato tale, finché il travaso non l'avrà svuotato. */}
+            {tutoreDaRelazione ? (
+              <Badge tinta="ottone">Tutore: {tutoreDaRelazione}</Badge>
+            ) : (
+              cliente.tutore_legale && (
+                <Badge tinta="ottone">Tutore: {cliente.tutore_legale} (storico)</Badge>
+              )
             )}
             {cliente.non_contattare && <Badge tinta="neutro">Non contattare</Badge>}
             {cliente.anonimizzato_il && <Badge tinta="neutro">Anonimizzato</Badge>}

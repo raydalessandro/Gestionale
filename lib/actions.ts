@@ -1298,6 +1298,12 @@ async function eseguiPrendiCliente(
     if (m.includes("CLIENTE_NON_TUO")) return { errore: "Quel cliente non è del tuo negozio." };
     if (m.includes("NON_TUA")) return { errore: "Questa richiesta non è del tuo negozio." };
     if (m.includes("PRENOTAZIONE_NON_TROVATA")) return { errore: "Richiesta non trovata." };
+    // C1 voce 6: l'anonimizzazione ha sganciato la persona da questa richiesta.
+    if (m.includes("PRENOTAZIONE_SGANCIATA"))
+      return {
+        errore:
+          "I dati di chi aveva prenotato sono stati eliminati: non c'è più nessuno da prendere come cliente.",
+      };
     return { errore: `Operazione non riuscita: ${m}` };
   }
   revalidatePath("/agenda");

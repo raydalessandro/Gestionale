@@ -11,6 +11,7 @@ import {
   anonimizzaCliente,
 } from "@/lib/actions";
 import { Card, Field, inputCls, Errore } from "@/components/ui";
+import { fmtData } from "@/lib/utils";
 
 /**
  * B1 · La sezione «Permessi» della scheda cliente (M1 §5).
@@ -284,7 +285,10 @@ function MastroConsensi({
                 Consenso {c.tipo === "marketing" ? "marketing" : "dati sanitari"}
               </span>{" "}
               {c.azione === "dato" ? "dato" : "revocato"} il{" "}
-              {new Date(c.avvenuto_il).toLocaleDateString("it-IT", { timeZone: "Europe/Rome" })}
+              {/* `fmtData`, come tutto il resto dell'app: due formati di data
+                  nella STESSA schermata (qui 06/08/2026, nel riquadro Privacy
+                  6 ago 2026) facevano sembrare due cose diverse due date. */}
+              {fmtData(c.avvenuto_il)}
               {c.modalita ? ` · ${c.modalita}` : ""}
               {c.canali?.length ? ` · ${c.canali.join(", ")}` : ""}
               {c.versione_informativa ? ` · informativa ${c.versione_informativa}` : ""}

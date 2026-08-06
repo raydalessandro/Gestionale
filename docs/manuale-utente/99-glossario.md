@@ -279,10 +279,10 @@ registra in un modo solo: il collegamento **Tutore legale** in "Famiglia e
 tutela", che lega davvero due schede — anche quella di un ente — e si legge dai
 due lati. C'era anche un campo di testo nell'Identità, che scriveva solo un
 nome: non si compila più. Dove qualcuno l'aveva riempito, il nome resta
-visibile come **"Tutore legale (storico)"** e in scheda compare ancora il
-segnalino "Tutore: <nome>" — da leggere, non da correggere. Quel segnalino
-arriva **solo** dal vecchio campo: un collegamento nuovo non lo accende, si
-legge nell'elenco dei "Permessi".
+visibile come **"Tutore legale (storico)"** — da leggere, non da correggere.
+Il segnalino in testata alla scheda mostra il tutore del **collegamento**; se
+quel collegamento non c'è ancora e c'è solo il vecchio testo, il segnalino lo
+dice: **"Tutore: <nome> (storico)"**.
 
 **Vendita.** L'incasso registrato in cassa, con un numero suo (`VE-…`). È
 sempre per l'intero valore; i pagamenti (uno o più metodi) devono farne la
