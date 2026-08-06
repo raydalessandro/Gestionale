@@ -120,6 +120,12 @@ riga cliente (`select … for update`), (2) inserisce l'evento, (3)
 aggiorna la cache. Due eventi simultanei si serializzano dal lock: la
 cache riflette l'ultimo commit, per costruzione — niente confronti di
 timestamp, niente pareggi possibili.
+**Retrodatazione: NON esiste (ratifica 05/08)** — il mastro registra
+FATTI al presente; `avvenuto_il` è il momento della registrazione,
+sempre. Il caso vero «firma cartacea di ieri, caricata oggi»: si
+registra OGGI, `modalita='penna'`, nota libera. Un eventuale
+`dichiarato_il` informativo sarà additive futuro e MAI letto dalla
+cache (romperebbe la semantica del lock).
 **Altre regole**: due `dato` consecutivi = lecito (aggiorna i canali)
 · la revoca non punta a una riga: vale per il tipo · la cache non si
 scrive MAI direttamente (solo l'azione del mastro).
