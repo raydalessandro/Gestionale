@@ -384,12 +384,19 @@ test.describe("M1 · Anagrafiche & Privacy (§8 · S1-S6)", () => {
     // "DaAnonimizzare …"»), quindi un `getByText(nome).toHaveCount(0)` sarebbe
     // rosso proprio nella schermata che dice che il cliente non c'è. Ci è
     // cascato il primo giro di CI in cui questo E2E ha girato davvero.
-    await expect(page.locator(`a[href="/clienti/${clienteId}"]`)).toHaveCount(0);
+    //
+    // La riga è un LINK il cui nome accessibile contiene «cognome nome»: si
+    // aggancia per RUOLO, non con un `a[href=…]`. È la stessa robustezza (lo
+    // stato vuoto ha un solo link, «Nuovo cliente») ma senza selettori CSS, che
+    // l'ordine di lavoro vieta — e senza dipendere dalla forma dell'URL.
+    const rigaCliente = page.getByRole("link", { name: new RegExp(`DaAnonimizzare ${id}`) });
+    await expect(rigaCliente).toHaveCount(0);
     await expect(page.getByText("Nessun risultato")).toBeVisible();
     // …né cercandola per il nome NUOVO: l'anonimizzato esce dal registro, che è
     // ciò che la 021 scrive sulla colonna («esclude da ricerche, code, letture»).
     await page.goto("/clienti?q=Anonimizzato");
-    await expect(page.locator(`a[href="/clienti/${clienteId}"]`)).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /Anonimizzato-/ })).toHaveCount(0);
+    await expect(page.getByText("Nessun risultato")).toBeVisible();
 
     // …ma il FATTO è intatto: numero e importi della busta si leggono ancora.
     await page.goto(urlBusta);

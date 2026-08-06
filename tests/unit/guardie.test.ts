@@ -2119,3 +2119,166 @@ describe("L4q · contratto UI ↔ E2E di M1 (B1)", () => {
     ).toEqual([]);
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * L4r · LE CONSEGUENZE DELLA VOCE 6 (C1) SUL CODICE CHE STA INTORNO
+ *
+ * La voce 6 non ha cambiato solo una funzione: ha cambiato due VERITÀ che il
+ * resto del programma dava per scontate.
+ *   (1) `prenotazioni.persona_id` può essere NULL. Nessuno, oggi, lo legge —
+ *       ed è per questo che va sorvegliato adesso: il primo che lo leggerà
+ *       scriverà `pren.persona_id!` senza pensarci, e lo sganciato diventerà un
+ *       crash o, peggio, un `undefined` che passa (G32).
+ *   (2) `anonimizzato_il` dichiara che il cliente «esce da ricerche, code e
+ *       letture». La lista clienti lo fa; i sette selettori-cliente che aprono
+ *       lavoro NUOVO no (G30, ratchet sul debito noto).
+ * E una terza, di forma: una funzione può guadagnare un errore parlante nuovo
+ * (`PRENOTAZIONE_SGANCIATA`) senza che l'azione lo impari, e l'operatore legge
+ * il nome della costante SQL (G31).
+ * ════════════════════════════════════════════════════════════════════════ */
+describe("L4r · conseguenze di C1 voce 6 sul codice intorno", () => {
+  it("G30 · i selettori-cliente che aprono lavoro NUOVO escludono gli anonimizzati (ratchet)", () => {
+    // Il contratto della colonna, scritto nella 021: «anonimizzato_il esclude il
+    // cliente da ricerche, code e letture». Oggi lo rispetta solo la lista
+    // `/clienti`; ovunque si SCELGA un cliente per iniziare qualcosa di nuovo
+    // (una busta, una vendita, un ordine LAC, un appuntamento, un richiamo, un
+    // reso, un fermo) l'anonimizzato si può ancora scegliere — e da lì rientra
+    // in agenda, in cassa e nelle code, con addosso il nome «Anonimizzato-…».
+    //
+    // RATCHET DOCUMENTATO (report-test.md §ganci): i punti che oggi non
+    // filtrano sono elencati qui sotto. La guardia non li corregge — non è
+    // compito dei test — ma impedisce che ne nasca un OTTAVO mentre si aspetta
+    // il gancio. Quando uno viene riparato, si toglie da questa lista: da quel
+    // momento è protetto per sempre.
+    const DEBITO_NOTO = [
+      "components/WizardBusta.tsx",
+      "components/WizardOrdineLac.tsx",
+      "components/WizardVendita.tsx",
+      "components/FormAppuntamento.tsx",
+      "components/AzioniRichiami.tsx",
+      "components/AzioniMagazzino.tsx",
+      "components/ResoEsterno.tsx",
+      // Ricerca sui FATTI, non sull'anagrafica: `/ordini?q=` filtra le buste per
+      // nome del cliente. Un anonimizzato lì è legittimo (i suoi ordini restano
+      // leggibili): resta in lista come scelta dichiarata, non come debito.
+      "app/(app)/ordini/page.tsx",
+    ];
+    // Una ricerca-cliente si riconosce così: interroga `clienti` filtrando per
+    // NOME (è il gesto «scrivi due lettere e scegli»). Le riletture per id
+    // (`.in("id", …)`, `.eq("id", …)`) NON sono ricerche: sono la lettura di un
+    // fatto già scritto — l'anonimo lì ci deve stare, col suo nome nuovo.
+    const RICERCA = /from\("clienti"\)[\s\S]{0,400}?nome\.ilike/;
+    const senzaFiltro: string[] = [];
+    for (const f of [...sorgenti("app"), ...sorgenti("components"), ...sorgenti("lib")]) {
+      const src = readFileSync(f, "utf8");
+      if (!RICERCA.test(src)) continue;
+      if (/\.is\(\s*["']anonimizzato_il["']\s*,\s*null\s*\)/.test(src)) continue;
+      senzaFiltro.push(rel(f));
+    }
+    const nuovi = senzaFiltro.filter((f) => !DEBITO_NOTO.includes(f));
+    expect(
+      nuovi,
+      "021: «anonimizzato_il esclude da ricerche, code e letture». Nuovi punti che " +
+        `scelgono un cliente senza escluderlo: ${nuovi.join(", ")}. ` +
+        "Aggiungi `.is(\"anonimizzato_il\", null)` alla query."
+    ).toEqual([]);
+  });
+
+  it("G31 · ogni errore parlante di `prendi_persona_come_cliente` arriva tradotto all'operatore", () => {
+    // Il modo esatto in cui questo si rompe: la 021 rifà la funzione della 018
+    // aggiungendo un `raise exception` nuovo (`PRENOTAZIONE_SGANCIATA`, che
+    // nasce dalla voce 6), l'azione non lo impara, e al banco compare
+    // «Operazione non riuscita: PRENOTAZIONE_SGANCIATA» — il nome di una
+    // costante SQL dentro un messaggio d'errore, che è il modo più veloce per
+    // far perdere fiducia a chi sta lavorando.
+    const M = "supabase/migrazioni/021_fondamenta.sql";
+    if (!existsSync(join(ROOT, M))) return;
+    const sql = leggi(M);
+    const i = sql.indexOf("create or replace function public.prendi_persona_come_cliente(");
+    if (i < 0) return; // la 021 non la rifà più: la sorveglia la sua migrazione
+    const corpo = sql.slice(i, i + sql.slice(i).indexOf("$$;"));
+    const sollevati = [
+      ...new Set(
+        Array.from(corpo.matchAll(/raise exception '([A-Z_]+)'/g)).map((m) => m[1])
+      ),
+    ].sort();
+    expect(sollevati.length, "la funzione deve sollevare errori parlanti").toBeGreaterThan(3);
+
+    // Non tradotti OGGI, e con una ragione ciascuno (report §ganci):
+    //  · NON_AUTENTICATO — irraggiungibile dall'azione (la sessione c'è già,
+    //    e senza sessione risponde prima il proxy);
+    //  · PRENOTAZIONE_SGANCIATA — gancio APERTO: raggiungibile solo se anche
+    //    `cliente_id` è NULL (cliente cancellato), quindi difesa in profondità.
+    //    Quando l'azione lo tradurrà, questa lista si accorcia; se ne compare un
+    //    TERZO, la guardia è rossa.
+    const SENZA_TRADUZIONE = ["NON_AUTENTICATO", "PRENOTAZIONE_SGANCIATA"];
+    const azioni = leggi("lib/actions.ts");
+    const muti = sollevati.filter(
+      (e) => !SENZA_TRADUZIONE.includes(e) && !azioni.includes(`"${e}"`)
+    );
+    expect(
+      muti,
+      `errori sollevati dalla RPC e non tradotti in lib/actions.ts: ${muti.join(", ")}`
+    ).toEqual([]);
+  });
+
+  it("G33 · i ruoli di `permessi.json` sono ESATTAMENTE quelli che il DB sa scrivere", () => {
+    // C2 è fail-closed: un ruolo che sta nel DB ma non nella matrice dà
+    // `ruolo_sconosciuto`, cioè NEGA TUTTO a quell'utente — e lo fa in silenzio,
+    // perché nessuna migrazione e nessun test lo tocca. Il caso inverso è
+    // peggiore al contrario: un ruolo aggiunto alla matrice ma non al CHECK non
+    // si può nemmeno assegnare, e la policy nuova resta lettera morta.
+    // Le due liste sono la stessa cosa scritta in due posti: qui si tengono
+    // legate. (Stessa famiglia di G12 su FONTI ↔ check SQL.)
+    const matrice = JSON.parse(leggi("docs/regole/permessi.json")) as { ruoli: string[] };
+    // Vale l'ULTIMA definizione del CHECK: `schema.sql` nasce con il vocabolario
+    // vecchio (optometrista/staff) e la 006 lo riscrive. Si prende quella.
+    const fonti = [
+      "supabase/schema.sql",
+      ...readdirSync(join(ROOT, "supabase/migrazioni"))
+        .filter((n) => n.endsWith(".sql"))
+        .sort()
+        .map((n) => `supabase/migrazioni/${n}`),
+    ];
+    let ultimo: string[] | null = null;
+    for (const f of fonti) {
+      const m = [...leggi(f).matchAll(/check\s*\(ruolo in \(([^)]+)\)\)/gi)].at(-1);
+      if (m) ultimo = m[1].split(",").map((s) => s.trim().replace(/^'|'$/g, ""));
+    }
+    expect(ultimo, "nessun CHECK su `utenti.ruolo` trovato nello schema").toBeTruthy();
+    expect(
+      [...ultimo!].sort(),
+      "i ruoli del DB e quelli di permessi.json devono coincidere (C2 nega i ruoli sconosciuti)"
+    ).toEqual([...matrice.ruoli].sort());
+  });
+
+  it("G32 · `persona_id` resta NULLABILE nel tipo, e nessuno lo presume valorizzato", () => {
+    // La 021 fa `alter column persona_id drop not null`: da lì in poi il tipo
+    // DEVE dire `string | null`, altrimenti TypeScript autorizza in silenzio
+    // ogni lettura sbagliata (e `tsc` resta verde mentre lo sganciato passa).
+    const tipi = leggi("lib/database.types.ts");
+    const riga = tipi.match(/persona_id:\s*([^;]+);/);
+    expect(riga, "PrenotazioneRow deve dichiarare persona_id").toBeTruthy();
+    expect(
+      /string\s*\|\s*null/.test(riga![1]),
+      "C1 voce 6: `persona_id` è NULL dopo lo sgancio. Il tipo non deve tornare `string`"
+    ).toBe(true);
+
+    // E nel codice dell'app: nessun `!` e nessun cast che scavalchi il null. Oggi
+    // NESSUNO legge quel campo (la lettura vive solo dentro le funzioni SQL):
+    // la guardia serve al primo che lo leggerà, che è esattamente il momento in
+    // cui lo sganciato tornerebbe a essere una sorpresa.
+    const colpevoli: string[] = [];
+    for (const f of [...sorgenti("app"), ...sorgenti("components"), ...sorgenti("lib")]) {
+      if (rel(f) === "lib/database.types.ts") continue;
+      const src = readFileSync(f, "utf8");
+      if (/persona_id\s*!/.test(src) || /persona_id\s+as\s+string(?!\s*\|)/.test(src)) {
+        colpevoli.push(rel(f));
+      }
+    }
+    expect(
+      colpevoli,
+      `un persona_id sganciato (NULL) viene presunto valorizzato in: ${colpevoli.join(", ")}`
+    ).toEqual([]);
+  });
+});

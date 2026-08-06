@@ -3,7 +3,9 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   creaTenant,
   creaCliente,
+  creaUtente,
   serviceClient,
+  anonClient,
   pulisci,
   haEnv,
   RUN_ID,
@@ -86,13 +88,24 @@ describe.skipIf(!haEnv())("021 · C1 · anonimizzazione (la mappa, campo per cam
     return d.toISOString();
   }
 
-  /** Crea una persona di portale + la sua prenotazione agganciata al cliente. */
-  async function personaCollegata(clienteId: string): Promise<string> {
-    const inizio = slotFuturo();
-    const { data: app, error: eApp } = await A.cli
+  /**
+   * Un appuntamento di un tenant qualunque, col service role.
+   *
+   * ⚠️ `prenotazioni.appuntamento_id` è **NOT NULL dalla 013** («l'agenda unica»:
+   * la verità dello slot è l'appuntamento). Una prenotazione seminata senza
+   * appuntamento non entra — dà 23502, e il test muore nel setup con un
+   * messaggio che parla di colonne, non di contratto. `risorsa_id` invece si
+   * omette apposta: lo riempie il trigger `assegna_sala_appuntamento` (014).
+   */
+  async function appuntamentoDi(
+    aziendaId: string,
+    inizio: string,
+    clienteId: string | null = null
+  ): Promise<string> {
+    const { data, error } = await svc
       .from("appuntamenti")
       .insert({
-        azienda_id: A.aziendaId,
+        azienda_id: aziendaId,
         cliente_id: clienteId,
         tipo: "controllo_vista",
         inizio,
@@ -102,31 +115,73 @@ describe.skipIf(!haEnv())("021 · C1 · anonimizzazione (la mappa, campo per cam
       })
       .select("id")
       .single();
-    if (eApp) throw new Error(`appuntamento per la prenotazione: ${eApp.message}`);
+    if (error) throw new Error(`appuntamento: ${error.message}`);
+    return data!.id as string;
+  }
 
+  /** Una persona di portale nuova (identità di PIATTAFORMA: nessun azienda_id). */
+  async function personaNuova(nome = "Laura Bianchi"): Promise<{ id: string; tel: string }> {
     const tel = telefonoUnico();
-    const { data: persona, error: eP } = await svc
+    const { data, error } = await svc
       .from("persone")
-      .insert({ telefono_grezzo: tel, nome: "Laura Bianchi", email: `p.${tel}@esempio.it` })
+      .insert({ telefono_grezzo: tel, nome, email: `p.${tel}@esempio.it` })
       .select("id")
       .single();
-    if (eP) throw new Error(`persona: ${eP.message}`);
+    if (error) throw new Error(`persona: ${error.message}`);
+    return { id: data!.id as string, tel };
+  }
 
-    const { error: ePren } = await svc.from("prenotazioni").insert({
-      azienda_id: A.aziendaId,
-      persona_id: persona!.id,
-      cliente_id: clienteId,
-      appuntamento_id: app!.id,
-      servizio_codice: "visita",
+  /** Una prenotazione di `aziendaId` per `persona`, eventualmente già presa come cliente. */
+  async function prenotazioneDi(o: {
+    aziendaId: string;
+    persona: string;
+    tel: string;
+    clienteId?: string | null;
+    nome?: string;
+    perContoDi?: string | null;
+    /** false = l'appuntamento NON punta al cliente (serve a poterlo cancellare). */
+    appuntamentoDelCliente?: boolean;
+  }): Promise<string> {
+    const inizio = slotFuturo();
+    const appuntamento = await appuntamentoDi(
+      o.aziendaId,
       inizio,
-      durata_minuti: 30,
-      contatto_nome: "Laura Bianchi",
-      contatto_telefono: tel,
-      contatto_email: `p.${tel}@esempio.it`,
-      note: "chiamare dopo le 15",
+      o.appuntamentoDelCliente === false ? null : o.clienteId ?? null
+    );
+    const nome = o.nome ?? "Laura Bianchi";
+    const { data, error } = await svc
+      .from("prenotazioni")
+      .insert({
+        azienda_id: o.aziendaId,
+        persona_id: o.persona,
+        cliente_id: o.clienteId ?? null,
+        appuntamento_id: appuntamento,
+        servizio_codice: "visita",
+        inizio,
+        durata_minuti: 30,
+        stato: "accettata",
+        contatto_nome: nome,
+        contatto_telefono: o.tel,
+        contatto_email: `p.${o.tel}@esempio.it`,
+        per_conto_di: o.perContoDi ?? null,
+        note: "chiamare dopo le 15",
+      })
+      .select("id")
+      .single();
+    if (error) throw new Error(`prenotazione: ${error.message}`);
+    return data!.id as string;
+  }
+
+  /** Crea una persona di portale + la sua prenotazione agganciata al cliente. */
+  async function personaCollegata(clienteId: string): Promise<string> {
+    const p = await personaNuova();
+    await prenotazioneDi({
+      aziendaId: A.aziendaId,
+      persona: p.id,
+      tel: p.tel,
+      clienteId,
     });
-    if (ePren) throw new Error(`prenotazione: ${ePren.message}`);
-    return persona!.id as string;
+    return p.id;
   }
 
   beforeAll(async () => {
@@ -482,21 +537,20 @@ describe.skipIf(!haEnv())("021 · C1 · anonimizzazione (la mappa, campo per cam
     // poter portare via il contatto a B. È il caso che rende vera quella frase.
     const B = await creaTenant("c1d");
     const clienteA = await creaCliente(A, { ...PERSONALI, cognome: `Condivisa ${RUN_ID}` });
-    const persona = await personaCollegata(clienteA);
+    // La persona nasce QUI (non da `personaCollegata`) perché la stessa riga
+    // deve poi comparire anche sulla prenotazione di B: è il punto del test.
+    const condivisa = await personaNuova();
+    const persona = condivisa.id;
+    await prenotazioneDi({
+      aziendaId: A.aziendaId,
+      persona,
+      tel: condivisa.tel,
+      clienteId: clienteA,
+    });
 
     // La STESSA persona prenota anche da B (riga `persone` unica, prenotazione sua).
-    const inizioB = slotFuturo();
-    const { error: ePrenB } = await svc.from("prenotazioni").insert({
-      azienda_id: B.aziendaId,
-      persona_id: persona,
-      servizio_codice: "visita",
-      inizio: inizioB,
-      durata_minuti: 30,
-      contatto_nome: "Laura Bianchi",
-      contatto_telefono: "+39 333 0000001",
-      contatto_email: "laura@esempio.it",
-    });
-    if (ePrenB) throw new Error(`prenotazione di B: ${ePrenB.message}`);
+    // ⚠️ Con l'appuntamento: `prenotazioni.appuntamento_id` è NOT NULL dalla 013.
+    await prenotazioneDi({ aziendaId: B.aziendaId, persona, tel: condivisa.tel });
 
     const { error } = await A.cli.rpc("anonimizza_cliente", { p_cliente_id: clienteA });
     expect(error, "A anonimizza il proprio cliente").toBeNull();
@@ -551,6 +605,224 @@ describe.skipIf(!haEnv())("021 · C1 · anonimizzazione (la mappa, campo per cam
     expect(p2!.telefono_normalizzato, "e la riga esce dalla dedup").toBe("");
   });
 
+  it("C1 voce 6 · DUE clienti dello STESSO negozio, una persona sola: si sgancia solo il suo", async () => {
+    // Il caso che il test «due negozi» non copre: il perimetro dello sgancio è
+    // `cliente_id AND azienda_id`, e dentro UN negozio la seconda condizione non
+    // discrimina. Se la funzione sganciasse per sola azienda, la prenotazione di
+    // un cliente MAI toccato perderebbe la sua persona — un danno invisibile,
+    // perché nessuno va a guardare il grafo di un cliente che non ha chiesto
+    // nulla. Qui si guarda.
+    const c1 = await creaCliente(A, { ...PERSONALI, cognome: `Coabita1 ${RUN_ID}` });
+    const c2 = await creaCliente(A, { ...PERSONALI, cognome: `Coabita2 ${RUN_ID}` });
+    const p = await personaNuova("Marco Coabita");
+    await prenotazioneDi({ aziendaId: A.aziendaId, persona: p.id, tel: p.tel, clienteId: c1, nome: "Marco Coabita" });
+    await prenotazioneDi({ aziendaId: A.aziendaId, persona: p.id, tel: p.tel, clienteId: c2, nome: "Marco Coabita" });
+
+    expect((await A.cli.rpc("anonimizza_cliente", { p_cliente_id: c1 })).error).toBeNull();
+
+    const { data: pren1 } = await svc
+      .from("prenotazioni")
+      .select("persona_id, contatto_nome")
+      .eq("cliente_id", c1)
+      .single();
+    expect(pren1!.persona_id, "la prenotazione del cliente anonimizzato è sganciata").toBeNull();
+    expect(pren1!.contatto_nome).toBe("Anonimo");
+
+    const { data: pren2 } = await svc
+      .from("prenotazioni")
+      .select("persona_id, contatto_nome")
+      .eq("cliente_id", c2)
+      .single();
+    expect(pren2!.persona_id, "quella dell'ALTRO cliente non si tocca").toBe(p.id);
+    expect(pren2!.contatto_nome, "…e nemmeno la sua istantanea di contatto").toBe("Marco Coabita");
+
+    // …e la persona resta INTATTA: è ancora agganciata, dentro lo stesso negozio.
+    const { data: viva } = await svc
+      .from("persone")
+      .select("nome, telefono_grezzo")
+      .eq("id", p.id)
+      .single();
+    expect(viva!.nome, "un legame residuo, anche del MIO negozio, la tiene viva").toBe("Marco Coabita");
+
+    // Quando se ne va anche il secondo, la catena si chiude e la riga si anonimizza.
+    expect((await A.cli.rpc("anonimizza_cliente", { p_cliente_id: c2 })).error).toBeNull();
+    const { data: ora } = await svc
+      .from("persone")
+      .select("nome, telefono_grezzo")
+      .eq("id", p.id)
+      .single();
+    expect(ora!.nome, "ultimo filo tagliato: ORA è orfana").toBe("Anonimo");
+    expect(ora!.telefono_grezzo).toBeNull();
+  });
+
+  it("C1 voce 6 · la lista d'attesa tiene viva la persona (scelta conservativa dichiarata)", async () => {
+    // Nota (c) del contratto: `lista_attesa` NON è nella mappa C1 e non viene
+    // toccata, quindi una sua riga rende la persona NON orfana e la riga resta
+    // intatta. Il test FOTOGRAFA quella scelta invece di lasciarla implicita —
+    // e mostra il suo prezzo: qui il legame residuo è del negozio STESSO che ha
+    // anonimizzato, quindi la frase «il negozio A non la raggiunge più da nessun
+    // suo dato» vale per le prenotazioni, non per la lista d'attesa. Se la
+    // decisione di regia cambierà, è questo test a diventare rosso per primo, ed
+    // è il posto giusto dove leggerne il perché.
+    const c = await creaCliente(A, { ...PERSONALI, cognome: `InLista ${RUN_ID}` });
+    const p = await personaNuova("Sara Lista");
+    await prenotazioneDi({ aziendaId: A.aziendaId, persona: p.id, tel: p.tel, clienteId: c, nome: "Sara Lista" });
+    const { error: eLista } = await svc.from("lista_attesa").insert({
+      persona_id: p.id,
+      azienda_id: A.aziendaId,
+      servizio_codice: "visita",
+    });
+    if (eLista) throw new Error(`lista_attesa: ${eLista.message}`);
+
+    expect((await A.cli.rpc("anonimizza_cliente", { p_cliente_id: c })).error).toBeNull();
+
+    // Lo SGANCIO avviene comunque: le prenotazioni del negozio lasciano andare
+    // la persona e le istantanee si spengono. È la parte che non dipende da nulla.
+    const { data: pren } = await svc
+      .from("prenotazioni")
+      .select("persona_id, contatto_nome, contatto_telefono, contatto_email")
+      .eq("cliente_id", c)
+      .single();
+    expect(pren!.persona_id).toBeNull();
+    expect(pren!.contatto_nome).toBe("Anonimo");
+    expect(pren!.contatto_telefono).toBe("");
+    expect(pren!.contatto_email).toBeNull();
+
+    // La riga `persone`, invece, resta viva: la lista d'attesa la trattiene.
+    const { data: persona } = await svc
+      .from("persone")
+      .select("nome, telefono_grezzo")
+      .eq("id", p.id)
+      .single();
+    expect(persona!.nome, "la lista d'attesa la tiene agganciata: non si sbianca").toBe("Sara Lista");
+    expect(persona!.telefono_grezzo).not.toBeNull();
+
+    // …e il PREZZO della scelta, fotografato perché non resti implicito: tolta
+    // la riga di lista, rifare l'anonimizzazione NON recupera niente. Lo sgancio
+    // del primo giro ha già azzerato `persona_id`, quindi `v_persone` è vuoto e
+    // non c'è più nessuna persona da valutare: l'occasione di sbiancare la riga
+    // si presenta UNA volta sola, nell'istante in cui si tagliano i fili.
+    // Non è un test rosso — è il comportamento reale, ed è il motivo per cui la
+    // decisione su `lista_attesa` non è rimandabile all'infinito (report §ganci).
+    await svc.from("lista_attesa").delete().eq("persona_id", p.id);
+    expect((await A.cli.rpc("anonimizza_cliente", { p_cliente_id: c })).error).toBeNull();
+    const { data: dopo } = await svc.from("persone").select("nome").eq("id", p.id).single();
+    expect(
+      dopo!.nome,
+      "l'orfanità si valuta solo sui fili che si stanno tagliando: ripetere non la ritrova"
+    ).toBe("Sara Lista");
+  });
+
+  it("C1 voce 6 · la definer dice QUANTE persone ha anonimizzato (0 se viva altrove)", async () => {
+    // Il valore di ritorno non è decorativo: è l'unico modo che ha un chiamante
+    // (oggi `anonimizza_cliente`, domani una procedura di regia) di sapere se la
+    // riga di piattaforma è stata sbiancata o solo sganciata. Un `perform` lo
+    // butta via, ma il contratto lo dichiara — quindi si collauda.
+    const B = await creaTenant("c1e");
+    const cViva = await creaCliente(A, { ...PERSONALI, cognome: `Conta1 ${RUN_ID}` });
+    const p = await personaNuova("Elsa Conta");
+    await prenotazioneDi({ aziendaId: A.aziendaId, persona: p.id, tel: p.tel, clienteId: cViva });
+    await prenotazioneDi({ aziendaId: B.aziendaId, persona: p.id, tel: p.tel });
+
+    const { data: zero, error: e0 } = await A.cli.rpc("anonimizza_persone_del_cliente", {
+      p_cliente_id: cViva,
+    });
+    expect(e0).toBeNull();
+    expect(zero, "viva da B: sganciata, non anonimizzata → 0").toBe(0);
+
+    const cOrfana = await creaCliente(A, { ...PERSONALI, cognome: `Conta2 ${RUN_ID}` });
+    const q = await personaNuova("Ugo Conta");
+    await prenotazioneDi({ aziendaId: A.aziendaId, persona: q.id, tel: q.tel, clienteId: cOrfana });
+    const { data: uno, error: e1 } = await A.cli.rpc("anonimizza_persone_del_cliente", {
+      p_cliente_id: cOrfana,
+    });
+    expect(e1).toBeNull();
+    expect(uno, "nessun altro legame: anonimizzata davvero → 1").toBe(1);
+  });
+
+  it("C1 voce 6 · `prendi_persona_come_cliente` su una prenotazione SGANCIATA si ferma parlando", async () => {
+    // Da quando `persona_id` può essere NULL, il passo (d) di quella funzione
+    // scriverebbe un NULL nel registro (NOT NULL) e l'operatore vedrebbe un
+    // 23502 crudo. La 021 la rifà con `PRENOTAZIONE_SGANCIATA`: qui si verifica
+    // che la frase esista DAVVERO, non solo nel sorgente (quello lo guarda G25e).
+    //
+    // Come ci si arriva: lo sgancio lascia `cliente_id` valorizzato, e con quello
+    // la funzione risponde prima l'idempotenza. Il caso vero è la riga rimasta
+    // senza NESSUNO dei due — cioè dopo che il cliente anonimizzato è stato
+    // cancellato (FK `on delete set null`), che è l'unico modo in cui il DB può
+    // produrla. L'appuntamento qui NON punta al cliente apposta: `appuntamenti.
+    // cliente_id` è `on delete cascade` e `prenotazioni.appuntamento_id` è NOT
+    // NULL, quindi cancellare il cliente porterebbe via l'appuntamento e la
+    // cancellazione fallirebbe in cascata (23502) prima di arrivare al punto.
+    const c = await creaCliente(A, { ...PERSONALI, cognome: `Sganciata ${RUN_ID}` });
+    const p = await personaNuova("Nina Sgancio");
+    const prenotazione = await prenotazioneDi({
+      aziendaId: A.aziendaId,
+      persona: p.id,
+      tel: p.tel,
+      clienteId: c,
+      appuntamentoDelCliente: false,
+    });
+    expect((await A.cli.rpc("anonimizza_cliente", { p_cliente_id: c })).error).toBeNull();
+    const { error: eDel } = await svc.from("clienti").delete().eq("id", c);
+    expect(eDel, "la cancellazione del cliente deve riuscire: è il setup del caso").toBeNull();
+
+    const { data: prima } = await svc
+      .from("prenotazioni")
+      .select("persona_id, cliente_id, stato")
+      .eq("id", prenotazione)
+      .single();
+    expect(prima!.persona_id, "sganciata").toBeNull();
+    expect(prima!.cliente_id, "e senza cliente: la FK ha fatto set null").toBeNull();
+    expect(prima!.stato, "…ed è ancora 'accettata', cioè prendibile per la funzione").toBe("accettata");
+
+    const { error } = await A.cli.rpc("prendi_persona_come_cliente", {
+      p_prenotazione_id: prenotazione,
+      p_cliente_id: null,
+    });
+    expect(error, "non c'è più nessuno da prendere: deve fermarsi").not.toBeNull();
+    expect(
+      error!.message,
+      "…e con la frase, non con un 23502 sul registro"
+    ).toMatch(/PRENOTAZIONE_SGANCIATA/);
+    expect(error!.message).not.toMatch(/persona_id/);
+  });
+
+  it("C1 · `per_conto_di` della prenotazione nomina un TERZO e deve sparire", async () => {
+    // ⚠️ ROSSO ATTESO finché la mappa non lo comprende (vedi report §ganci).
+    // `per_conto_di` è il campo che il portale riempie con «Prenoto per un'altra
+    // persona»: contiene il NOME DI UN TERZO, esattamente come il `tutore_legale`
+    // che C1 manda a NULL «perché identifica un TERZO per nome», e come i
+    // `contatto_*` entrati in mappa il 05/08. La regola generale del contratto è
+    // esplicita: «i quasi-identificatori e i testi liberi → NULL». Oggi la riga
+    // sopravvive all'anonimizzazione e l'agenda la stampa ancora («· per Marco
+    // Rossi»): il fatto resta, il nome del terzo pure.
+    const c = await creaCliente(A, { ...PERSONALI, cognome: `PerConto ${RUN_ID}` });
+    const p = await personaNuova("Chi Prenota");
+    await prenotazioneDi({
+      aziendaId: A.aziendaId,
+      persona: p.id,
+      tel: p.tel,
+      clienteId: c,
+      nome: "Chi Prenota",
+      perContoDi: "Marco Rossi (il figlio)",
+    });
+
+    expect((await A.cli.rpc("anonimizza_cliente", { p_cliente_id: c })).error).toBeNull();
+
+    const { data: pren } = await svc
+      .from("prenotazioni")
+      .select("per_conto_di, contatto_nome, note")
+      .eq("cliente_id", c)
+      .single();
+    expect(pren!.contatto_nome, "le istantanee di contatto sono in mappa dal 05/08").toBe("Anonimo");
+    expect(pren!.note, "le note libere pure").toBeNull();
+    expect(
+      pren!.per_conto_di,
+      "per_conto_di è un testo libero col nome di un terzo: la regola generale di C1 lo manda a NULL"
+    ).toBeNull();
+  });
+
   it("TENANT · la definer della parte-persone si difende DA SOLA (la RLS lì non c'è più)", async () => {
     // `anonimizza_persone_del_cliente` è `security definer`: dentro, la RLS non
     // filtra più nulla. Il tenant lo tiene la guardia scritta a mano — e questo
@@ -573,5 +845,43 @@ describe.skipIf(!haEnv())("021 · C1 · anonimizzazione (la mappa, campo per cam
       .single();
     expect(persona!.nome, "la persona del portale di A non è stata toccata").not.toBe("Anonimo");
     expect(persona!.telefono_grezzo, "e il suo telefono è ancora al suo posto").not.toBeNull();
+  });
+
+  it("TENANT · l'ANONIMO non può nemmeno chiamare le due funzioni (grant, non guardia)", async () => {
+    // Prima linea, quella che la guardia interna non vede: `revoke execute …
+    // from public, anon`. Se un giorno saltasse — per una `alter default
+    // privileges` diversa, o per una funzione ricreata senza i suoi grant — la
+    // parte-persone diventerebbe una definer INVOCABILE DAL MARCIAPIEDE, e la
+    // guardia di tenant non salverebbe nulla: `get_azienda_id()` per l'anon è
+    // NULL, quindi risponderebbe NON_AUTENTICATO… ma solo perché la guardia c'è.
+    // Le due difese vanno tenute distinte, e questa prova la PRIMA: 42501.
+    const senzaLogin = anonClient();
+    for (const fn of ["anonimizza_persone_del_cliente", "anonimizza_cliente"]) {
+      const { error } = await senzaLogin.rpc(fn, {
+        p_cliente_id: "00000000-0000-0000-0000-000000000000",
+      });
+      expect(error, `${fn} deve essere irraggiungibile dall'anon`).not.toBeNull();
+      expect(
+        `${error!.code ?? ""} ${error!.message}`,
+        `${fn}: all'anon deve mancare il PRIVILEGIO (42501/404), non solo il tenant`
+      ).toMatch(/42501|denied|does not exist|not find/i);
+    }
+  });
+
+  it("TENANT · un utente SENZA azienda si ferma su NON_AUTENTICATO (l'azienda viene dal JWT)", async () => {
+    // La differenza fra questa definer e una scritta male sta tutta qui:
+    // l'azienda si prende dal JWT del chiamante e MAI da un argomento. Un
+    // autenticato senza riga in `utenti` (registrato ma non onboardato) ha
+    // `get_azienda_id()` NULL: la funzione deve fermarsi PRIMA di guardare il
+    // cliente — se rispondesse CLIENTE_NON_TROVATO, vorrebbe dire che sta
+    // cercando fra i clienti di tutti.
+    const c = await creaCliente(A, { ...PERSONALI, cognome: `SenzaAzienda ${RUN_ID}` });
+    const orfano = await creaUtente("c1nof");
+    const { error } = await orfano.cli.rpc("anonimizza_persone_del_cliente", { p_cliente_id: c });
+    expect(error, "senza azienda nel JWT la funzione non deve fare nulla").not.toBeNull();
+    expect(error!.message).toMatch(/NON_AUTENTICATO/);
+
+    const { data } = await A.cli.from("clienti").select("nome").eq("id", c).single();
+    expect(data!.nome, "e il cliente di A è intatto").toBe(PERSONALI.nome);
   });
 });

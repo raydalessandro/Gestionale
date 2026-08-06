@@ -4,6 +4,220 @@ Aggiornato: 2026-08-06 · Ultima consegna coperta: **Era 2 · B1 · Fondamenta**
 (branch `era2/B1-fondamenta`, migrazione **021**, contratti **C1-C4**) — sezione
 qui sotto. I giri precedenti restano più in basso.
 
+## B1 · 3° giro (06/08 sera) — la voce 6 e ciò che le è cresciuto intorno
+
+Giro di ALLINEAMENTO alla voce 6 di C1 («sgancia-e-se-orfana-anonimizza»,
+`anonimizza_persone_del_cliente`) e di caccia ai buchi che restano. Le guardie
+già scritte dall'orchestratore (G23g, G25b-f, G29g) e i due casi di contratto
+della voce 6 non sono stati duplicati: si è guardato **dove NON arrivano**.
+
+### File toccati
+| File | Livello | Che cosa |
+|---|---|---|
+| `tests/contratto/b1-anonimizzazione.test.ts` | L2 | **1 bug di setup riparato** + 7 casi nuovi (8 → 14) |
+| `tests/contratto/b1-dedup-anonimi.test.ts` (nuovo) | L2 | 2 casi: l'anonimo esce dalla dedup **anche dalla ricerca** |
+| `e2e/g8b-richieste-agenda.spec.ts` | L3 | +1 scenario: la voce 6 dal gesto vero (portale → banco → anonimizzazione) |
+| `e2e/m1-anagrafiche.spec.ts` | L3 | S6: via i due selettori **CSS** rimasti, sostituiti da `getByRole` |
+| `tests/unit/guardie.test.ts` | L4 | nuovo blocco **L4r**: G30, G31, G32, G33 (81 → **85**) |
+
+Nessuna dipendenza nuova; `package.json`, `vitest.config.ts`,
+`playwright.config.ts`, `ci.yml` invariati (i glob raccolgono i file nuovi).
+
+### 1 · Il rosso che c'era già, e nessuno aveva ancora visto
+`b1-anonimizzazione.test.ts` → «due negozi, UNA persona» (scritto con la voce 6,
+mai girato in CI) semina la prenotazione del secondo negozio **senza
+`appuntamento_id`**. Ma dalla **013** («l'agenda unica») quella colonna è
+`NOT NULL`: l'insert dà 23502, l'helper fa `throw`, e il caso muore nel setup
+con un messaggio che parla di colonne — non di contratto. Riparato dando a
+quella prenotazione il suo appuntamento; già che c'ero, il seeding di persone e
+prenotazioni è diventato tre helper (`appuntamentoDi`, `personaNuova`,
+`prenotazioneDi`) usati da tutti i casi, così il prossimo vincolo che cambia si
+ripara in un posto solo.
+
+### 2 · «Esce dalla dedup» è vero per l'INDICE, non per la RICERCA
+Il buco più serio del giro, e nasce **dalla 021 stessa** (nuovo file
+`b1-dedup-anonimi.test.ts`, ⚠️ **rosso atteso**).
+1. L'anonimizzazione mette `telefono_grezzo = NULL`; `telefono_normalizzato` è
+   GENERATA e `normalizza_telefono(NULL)` è **`''`**. La 021 lo aveva misurato e
+   ha reso PARZIALE l'unicità (`where telefono_normalizzato <> ''`): giusto, e
+   già coperto.
+2. Ma la ricerca dentro `crea_prenotazione` (013/014/016, **non toccata dalla
+   021**) è `where persone.telefono_normalizzato = v_tel` **senza filtro su
+   `v_tel <> ''`**. E `v_tel` è `''` ogni volta che il numero digitato non
+   contiene cifre: la RPC non valida il telefono e il portale chiede solo
+   `telefono.trim().length > 0` (`WizardPrenota`). Un «-», un «n/d» passano.
+3. Quindi **una persona NUOVA che prenota con un telefono illeggibile viene
+   agganciata a una riga ANONIMIZZATA**: se la riprende, quella torna non
+   orfana (irrecuperabile: l'orfanità si valuta solo nell'istante in cui si
+   tagliano i fili) e la prenotazione nuova eredita `nome = 'Anonimo'` e
+   `anon-…@invalid`. Prima della 021 non poteva succedere: l'unicità era totale.
+Il test parla **dal lato anon**, cioè dal punto esatto in cui un cliente vero
+preme «Invia», e asserisce la REGOLA («una prenotazione nuova non atterra mai su
+un'identità anonimizzata»), non l'uguaglianza con una riga specifica: sul DB di
+test le righe anonime di tutti i run stanno su `''` e la `select … into` ne
+pesca una qualunque. Un secondo caso fa da contrappeso: **il telefono vero
+continua a deduplicare** (stesso numero scritto in due forme = una persona
+sola), così la riparazione non può consistere nello spegnere la ricerca.
+
+### 3 · `per_conto_di`: la mappa C1 dimentica il nome di un terzo
+⚠️ **Rosso atteso** (`b1-anonimizzazione.test.ts`). `prenotazioni.per_conto_di`
+è il campo che il portale riempie con «Prenoto per un'altra persona»: contiene
+il **nome di un terzo**, esattamente come il `tutore_legale` che C1 manda a NULL
+«perché identifica un TERZO per nome» e come i `contatto_*` entrati in mappa il
+05/08. La regola generale del contratto è esplicita — «i quasi-identificatori e
+i testi liberi → NULL» — ma la 021 azzera solo `note`. Oggi la riga sopravvive
+all'anonimizzazione **e l'agenda la stampa ancora** (`· per Marco Rossi`, riga
+delle richieste in `app/(app)/agenda/page.tsx`).
+
+### 4 · Gli altri casi nuovi al L2 (verdi: dicono che cosa fa la funzione)
+- **due clienti dello STESSO negozio, una persona sola** — il perimetro dello
+  sgancio è `cliente_id AND azienda_id`, e dentro un negozio la seconda
+  condizione non discrimina: se si sganciasse per sola azienda, la prenotazione
+  di un cliente mai toccato perderebbe la persona in silenzio. Poi si
+  anonimizza il secondo e la catena si chiude: la riga diventa orfana e SOLO
+  ALLORA si sbianca.
+- **la lista d'attesa tiene viva la persona** — nota (c) del contratto,
+  fotografata invece che lasciata implicita. Con il suo prezzo, misurato: qui il
+  legame residuo è **del negozio stesso** che ha anonimizzato, e togliere poi la
+  riga di lista **non recupera niente** (rifare l'anonimizzazione non ritrova la
+  persona: lo sgancio ha già azzerato `persona_id`, `v_persone` è vuoto).
+  L'occasione di sbiancare la riga si presenta **una volta sola**.
+- **il valore di ritorno della definer** (0 se viva altrove, 1 se orfana): è
+  l'unico modo che ha un chiamante di sapere se la riga è stata sbiancata o solo
+  sganciata; `anonimizza_cliente` lo butta via con `perform`, ma il contratto lo
+  dichiara, quindi si collauda.
+- **`PRENOTAZIONE_SGANCIATA` esiste davvero** (G25e guarda il sorgente, questo
+  la RPC). Per arrivarci serve una prenotazione senza NESSUNO dei due legami:
+  si ottiene cancellando il cliente anonimizzato (FK `on delete set null`), e
+  l'appuntamento **non** deve puntare a quel cliente — `appuntamenti.cliente_id`
+  è `on delete cascade` e `prenotazioni.appuntamento_id` è NOT NULL, quindi la
+  cancellazione fallirebbe in cascata prima di arrivare al punto (misurato
+  leggendo le FK, non tentato a caso).
+- **anon non può chiamare le due funzioni** (42501/404: il *grant*, che è una
+  difesa diversa dalla guardia interna) e **un autenticato senza azienda** si
+  ferma su `NON_AUTENTICATO` prima di guardare il cliente — la prova che
+  l'azienda arriva dal JWT e non da un argomento.
+
+### 5 · L3 · lo sgancio dal gesto vero, e i due selettori CSS rimasti
+- **Nuovo scenario** in `e2e/g8b-richieste-agenda.spec.ts`: la persona nasce da
+  `crea_prenotazione` come dal marciapiede, il legame col cliente lo fa il
+  bottone «Prendi come cliente», l'anonimizzazione passa dalla conferma battuta
+  a mano. Poi due verifiche di natura diversa: **a video**, in agenda la riga
+  del giorno non nomina più chi ha prenotato (c'è l'anonimo, e l'appuntamento è
+  ancora lì); **a valle**, sgancio + istantanee spente + `persone` orfana
+  anonimizzata e fuori dalla dedup. Il L2 semina col service role: prova la
+  funzione, non la strada. Questo prova la strada.
+- **S6 di M1**: la riparazione del 06/08 era giusta nel merito (asserire sulla
+  riga, non sul testo: lo stato vuoto CITA il nome cercato) ma usava
+  `page.locator('a[href="/clienti/<id>"]')` — un selettore **CSS**, che l'ordine
+  di lavoro vieta. Stessa robustezza per RUOLO: `getByRole("link", { name })`,
+  perché la riga È un link e il suo nome accessibile contiene «cognome nome»,
+  mentre lo stato vuoto ha un solo link («Nuovo cliente»). Aggiunto anche il
+  controllo dello stato vuoto sulla seconda ricerca.
+- **Caccia alle asserzioni dello stesso genere**: passate al setaccio tutte le
+  27 asserzioni di assenza (`toHaveCount(0)` / `not.toBeVisible`) delle 14 spec.
+  L'unico stato vuoto che **cita ciò che hai cercato** in tutta l'app è quello di
+  `/clienti` (`testo={\`Nessun cliente corrisponde a "${q}"…\`}`, l'unico
+  template letterale in un `Vuoto`), ed era proprio quello. Gli altri candidati
+  sono stati verificati sul sorgente e **assolti**: «LAC in esaurimento» e
+  «Controllo vista in scadenza» su `/richiami` non compaiono nel `<select>` dei
+  tipi perché il pannello `NuovoRichiamo` nasce chiuso; «12:30»/«09:00» di
+  `g6-slot` sono `exact` e le fasce d'orario sono intervalli; il nome del negozio
+  spento di `g4` è su una 404 vera.
+
+### 6 · L4 · nuovo blocco **L4r** (+4 → 85 guardie)
+La voce 6 ha cambiato due verità che il resto del programma dava per scontate.
+- **G30 · ratchet** — «anonimizzato_il esclude da ricerche, code e letture» (021)
+  lo rispetta oggi solo la lista `/clienti`. I **sette** selettori-cliente che
+  aprono lavoro NUOVO (busta, ordine LAC, vendita, appuntamento, richiamo,
+  fermo, reso esterno) trovano ancora l'anonimizzato e lo lasciano scegliere.
+  La guardia elenca il debito noto e diventa rossa all'**ottavo**. Riconosce una
+  ricerca da `from("clienti")` + `nome.ilike`; le riletture per id NON sono
+  ricerche (un fatto già scritto deve restare leggibile, col nome nuovo).
+  *Trade-off*: `app/(app)/ordini/page.tsx` cerca per nome ma sui FATTI — resta in
+  lista come scelta dichiarata, non come debito.
+- **G31** — ogni `raise exception` parlante di `prendi_persona_come_cliente`
+  arriva **tradotto** all'operatore. È il modo esatto in cui questo si è rotto:
+  la 021 rifà la funzione della 018 aggiungendo un errore nuovo, l'azione non lo
+  impara, e al banco compare il nome di una costante SQL. Due eccezioni
+  dichiarate (`NON_AUTENTICATO`, `PRENOTAZIONE_SGANCIATA`): un TERZO è rosso.
+- **G32** — `PrenotazioneRow.persona_id` resta `string | null` **e** nessuno lo
+  presume valorizzato (`persona_id!`, `as string`). Oggi non lo legge nessuno in
+  `app/`, `components/`, `lib/`: la guardia serve al primo che lo leggerà, che è
+  esattamente il momento in cui lo sganciato tornerebbe a essere una sorpresa.
+- **G33** — i quattro ruoli di `permessi.json` coincidono col CHECK di
+  `utenti.ruolo`. C2 è fail-closed: un ruolo che sta nel DB ma non nella matrice
+  **nega tutto** a quell'utente, in silenzio; uno che sta nella matrice ma non
+  nel CHECK non si può nemmeno assegnare. Vale l'ULTIMA definizione del CHECK
+  (`schema.sql` nasce con `optometrista/staff`, la **006** lo riscrive): la
+  guardia scandaglia schema + migrazioni in ordine, come G21d.
+- Tutte e quattro **verificate contro una mutazione** (fuori dal repo): G30
+  segnala i file veri se si toglie l'allowlist, G31 diventa rossa togliendo la
+  traduzione di `CLIENTE_NON_TUO`, G32 riconosce `persona_id!` e
+  `persona_id as string`, G33 legge il CHECK giusto (006, non schema.sql).
+
+### 7 · Rilievi che NON diventano test (per non fare rumore)
+1. **La coda dei richiami non esclude gli anonimizzati.** `calcolaProposte`
+   (`lib/richiami-proposte.ts`) legge i clienti delle proposte senza
+   `.is("anonimizzato_il", null)`: `non_contattare = true` ferma le sole
+   COMMERCIALI, quindi un anonimizzato con una busta pronta resta in coda per
+   sempre come «Anonimizzato-… Cliente», senza recapiti (i tasti Chiama/WhatsApp
+   spariscono: `telefono` è NULL). Per la 021 «code» è una delle tre parole del
+   contratto. Non l'ho messo in G30 perché lì la lettura è per id, che altrove è
+   legittima: è un gancio, non una guardia.
+2. **Il permesso `anonimizzazione` vive solo nell'azione.** A DB
+   `anonimizza_cliente` è `grant execute to authenticated`: qualunque utente del
+   tenant, con la chiave anon e il proprio login, può chiamarla via RPC e
+   scavalcare `richiedi("anonimizzazione")`. È la postura dichiarata del
+   progetto (il DB tiene il tenant, l'app tiene i ruoli) — ma C1 dice «solo
+   titolare/responsabile» e oggi quella frase è vera solo passando dai bottoni.
+3. **Il `comment on function` di `prendi_persona_come_cliente` (021) elenca gli
+   errori e non nomina `PRENOTAZIONE_SGANCIATA`**: chi legge il commento crede
+   che i casi siano cinque. Una riga.
+4. **`persone.ottico_di_riferimento` e `persone_riferimento_registro` non sono
+   nella mappa C1**: dopo lo sgancio la riga anonima punta ancora al negozio, e
+   il registro conserva `persona_id` + `prenotazione_id`. Nessun dato personale
+   trapela (la riga è già sbiancata) e il registro è un FATTO: lo segnalo perché
+   sia una scelta scritta, non una dimenticanza.
+5. **`prescrizioni.esaminatore`** (nome del medico esterno) sopravvive
+   all'anonimizzazione: è un professionista, non un familiare, quindi non
+   de-anonimizza per prossimità. Se la lettura di C1 fosse più stretta («tutti i
+   campi testo libero»), andrebbe in mappa.
+6. **`canale_contatto`, che C1 elenca per gli ordini, non esiste nello schema**
+   (mai creato). La mappa nomina un campo fantasma: innocuo, ma la prossima
+   rilettura di C1 lo cercherà.
+7. **Verificato invece corretto** ciò che poteva rompersi in silenzio: la copia
+   di `prendi_persona_come_cliente` dalla 018 alla 021 è **identica riga per
+   riga** più la sola guardia nuova (diff fatto, non supposto) — nessuna
+   regressione nascosta nel `create or replace`.
+
+### Esito auto-verifica — 3° giro: misurato vs NON misurato
+**Misurato qui, adesso:**
+- `npm test` (L1 + L4): **213 passed**, 11 file, 0 falliti — guardie 81 → **85**.
+- Typecheck mirato di `tests/**` + `e2e/**` (tsconfig usa-e-getta fuori dal repo,
+  stessi `paths`, `strict`): **pulito**.
+- `npx vitest run tests/contratto` senza env: **224 skippati puliti**, di cui i 2
+  nuovi di `b1-dedup-anonimi` e i 14 (era 8) di `b1-anonimizzazione`.
+- `npx playwright test --list`: **43 test in 14 file** (era 42), tutti compilano.
+
+**NON misurato — e nessuno lo dichiari verde al posto mio:** tutto il L2 e tutto
+il L3 (mancano i segreti e l'app viva). **DUE casi di contratto sono ROSSI di
+proposito** finché i ganci non si chiudono, e sono il segnale, non un difetto del
+test (il commento sopra l'`expect` lo dice, con la riparazione):
+1. `b1-dedup-anonimi` → «telefono illeggibile ≠ persona anonimizzata». Verde con
+   una riga: `and persone.telefono_normalizzato <> ''` nella ricerca di
+   `crea_prenotazione` (o il rifiuto di un telefono senza cifre). L'altro caso
+   dello stesso file (la dedup dei numeri veri) è verde ed è il contrappeso.
+2. `b1-anonimizzazione` → `per_conto_di` a NULL. Verde aggiungendo il campo
+   all'UPDATE delle prenotazioni dentro `anonimizza_cliente`.
+
+**Ganci richiesti da questo giro** (nessuno applicato: fuori dalla mia
+proprietà), in ordine di gravità: (1) la ricerca di `crea_prenotazione` che
+riesuma gli anonimi; (2) `per_conto_di` in mappa C1; (3) i sette selettori-cliente
++ la coda dei richiami che non escludono `anonimizzato_il` (G30 li sorveglia dal
+settimo in poi); (4) `PRENOTAZIONE_SGANCIATA` tradotto in `eseguiPrendiCliente`
+(bassa: è difesa in profondità) e nominato nel `comment on function`.
+
 ## Era 2 · B1 · Fondamenta (branch `era2/B1-fondamenta`, migrazione 021)
 
 B1 pianta le fondamenta che tutte le buste successive useranno, e lo fa con
