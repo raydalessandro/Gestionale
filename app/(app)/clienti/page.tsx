@@ -23,6 +23,10 @@ export default async function ClientiPage({
   let query = supabase
     .from("clienti")
     .select("id, nome, cognome, telefono, email, citta, fonte")
+    // Gli anonimizzati escono dal registro: è il contratto scritto sulla
+    // colonna nella 021 («esclude il cliente da ricerche, code e letture»).
+    // I loro FATTI restano leggibili dai registri di vendite e ordini.
+    .is("anonimizzato_il", null)
     .order("cognome")
     .order("nome")
     .limit(100);
