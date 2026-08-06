@@ -1608,6 +1608,40 @@ describe.skipIf(!existsSync(join(ROOT, M021)))("L4p · guardie B1 fondamenta (02
     expect(/modalita\s+text\s+check \(modalita in \('penna','digitale'\)\)/i.test(sql)).toBe(true);
   });
 
+  it("G23g · «almeno un canale» si conta con `cardinality`, MAI con `array_length`", () => {
+    const sql = sql021();
+    // Su un array VUOTO `array_length(x,1)` torna NULL, non 0. Il confronto
+    // `>= 1` diventa NULL, l'intera CHECK vale NULL, e una CHECK che vale NULL
+    // ACCETTA (rifiuta solo su FALSE): un consenso marketing «dato» con canali
+    // `{}` — cioè un consenso senza alcun canale, che C3 vieta — entrava nel
+    // mastro. `cardinality('{}')` è 0 e il confronto è FALSE davvero.
+    expect(
+      /array_length\s*\(\s*canali/i.test(sql),
+      "su `canali` non si usa array_length: su un array vuoto torna NULL e la CHECK accetta"
+    ).toBe(false);
+    const compatto = sql.replace(/\s+/g, " ");
+    expect(
+      (compatto.match(/cardinality\(canali\) >= 1/gi) ?? []).length >= 1,
+      "il CHECK del marketing «dato» deve contare i canali con `cardinality(canali) >= 1`"
+    ).toBe(true);
+    // La riparazione per i DB dove la 021 è già passata col vincolo vecchio:
+    // si rifà il vincolo, `not valid` (morde in avanti senza pretendere le
+    // righe vecchie: il mastro è un libro di fatti, G28b non ammette delete),
+    // e lo si valida solo se il mastro è già pulito.
+    expect(
+      /alter table public\.consensi drop constraint if exists consensi_dato_marketing_canali/i.test(sql),
+      "il vincolo va rifatto anche su un DB dove la 021 è già passata (il create table non lo tocca)"
+    ).toBe(true);
+    expect(
+      /alter table public\.consensi\s+add\s+constraint consensi_dato_marketing_canali check \([\s\S]*?\)\s*not valid;/i.test(sql),
+      "il vincolo si rifà `not valid`: nessun fatto del mastro va cancellato per farlo passare"
+    ).toBe(true);
+    expect(
+      /validate constraint consensi_dato_marketing_canali/i.test(sql),
+      "se il mastro è pulito il vincolo va poi validato, non lasciato a metà"
+    ).toBe(true);
+  });
+
   it("G23b · C4: check anti-self + indice funzionale least/greatest LIMITATO ai familiari", () => {
     const sql = sql021();
     expect(

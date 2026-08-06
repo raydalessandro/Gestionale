@@ -141,10 +141,17 @@ create table if not exists public.consensi (
     tipo <> 'marketing' or prescrizione_id is null
   ),
   -- (3) marketing DATO: almeno un canale, tutti leciti, e la modalità di firma
+  --
+  -- ⚠️ `cardinality`, NON `array_length`. Su un array vuoto `array_length(x,1)`
+  -- torna **NULL**, non 0: il confronto `>= 1` diventa NULL, l'intera CHECK
+  -- vale NULL, e una CHECK che vale NULL **accetta** (rifiuta solo su FALSE).
+  -- Con `array_length` il consenso marketing «dato» con canali `{}` entrava —
+  -- cioè un consenso senza alcun canale, che C3 vieta. `cardinality('{}')` è 0
+  -- e il confronto è FALSE, quindi la riga viene rifiutata davvero.
   constraint consensi_dato_marketing_canali check (
     not (azione = 'dato' and tipo = 'marketing')
     or (canali is not null
-        and array_length(canali, 1) >= 1
+        and cardinality(canali) >= 1
         and canali <@ array['email','cellulare','cartaceo']::text[]
         and modalita is not null)
   ),
@@ -155,6 +162,42 @@ create table if not exists public.consensi (
 );
 comment on table public.consensi is
   'Libro mastro dei consensi (M1 §4, contratto C3). Eventi immutabili; clienti.consenso_marketing/consenso_canali sono la CACHE dell''ultimo evento marketing COMMESSO, scritta solo dall''azione del mastro. Per i dati sanitari nessuna cache: si legge qui, per prescrizione.';
+
+-- Riparazione idempotente del vincolo (3). Su un database dove la 021 è già
+-- passata, il `create table if not exists` qui sopra non tocca nulla: il
+-- vincolo resterebbe quello vecchio, col buco di `array_length`. Qui lo si
+-- rifà sempre — su un DB nuovo è un giro a vuoto, su uno già passato è la
+-- correzione.
+--
+-- Si rifà `not valid`, e questo è il punto: il mastro è un libro di FATTI e la
+-- 021 non ne cancella nessuno (G28b). `not valid` blocca da subito ogni riga
+-- NUOVA — l'enforcement su insert/update è pieno — e lascia stare le righe
+-- vecchie invece di pretenderle in regola o farle sparire. Poi, se il mastro
+-- è già pulito (il caso normale), il vincolo si valida qui sotto e resta
+-- pieno a tutti gli effetti. Se righe rotte ci sono, la migrazione NON cade:
+-- resta il vincolo che morde in avanti e le righe restano visibili, da
+-- guardare a mano — che è come si tratta un fatto sbagliato in un mastro.
+alter table public.consensi drop constraint if exists consensi_dato_marketing_canali;
+alter table public.consensi add  constraint consensi_dato_marketing_canali check (
+  not (azione = 'dato' and tipo = 'marketing')
+  or (canali is not null
+      and cardinality(canali) >= 1
+      and canali <@ array['email','cellulare','cartaceo']::text[]
+      and modalita is not null)
+) not valid;
+
+do $$
+begin
+  if not exists (
+    select 1 from public.consensi
+     where azione = 'dato' and tipo = 'marketing'
+       and coalesce(cardinality(canali), 0) = 0
+  ) then
+    alter table public.consensi validate constraint consensi_dato_marketing_canali;
+  else
+    raise warning 'consensi: righe marketing «dato» senza canali già presenti — il vincolo resta NOT VALID e morde solo in avanti. Vanno guardate a mano.';
+  end if;
+end $$;
 
 create index if not exists idx_consensi_cliente on public.consensi (cliente_id, tipo, avvenuto_il desc);
 create index if not exists idx_consensi_rx      on public.consensi (prescrizione_id) where prescrizione_id is not null;
