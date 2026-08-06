@@ -552,3 +552,18 @@ comment on function public.anonimizza_cliente(uuid) is
   'C1: rende irriconoscibile la persona lasciando integri i FATTI aziendali (vendite, ordini, movimenti). Una sola transazione. Il permesso «anonimizzazione» lo verifica l''azione con richiedi() PRIMA di chiamarla.';
 revoke execute on function public.anonimizza_cliente(uuid) from public, anon;
 grant  execute on function public.anonimizza_cliente(uuid) to authenticated;
+
+-- La rimozione di una relazione è una DELETE legittima: `clienti_relazioni` è
+-- ANAGRAFE (un legame), non un FATTO — e C1 stessa le cancella. Vive qui come
+-- RPC, non nell'azione, perché la guardia G1 vieta `.delete()` in
+-- `lib/actions.ts`: la regola di casa resta intatta e l'eccezione è esplicita.
+create or replace function public.elimina_relazione(p_id uuid)
+returns void
+language plpgsql security invoker set search_path = public, pg_catalog as $$
+begin
+  delete from public.clienti_relazioni where id = p_id;   -- la RLS impone il tenant
+end $$;
+comment on function public.elimina_relazione(uuid) is
+  'C4: rimuove UNA relazione. Legittima perché la relazione è ANAGRAFE, non un fatto. La RLS limita al proprio negozio.';
+revoke execute on function public.elimina_relazione(uuid) from public, anon;
+grant  execute on function public.elimina_relazione(uuid) to authenticated;

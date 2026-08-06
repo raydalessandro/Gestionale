@@ -22,6 +22,7 @@ import {
   NOME_CAPARRA,
 } from "@/lib/cassa-calcoli";
 import { istanteRomaISO } from "@/lib/utils";
+import { richiedi, esitoDaErrore } from "@/lib/permessi";
 
 /* ── Helper ────────────────────────────────────────────────────────── */
 
@@ -2165,4 +2166,157 @@ export async function chiudiCassa(_prev: Esito, formData: FormData): Promise<Esi
   revalidatePath("/cassa");
   revalidatePath("/cassa/chiusure");
   redirect("/cassa/chiusure");
+}
+
+/* ── B1 · Fondamenta (Era 2) ────────────────────────────────────────── */
+// OGNI azione qui sotto chiama `richiedi()` in TESTA (contratto C2): la UI che
+// nasconde un bottone è cortesia, l'enforcement è qui. Le scritture che devono
+// essere atomiche (consensi C3, anonimizzazione C1) passano da una RPC: il
+// client Supabase non ha transazioni, e quei contratti le pretendono.
+
+/** Mastro consensi (C3). La cache su `clienti` la riallinea la funzione, mai noi. */
+export async function registraConsenso(
+  clienteId: string,
+  dati: {
+    tipo: "marketing" | "dati_sanitari";
+    azione: "dato" | "revocato";
+    canali?: string[] | null;
+    modalita?: "penna" | "digitale" | null;
+    prescrizioneId?: string | null;
+    versione?: string | null;
+  }
+): Promise<{ ok: true; id: string } | { errore: string }> {
+  try {
+    await richiedi("anagrafiche_consensi");
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("registra_consenso", {
+      p_cliente_id: clienteId,
+      p_tipo: dati.tipo,
+      p_azione: dati.azione,
+      p_canali: dati.canali ?? null,
+      p_modalita: dati.modalita ?? null,
+      p_prescrizione_id: dati.prescrizioneId ?? null,
+      p_versione: dati.versione ?? null,
+      p_documento_ref: null,
+    });
+    if (error) return { errore: `Consenso non registrato: ${error.message}` };
+    revalidatePath(`/clienti/${clienteId}`);
+    return { ok: true, id: data as string };
+  } catch (e) {
+    return esitoDaErrore(e);
+  }
+}
+
+/** Il tasto «revoca»: i richiami COMMERCIALI si fermano subito, gli operativi no. */
+export async function revocaMarketing(clienteId: string): Promise<Esito> {
+  try {
+    await richiedi("anagrafiche_consensi");
+    const supabase = await createClient();
+    const { error } = await supabase.rpc("revoca_marketing", {
+      p_cliente_id: clienteId,
+      p_modalita: null,
+    });
+    if (error) return { errore: `Revoca non riuscita: ${error.message}` };
+    revalidatePath(`/clienti/${clienteId}`);
+    return null;
+  } catch (e) {
+    return esitoDaErrore(e);
+  }
+}
+
+/** Relazioni (C4): UNA riga, mai le inverse. */
+export async function creaRelazione(
+  clienteId: string,
+  relativoId: string,
+  tipo: string
+): Promise<Esito> {
+  try {
+    await richiedi("anagrafiche_consensi");
+    const supabase = await createClient();
+    const { error } = await supabase.rpc("crea_relazione", {
+      p_cliente_id: clienteId,
+      p_relativo_id: relativoId,
+      p_tipo: tipo,
+      p_note: null,
+    });
+    if (error) {
+      const m = error.message;
+      if (m.includes("relazione_con_se_stesso")) return { errore: "Una persona non è parente di sé stessa." };
+      if (m.includes("gia_in_relazione")) return { errore: "Fra questi due c'è già una relazione familiare." };
+      return { errore: `Relazione non creata: ${m}` };
+    }
+    revalidatePath(`/clienti/${clienteId}`);
+    return null;
+  } catch (e) {
+    return esitoDaErrore(e);
+  }
+}
+
+export async function eliminaRelazione(id: string, clienteId: string): Promise<Esito> {
+  try {
+    await richiedi("anagrafiche_consensi");
+    const supabase = await createClient();
+    // Via RPC: la guardia G1 vieta le cancellazioni dirette in questo file, e
+    // la regola non si piega per un caso — l'eccezione si esplicita nella 021.
+    const { error } = await supabase.rpc("elimina_relazione", { p_id: id });
+    if (error) return { errore: `Relazione non rimossa: ${error.message}` };
+    revalidatePath(`/clienti/${clienteId}`);
+    return null;
+  } catch (e) {
+    return esitoDaErrore(e);
+  }
+}
+
+/** C1 · eliminazione definitiva protetta. Solo titolare/responsabile. */
+export async function anonimizzaCliente(clienteId: string): Promise<Esito> {
+  try {
+    await richiedi("anonimizzazione");
+    const supabase = await createClient();
+    const { error } = await supabase.rpc("anonimizza_cliente", { p_cliente_id: clienteId });
+    if (error) return { errore: `Anonimizzazione non riuscita: ${error.message}` };
+    revalidatePath("/clienti");
+    revalidatePath(`/clienti/${clienteId}`);
+    return null;
+  } catch (e) {
+    return esitoDaErrore(e);
+  }
+}
+
+/** Oculista al volo alla prima ricetta (M2 f2b). Idempotente. */
+export async function creaOculistaAlVolo(
+  nome: string,
+  studio?: string | null,
+  citta?: string | null
+): Promise<{ ok: true; id: string } | { errore: string }> {
+  try {
+    await richiedi("anagrafiche_consensi");
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("crea_oculista_al_volo", {
+      p_nome: nome,
+      p_studio: studio ?? null,
+      p_citta: citta ?? null,
+    });
+    if (error) return { errore: `Oculista non aggiunto: ${error.message}` };
+    return { ok: true, id: data as string };
+  } catch (e) {
+    return esitoDaErrore(e);
+  }
+}
+
+/** Parametri di negozio (M10 §4): qui le POLITICHE escono dal codice. */
+export async function scriviParametro(chiave: string, valore: unknown): Promise<Esito> {
+  try {
+    const ctx = await richiedi("parametri_negozio");
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("parametri")
+      .upsert(
+        { azienda_id: ctx.azienda_id, chiave, valore: valore as Json },
+        { onConflict: "azienda_id,chiave" }
+      );
+    if (error) return { errore: `Parametro non salvato: ${error.message}` };
+    return null;
+  } catch (e) {
+    return esitoDaErrore(e);
+  }
 }
