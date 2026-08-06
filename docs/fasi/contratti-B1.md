@@ -82,12 +82,30 @@ fermarsi e segnalare):**
   con lo stesso `CLIENTE_NON_TROVATO` che dà il cliente inesistente.
   Sorvegliata da G25b/G25c/G25d e da un caso di contratto che punta la
   RPC dritta, come farebbe un altro negozio che conosce l'id.
-  **Resta aperto, e non è stato deciso qui**: `persone` è del PORTALE e
-  non ha `azienda_id` — la stessa riga può essere collegata a
-  prenotazioni di negozi diversi (la dedup sul telefono è globale), e
-  anonimizzare la sbianca anche per l'altro negozio. Prima era un
-  non-problema solo perché l'UPDATE non passava; ora la domanda è vera
-  ed è in `TODO-regia.md`.
+  **Attuazione della voce 6 (06/08)**: la definer è ora
+  «sgancia-e-se-orfana-anonimizza». Tre note che si leggono nel codice
+  ma vanno anche dette qui, perché sono letture di questo contratto e
+  non scelte di gusto. (a) La definer serve una SECONDA volta, non solo
+  per la RLS di `persone`: sapere se la persona è orfana vuol dire
+  guardare le prenotazioni degli ALTRI negozi, che sotto invoker la RLS
+  nasconde — l'orfanità risulterebbe sempre «sì» e si tornerebbe a
+  sbiancare il grafo altrui. (b) `contatto_nome` e `contatto_telefono`
+  sono NOT NULL e RESTANO tali: si applica la regola già usata su
+  `persone.nome` («il NOT NULL si rispetta, l'identità sparisce») →
+  `'Anonimo'` e stringa vuota. Il vincolo garantisce le prenotazioni
+  NUOVE e non si allenta per ripulire le vecchie; si allenta invece
+  `prenotazioni.persona_id`, come la voce 6 prevede. (c) `lista_attesa`
+  NON è in questa mappa e non viene toccata: una sua riga tiene quindi
+  la persona NON orfana, e la persona resta intatta — scelta
+  conservativa (non sbianca mai chi è ancora agganciato). Se la mappa
+  dovrà comprenderla è decisione di regia. Sorvegliata da G25f.
+  **Conseguenza chiusa insieme**: da quando `persona_id` può essere
+  NULL, `prendi_persona_come_cliente` (018) scriverebbe quel NULL nel
+  registro, che è NOT NULL. La funzione è rifatta nella 021 con una
+  guardia parlante — `PRENOTAZIONE_SGANCIATA` — al posto di un 23502
+  crudo (G25e). È raggiungibile solo se anche `cliente_id` è NULL (FK
+  `on delete set null`): con il cliente ancora lì risponde prima
+  l'idempotenza, che è il comportamento giusto.
 - `ordini_occhiali` / `ordini_lac`: SI CONSERVANO (fatti + istantanee
   Rx) · note → NULL · canale_contatto → NULL (è un recapito).
 - `beni_in_custodia`: si conserva; descrizione resta (è dell'oggetto).

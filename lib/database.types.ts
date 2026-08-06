@@ -247,7 +247,9 @@ export type RisorsaRow = {
 export type PrenotazioneRow = {
   id: string;
   azienda_id: string;
-  persona_id: string;
+  /** NULL dopo lo SGANCIO dell'anonimizzazione (C1 voce 6): il fatto resta,
+   *  il filo verso l'identità di piattaforma no. Non presumerlo valorizzato. */
+  persona_id: string | null;
   cliente_id: string | null;
   appuntamento_id: string | null;
   servizio_codice: string;

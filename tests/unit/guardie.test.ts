@@ -1730,19 +1730,41 @@ describe.skipIf(!existsSync(join(ROOT, M021)))("L4p · guardie B1 fondamenta (02
     }
   });
 
-  it("G25b · l'UNICA `security definer` della 021 è la parte-persone, e nessun'altra", () => {
+  it("G25b · le `security definer` della 021 sono SOLO le due dichiarate", () => {
     const sql = sql021();
     const definer = Array.from(
       sql.matchAll(/create or replace function public\.(\w+)\([\s\S]*?security\s+(invoker|definer)/gi)
     )
       .filter((m) => m[2].toLowerCase() === "definer")
-      .map((m) => m[1]);
-    // Se ne compare una seconda va discussa, non aggiunta: una definer scavalca
-    // la RLS e con lei il tenant, e il tenant torna a dipendere da una guardia
-    // scritta a mano invece che dall'ambiente.
-    expect(definer, "la 021 ammette UNA sola security definer, la parte-persone di C1").toEqual([
+      .map((m) => m[1])
+      .sort();
+    // Se ne compare una terza va discussa, non aggiunta: una definer scavalca la
+    // RLS e con lei il tenant, e il tenant torna a dipendere da una guardia
+    // scritta a mano invece che dall'ambiente. Le due ammesse:
+    //  · `anonimizza_persone_del_cliente` — nasce definer (C1);
+    //  · `prendi_persona_come_cliente` — ERA GIÀ definer nella 018: qui è solo
+    //    rifatta per aggiungere la guardia sullo sganciato (C1 voce 6). Non è
+    //    una definer in più nel sistema, è la stessa riscritta.
+    expect(definer, "la 021 ammette due sole security definer, entrambe motivate").toEqual([
       "anonimizza_persone_del_cliente",
+      "prendi_persona_come_cliente",
     ]);
+  });
+
+  it("G25e · `prendi_persona_come_cliente` si ferma sulla prenotazione SGANCIATA", () => {
+    const corpo = corpoFunzione("prendi_persona_come_cliente");
+    // Da C1 voce 6 `persona_id` può essere NULL. Il passo (d) scrive quel valore
+    // nel registro, che è NOT NULL: senza guardia l'operatore vede un 23502
+    // crudo invece di una frase.
+    expect(
+      /if r\.persona_id is null then\s*\n?\s*raise exception 'PRENOTAZIONE_SGANCIATA'/i.test(corpo),
+      "manca la guardia sullo sganciato: il registro prenderebbe un persona_id NULL (23502)"
+    ).toBe(true);
+    // …e deve stare PRIMA della scrittura nel registro, non dopo.
+    const guardia = corpo.search(/PRENOTAZIONE_SGANCIATA/i);
+    const registro = corpo.search(/insert into public\.persone_riferimento_registro/i);
+    expect(registro, "la funzione deve ancora scrivere il registro").toBeGreaterThan(0);
+    expect(guardia < registro, "la guardia deve precedere la scrittura del registro").toBe(true);
   });
 
   it("G25c · la definer della parte-persone ha search_path pinnato, grant chiusi e guardia di tenant esplicita", () => {
@@ -1775,12 +1797,49 @@ describe.skipIf(!existsSync(join(ROOT, M021)))("L4p · guardie B1 fondamenta (02
       /from public\.clienti c\s*\n?\s*where c\.id = p_cliente_id and c\.azienda_id = v_az/i.test(corpo),
       "manca il controllo «il cliente è della MIA azienda»: dentro una definer la RLS non filtra più"
     ).toBe(true);
-    // E il perimetro dell'UPDATE: solo prenotazioni di quel cliente E di quella
+    // E il perimetro dello SGANCIO: solo prenotazioni di quel cliente E di quella
     // azienda — è la condizione che la policy della 011 dava gratis sotto invoker.
+    const compatto = corpo.replace(/\s+/g, " ");
     expect(
-      /where pr\.cliente_id = p_cliente_id and pr\.azienda_id = v_az/i.test(corpo),
-      "l'UPDATE deve restare dentro il tenant: la policy delle prenotazioni qui non si applica"
+      /where pr\.cliente_id = p_cliente_id and pr\.azienda_id = v_az/i.test(compatto),
+      "lo sgancio deve restare dentro il tenant: la policy delle prenotazioni qui non si applica"
     ).toBe(true);
+  });
+
+  it("G25f · C1 voce 6 · si SGANCIA sempre, si anonimizza SOLO SE ORFANA", () => {
+    const corpo = corpoFunzione("anonimizza_persone_del_cliente");
+    const compatto = corpo.replace(/\s+/g, " ");
+    // (a) chi era attaccato si legge PRIMA dello sgancio: dopo l'update i valori
+    //     sono già NULL e l'orfanità non si potrebbe più chiedere a nessuno.
+    const raccolta = compatto.search(/array_agg\(distinct pr\.persona_id\)/i);
+    const sgancio = compatto.search(/update public\.prenotazioni pr set persona_id = null/i);
+    const orfana = compatto.search(/update public\.persone p set/i);
+    expect(raccolta, "manca la raccolta delle persone agganciate").toBeGreaterThanOrEqual(0);
+    expect(sgancio, "manca lo sgancio (`persona_id → NULL`)").toBeGreaterThan(0);
+    expect(raccolta < sgancio, "le persone si raccolgono PRIMA di sganciarle").toBe(true);
+    expect(sgancio < orfana, "l'orfanità si chiede DOPO lo sgancio, o non è vera").toBe(true);
+    // (b) le istantanee di contatto della prenotazione entrano in mappa C1.
+    expect(
+      /contatto_nome = 'Anonimo'/i.test(compatto) &&
+        /contatto_telefono = ''/i.test(compatto) &&
+        /contatto_email = null/i.test(compatto),
+      "i `contatto_*` della prenotazione sono in mappa C1 (istantanee personali)"
+    ).toBe(true);
+    // (c) il cuore della decisione: si anonimizza SOLO se non resta agganciata a
+    //     NULLA — e il controllo NON è ristretto all'azienda del chiamante,
+    //     altrimenti si tornerebbe a sbiancare il grafo del negozio altrui.
+    expect(
+      /not exists \( ?select 1 from public\.prenotazioni pr2 where pr2\.persona_id = p\.id ?\)/i.test(compatto),
+      "manca il controllo di orfanità sulle prenotazioni (di TUTTE le aziende)"
+    ).toBe(true);
+    expect(
+      /not exists \( ?select 1 from public\.lista_attesa la where la\.persona_id = p\.id ?\)/i.test(compatto),
+      "manca il controllo di orfanità sulla lista d'attesa"
+    ).toBe(true);
+    expect(
+      /pr2\.azienda_id|la\.azienda_id/i.test(compatto),
+      "l'orfanità NON va ristretta all'azienda del chiamante: così si sbiancherebbe il grafo altrui"
+    ).toBe(false);
   });
 
   it("G25d · `anonimizza_cliente` resta invoker e DELEGA la parte-persone (non la riscrive)", () => {

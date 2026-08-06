@@ -515,6 +515,16 @@ create unique index if not exists uq_persone_telefono_reale
 comment on column public.persone.telefono_grezzo is
   'Chiave di dedup della persona. NULL solo dopo l''anonimizzazione (C1): la riga esce dalla dedup — l''unicità è parziale, «solo sui telefoni veri» (uq_persone_telefono_reale).';
 
+-- C1 · voce 6 (decisa 05/08): `persone` è identità di PIATTAFORMA e non ha
+-- azienda_id — la stessa riga sta su prenotazioni di negozi diversi. Perché
+-- l'anonimizzazione di UN negozio non tocchi il grafo altrui, le prenotazioni
+-- di quel negozio devono poter LASCIARE ANDARE la persona: `persona_id` diventa
+-- annullabile. È la modifica-di-vincolo che C1 sancisce lecita, la stessa già
+-- usata su `persone.telefono_grezzo`: si allenta, non si droppa.
+alter table public.prenotazioni alter column persona_id drop not null;
+comment on column public.prenotazioni.persona_id is
+  'La persona del portale che ha prenotato. NULL solo dopo lo SGANCIO dell''anonimizzazione (C1, voce 6): il fatto resta, il filo verso l''identità di piattaforma no. Chi legge non deve presumerlo valorizzato.';
+
 -- ⚠️ L'UNICA `security definer` della 021, e la ragione è una sola.
 -- `persone` ha RLS attiva **senza policy** (011 §8, ID-01): nessuno la legge né
 -- la scrive, nemmeno l'ottico autenticato — ci arrivano solo le funzioni
@@ -527,14 +537,29 @@ comment on column public.persone.telefono_grezzo is
 -- tenant lo protegge la GUARDIA ESPLICITA dei punti (1) e (2): l'azienda si
 -- prende dal JWT del chiamante, mai da un parametro (un parametro sarebbe
 -- scavalcabile chiamando la funzione fuori dall'azione), e il cliente deve
--- essere di quell'azienda. Il perimetro resta quello che la policy della 011
--- dava gratis sotto invoker, riscritto a mano perché qui non c'è.
+-- essere di quell'azienda.
+--
+-- ── C1 · voce 6 (decisa 05/08): SGANCIA-E-SE-ORFANA-ANONIMIZZA ──────────────
+-- `persone` è identità di PIATTAFORMA: la stessa riga sta su prenotazioni di
+-- negozi diversi, perché la dedup sul telefono è globale. Sbiancarla a comando
+-- di UN negozio porterebbe via il contatto anche all'altro. Quindi:
+--   (3) SGANCIO — le prenotazioni di QUESTO negozio per QUESTO cliente
+--       lasciano andare la persona (`persona_id → NULL`) e azzerano le PROPRIE
+--       istantanee di contatto: il fatto resta, il nome no.
+--   (4) la riga `persone` si anonimizza SOLO SE ORFANA dopo lo sgancio. Se è
+--       viva altrove resta INTATTA: il negozio B non perde nulla, e il negozio
+--       A non la raggiunge più da nessun suo dato. Tenant-safe per costruzione.
+-- E qui la definer serve una seconda volta, non solo per la RLS di `persone`:
+-- sapere se la persona è orfana vuol dire GUARDARE LE PRENOTAZIONI DEGLI ALTRI
+-- NEGOZI, che sotto invoker la RLS nasconde. Sotto invoker l'orfanità sarebbe
+-- sempre «sì», e si tornerebbe a sbiancare il grafo altrui.
 create or replace function public.anonimizza_persone_del_cliente(p_cliente_id uuid)
 returns integer
 language plpgsql security definer set search_path = public, pg_catalog as $$
 declare
-  v_az uuid;
-  v_n  integer;
+  v_az      uuid;
+  v_persone uuid[];
+  v_n       integer := 0;
 begin
   -- (1) l'azienda del CHIAMANTE, dal suo JWT
   v_az := public.get_azienda_id();
@@ -551,28 +576,47 @@ begin
     raise exception 'CLIENTE_NON_TROVATO';
   end if;
 
-  -- (3) solo le persone collegate a prenotazioni di QUEL cliente e di QUELLA
-  --     azienda.
-  --     NOTA (in carico alla regia, non decisa qui): `persone` è del PORTALE e
-  --     non ha azienda_id — la stessa riga può essere collegata a prenotazioni
-  --     di negozi diversi (la dedup sul telefono è globale). Anonimizzare qui
-  --     la sbianca anche per l'altro negozio. Prima era un non-problema solo
-  --     perché l'UPDATE non passava affatto; ora che passa, la domanda è vera
-  --     e sta in TODO-regia.
+  -- Chi era attaccato, PRIMA di sganciare: dopo l'update `returning` darebbe i
+  -- valori nuovi, cioè NULL, e l'orfanità non si potrebbe più chiedere.
+  select coalesce(array_agg(distinct pr.persona_id), '{}')
+    into v_persone
+  from public.prenotazioni pr
+  where pr.cliente_id = p_cliente_id
+    and pr.azienda_id = v_az
+    and pr.persona_id is not null;
+
+  -- (3) SGANCIO + istantanee di contatto (in mappa C1 dal 05/08). `contatto_nome`
+  --     e `contatto_telefono` sono NOT NULL e restano tali: si applica la regola
+  --     già usata su `persone.nome` — «il NOT NULL si rispetta, l'identità
+  --     sparisce». Il vincolo è una garanzia sulle prenotazioni NUOVE e non si
+  --     allenta per ripulire le vecchie.
+  update public.prenotazioni pr set
+    persona_id        = null,
+    contatto_nome     = 'Anonimo',
+    contatto_telefono = '',
+    contatto_email    = null,
+    updated_at        = now()
+  where pr.cliente_id = p_cliente_id
+    and pr.azienda_id = v_az;
+
+  -- (4) …e solo ora l'orfanità, che è vera perché lo sgancio è già avvenuto.
+  --     NOTA · `lista_attesa` NON è nella mappa C1 e non viene toccata: una sua
+  --     riga tiene quindi la persona NON orfana, e la riga resta intatta. È la
+  --     scelta conservativa (non sbianca mai chi è ancora agganciato); se la
+  --     mappa dovrà comprenderla, è una decisione di regia, non di qui.
   update public.persone p set
     email           = 'anon-' || p.id::text || '@invalid',
     nome            = 'Anonimo',        -- il NOT NULL si rispetta, l'identità sparisce
     telefono_grezzo = null,             -- esce dalla dedup (indice unico parziale)
     updated_at      = now()
-  where p.id in (
-    select pr.persona_id from public.prenotazioni pr
-     where pr.cliente_id = p_cliente_id and pr.azienda_id = v_az
-  );
+  where p.id = any (v_persone)
+    and not exists (select 1 from public.prenotazioni pr2 where pr2.persona_id = p.id)
+    and not exists (select 1 from public.lista_attesa  la  where la.persona_id  = p.id);
   get diagnostics v_n = row_count;
   return v_n;
 end $$;
 comment on function public.anonimizza_persone_del_cliente(uuid) is
-  'C1, parte-persone. UNICA security DEFINER della 021: `persone` ha RLS senza policy (ID-01), quindi sotto invoker l''UPDATE passava a 0 righe in silenzio. Il tenant NON è più protetto dalla RLS ma dalla guardia esplicita interna (azienda dal JWT + cliente della propria azienda). Torna il numero di persone toccate.';
+  'C1 voce 6, parte-persone: SGANCIA-E-SE-ORFANA-ANONIMIZZA. Le prenotazioni del negozio chiamante lasciano andare la persona (persona_id→NULL) e azzerano le proprie istantanee contatto_*; la riga `persone` si anonimizza SOLO se non resta agganciata a nessuna prenotazione né lista d''attesa (di NESSUNA azienda) — altrove viva, resta intatta. UNICA security DEFINER della 021, per due ragioni: `persone` ha RLS senza policy (ID-01), e l''orfanità si può leggere solo vedendo le prenotazioni degli altri negozi. Il tenant è protetto dalla guardia esplicita interna (azienda dal JWT + cliente della propria azienda). Torna il numero di persone ANONIMIZZATE (0 se tutte ancora vive altrove).';
 revoke execute on function public.anonimizza_persone_del_cliente(uuid) from public, anon;
 grant  execute on function public.anonimizza_persone_del_cliente(uuid) to authenticated;
 
@@ -660,6 +704,103 @@ grant  execute on function public.anonimizza_cliente(uuid) to authenticated;
 -- ANAGRAFE (un legame), non un FATTO — e C1 stessa le cancella. Vive qui come
 -- RPC, non nell'azione, perché la guardia G1 vieta `.delete()` in
 -- `lib/actions.ts`: la regola di casa resta intatta e l'eccezione è esplicita.
+-- ⚠️ RIFATTA QUI (l'originale è nella 018): da C1 voce 6 `prenotazioni.persona_id`
+-- può essere NULL — lo SGANCIO dell'anonimizzazione — e il passo (d) di questa
+-- funzione scrive `persona_id` nel registro, che è NOT NULL. Senza la guardia
+-- l'operatore prenderebbe un 23502 crudo. Il resto del corpo è quello della 018,
+-- invariato: se un giorno la 018 cambia, questa va riallineata (è il prezzo del
+-- `create or replace`, ed è la stessa strada già percorsa da 013/014/016 su
+-- `crea_prenotazione`).
+create or replace function public.prendi_persona_come_cliente(
+  p_prenotazione_id uuid,
+  p_cliente_id      uuid default null   -- valorizzato = collega quell'esistente; null = crea
+) returns uuid
+language plpgsql security definer set search_path = public, pg_catalog as $$
+declare
+  v_az       uuid := public.get_azienda_id();
+  v_utente   uuid := auth.uid();
+  r          record;
+  v_cli      uuid;
+  v_prec     uuid;         -- ottico_di_riferimento precedente (→ da_azienda nel registro)
+  v_nome_pieno text;
+  v_nome     text;
+  v_cognome  text;
+  v_spazio   int;
+begin
+  if v_az is null then raise exception 'NON_AUTENTICATO'; end if;
+
+  select p.id, p.azienda_id, p.stato, p.persona_id, p.appuntamento_id, p.cliente_id,
+         p.contatto_nome, p.contatto_telefono, p.fonte
+    into r
+  from public.prenotazioni p
+  where p.id = p_prenotazione_id;
+  if not found            then raise exception 'PRENOTAZIONE_NON_TROVATA'; end if;
+  if r.azienda_id <> v_az then raise exception 'NON_TUA'; end if;
+  if r.stato <> 'accettata' then raise exception 'NON_ACCETTATA'; end if;
+
+  -- idempotenza: già presa → ritorna il cliente collegato, niente doppi.
+  if r.cliente_id is not null then
+    return r.cliente_id;
+  end if;
+
+  -- C1 · voce 6: se l'anonimizzazione ha SGANCIATO la persona, qui non c'è più
+  -- nessuno da prendere come cliente. Senza questo controllo il passo (d)
+  -- proverebbe a scrivere un persona_id NULL nel registro (NOT NULL) e
+  -- l'operatore vedrebbe un 23502 crudo invece di una frase.
+  if r.persona_id is null then
+    raise exception 'PRENOTAZIONE_SGANCIATA';
+  end if;
+
+  -- (a) cliente: collega il proprio esistente o creane uno nuovo.
+  if p_cliente_id is not null then
+    select c.id into v_cli from public.clienti c
+    where c.id = p_cliente_id and c.azienda_id = v_az;
+    if v_cli is null then raise exception 'CLIENTE_NON_TUO'; end if;
+  else
+    -- nome unico dalla prenotazione → nome/cognome (best-effort: primo token /
+    -- resto). Il cognome mancante resta '—' da completare: non si perde nulla.
+    v_nome_pieno := btrim(coalesce(r.contatto_nome, ''));
+    if v_nome_pieno = '' then v_nome_pieno := 'Cliente'; end if;
+    v_spazio := position(' ' in v_nome_pieno);
+    if v_spazio > 0 then
+      v_nome    := btrim(substr(v_nome_pieno, 1, v_spazio - 1));
+      v_cognome := btrim(substr(v_nome_pieno, v_spazio + 1));
+    else
+      v_nome    := v_nome_pieno;
+      v_cognome := '—';
+    end if;
+    if v_cognome = '' then v_cognome := '—'; end if;
+
+    insert into public.clienti (azienda_id, nome, cognome, telefono, fonte)
+    values (v_az, v_nome, v_cognome, r.contatto_telefono, r.fonte)
+    returning clienti.id into v_cli;
+  end if;
+
+  -- (b) collega il cliente all'appuntamento e alla prenotazione.
+  if r.appuntamento_id is not null then
+    update public.appuntamenti set cliente_id = v_cli where id = r.appuntamento_id;
+  end if;
+  update public.prenotazioni set cliente_id = v_cli, updated_at = now() where id = r.id;
+
+  -- (c) l'ottico di riferimento della persona diventa quest'azienda; il vecchio
+  --     va nel registro come da_azienda.
+  select persone.ottico_di_riferimento into v_prec from public.persone where persone.id = r.persona_id;
+  update public.persone set ottico_di_riferimento = v_az, updated_at = now()
+  where persone.id = r.persona_id;
+
+  -- (d) la riga di registro: l'unica cosa che fra un anno spiega «perché questa
+  --     persona risulta di questo negozio».
+  insert into public.persone_riferimento_registro
+    (persona_id, da_azienda_id, a_azienda_id, prenotazione_id, utente_id)
+  values (r.persona_id, v_prec, v_az, r.id, v_utente);
+
+  return v_cli;
+end $$;
+comment on function public.prendi_persona_come_cliente(uuid, uuid) is
+  'G8 §6: prende la persona di una prenotazione ACCETTATA come cliente del negozio chiamante (get_azienda_id). Collega un cliente esistente (p_cliente_id) o ne crea uno (nome/telefono/fonte dalla prenotazione, senza consenso commerciale), riempie i due cliente_id, imposta persone.ottico_di_riferimento e scrive il registro. Idempotente. Errori: NON_AUTENTICATO, PRENOTAZIONE_NON_TROVATA, NON_TUA, NON_ACCETTATA, CLIENTE_NON_TUO.';
+revoke execute on function public.prendi_persona_come_cliente(uuid, uuid) from anon, public;
+grant  execute on function public.prendi_persona_come_cliente(uuid, uuid) to authenticated;
+
 create or replace function public.elimina_relazione(p_id uuid)
 returns void
 language plpgsql security invoker set search_path = public, pg_catalog as $$

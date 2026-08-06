@@ -475,6 +475,82 @@ describe.skipIf(!haEnv())("021 · C1 · anonimizzazione (la mappa, campo per cam
     expect(data!.anonimizzato_il).toBeNull();
   });
 
+  it("C1 voce 6 · due negozi, UNA persona: A anonimizza, B resta intatto", async () => {
+    // `persone` è identità di PIATTAFORMA: chi ha prenotato da due ottici è UNA
+    // riga sola (la dedup sul telefono è globale). La decisione del 05/08 è
+    // «sgancia-e-se-orfana-anonimizza»: A agisce sul PROPRIO grafo e non deve
+    // poter portare via il contatto a B. È il caso che rende vera quella frase.
+    const B = await creaTenant("c1d");
+    const clienteA = await creaCliente(A, { ...PERSONALI, cognome: `Condivisa ${RUN_ID}` });
+    const persona = await personaCollegata(clienteA);
+
+    // La STESSA persona prenota anche da B (riga `persone` unica, prenotazione sua).
+    const inizioB = slotFuturo();
+    const { error: ePrenB } = await svc.from("prenotazioni").insert({
+      azienda_id: B.aziendaId,
+      persona_id: persona,
+      servizio_codice: "visita",
+      inizio: inizioB,
+      durata_minuti: 30,
+      contatto_nome: "Laura Bianchi",
+      contatto_telefono: "+39 333 0000001",
+      contatto_email: "laura@esempio.it",
+    });
+    if (ePrenB) throw new Error(`prenotazione di B: ${ePrenB.message}`);
+
+    const { error } = await A.cli.rpc("anonimizza_cliente", { p_cliente_id: clienteA });
+    expect(error, "A anonimizza il proprio cliente").toBeNull();
+
+    // (1) Il grafo di A: la prenotazione ha lasciato andare la persona e le sue
+    //     istantanee di contatto sono spente — il FATTO resta, il nome no.
+    const { data: prenA } = await svc
+      .from("prenotazioni")
+      .select("persona_id, contatto_nome, contatto_telefono, contatto_email, note")
+      .eq("cliente_id", clienteA);
+    expect(prenA!.length, "la prenotazione di A si conserva: è un fatto").toBe(1);
+    expect(prenA![0].persona_id, "…ma è SGANCIATA dall'identità di piattaforma").toBeNull();
+    expect(prenA![0].contatto_nome).toBe("Anonimo");
+    expect(prenA![0].contatto_telefono).toBe("");
+    expect(prenA![0].contatto_email).toBeNull();
+    expect(prenA![0].note, "le note libere via").toBeNull();
+
+    // (2) Il cuore: la persona è ancora VIVA da B, quindi resta INTATTA. Se
+    //     questo expect diventa rosso, un negozio sta cancellando il contatto
+    //     di un altro — che è precisamente ciò che la decisione vieta.
+    const { data: p } = await svc
+      .from("persone")
+      .select("nome, email, telefono_grezzo")
+      .eq("id", persona)
+      .single();
+    expect(p!.nome, "la persona è viva da B: nessuno la tocca").toBe("Laura Bianchi");
+    expect(p!.telefono_grezzo, "e il suo telefono resta la sua chiave di dedup").not.toBeNull();
+
+    // (3) La prenotazione di B non è stata sfiorata.
+    const { data: prenB } = await svc
+      .from("prenotazioni")
+      .select("persona_id, contatto_nome")
+      .eq("azienda_id", B.aziendaId);
+    expect(prenB!.length).toBe(1);
+    expect(prenB![0].persona_id, "B tiene il suo filo verso la persona").toBe(persona);
+    expect(prenB![0].contatto_nome).toBe("Laura Bianchi");
+
+    // (4) E quando anche B se ne va, la persona diventa orfana e SOLO ALLORA si
+    //     anonimizza: la mappa C1 si compie, ma alla fine della catena.
+    await svc.from("prenotazioni").update({ persona_id: null }).eq("azienda_id", B.aziendaId);
+    const clienteA2 = await creaCliente(A, { ...PERSONALI, cognome: `Orfana ${RUN_ID}` });
+    const persona2 = await personaCollegata(clienteA2);
+    expect((await A.cli.rpc("anonimizza_cliente", { p_cliente_id: clienteA2 })).error).toBeNull();
+    const { data: p2 } = await svc
+      .from("persone")
+      .select("nome, email, telefono_grezzo, telefono_normalizzato")
+      .eq("id", persona2)
+      .single();
+    expect(p2!.nome, "nessun altro legame: ora sì").toBe("Anonimo");
+    expect(p2!.email).toBe(`anon-${persona2}@invalid`);
+    expect(p2!.telefono_grezzo).toBeNull();
+    expect(p2!.telefono_normalizzato, "e la riga esce dalla dedup").toBe("");
+  });
+
   it("TENANT · la definer della parte-persone si difende DA SOLA (la RLS lì non c'è più)", async () => {
     // `anonimizza_persone_del_cliente` è `security definer`: dentro, la RLS non
     // filtra più nulla. Il tenant lo tiene la guardia scritta a mano — e questo
