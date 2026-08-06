@@ -233,6 +233,10 @@ test.describe("M1 · Anagrafiche & Privacy (§8 · S1-S6)", () => {
 
     await page.getByRole("button", { name: "Aggiungi relazione" }).click();
     await page.getByLabel("Persona collegata").fill(`Sociale ${id}`);
+    // Il suggerimento è un `<button role="option">` dentro un `<div
+    // role="listbox">` (dal 06/08: prima il ruolo stava su un `<li>` guscio che
+    // conteneva il bottone). Il selettore per RUOLO non cambia — ed è esatto il
+    // motivo per cui si sceglie il ruolo e non la struttura.
     await page.getByRole("option", { name: new RegExp(`Centro Sociale ${id}`) }).click();
     await page.getByLabel("Tipo di relazione").selectOption("tutore_legale");
     await page.getByRole("button", { name: "Collega" }).click();
@@ -263,23 +267,30 @@ test.describe("M1 · Anagrafiche & Privacy (§8 · S1-S6)", () => {
     const id = unico();
     const clienteId = await creaCliente(page, { nome: "Anna", cognome: `Sconto ${id}` });
 
-    // (a) appena nato: assicurazione NON rilevata → la scheda non dichiara nulla.
-    await expect(page.getByText(/^Assicurazione:/)).toHaveCount(0);
+    // La riga c'è SEMPRE (gancio chiuso il 06/08): «da rilevare» è uno stato, e
+    // si asserisce in positivo. Prima era dietro una condizione e lo scenario
+    // poteva solo constatare l'ASSENZA della riga — un segnale muto, che non
+    // distingueva «non gliel'ho chiesto» da «la scheda non lo dice».
+    const rigaAssicurazione = page.getByText(/^Assicurazione:/);
+
+    // (a) appena nato: nessuno gliel'ha ancora chiesto.
+    await expect(rigaAssicurazione).toHaveText("Assicurazione: da rilevare");
 
     // (b) glielo chiediamo e non ne ha: la voce NESSUNA è un FATTO, e si vede.
     await page.goto(`/clienti/${clienteId}/modifica`);
     await page.getByLabel("Assicurazione").selectOption({ label: "NESSUNA" });
     await page.getByRole("button", { name: "Salva modifiche" }).click();
     await page.waitForURL(new RegExp(`/clienti/${clienteId}$`));
-    await expect(page.getByText(/^Assicurazione: NESSUNA$/)).toBeVisible();
+    await expect(rigaAssicurazione).toHaveText("Assicurazione: NESSUNA");
 
     // (c) e si torna indietro: la voce vuota rimette il cliente in «da rilevare»
-    // (null), che NON è «non ne ha». Le due cose non si confondono mai.
+    // (null), che NON è «non ne ha». Tre stati, tutti e tre asseriti in
+    // positivo: è questo che rende lo scenario una prova e non un'impressione.
     await page.goto(`/clienti/${clienteId}/modifica`);
     await page.getByLabel("Assicurazione").selectOption({ value: "" });
     await page.getByRole("button", { name: "Salva modifiche" }).click();
     await page.waitForURL(new RegExp(`/clienti/${clienteId}$`));
-    await expect(page.getByText(/^Assicurazione: NESSUNA$/)).toHaveCount(0);
+    await expect(rigaAssicurazione).toHaveText("Assicurazione: da rilevare");
   });
 
   /* ── S5 · seconda metà (ANCORA `fixme`) ─────────────────────────────────
@@ -361,12 +372,18 @@ test.describe("M1 · Anagrafiche & Privacy (§8 · S1-S6)", () => {
     await expect(page.getByText(/^Anonimizzato-/)).toBeVisible();
     await expect(page.getByText(`DaAnonimizzare ${id}`)).toHaveCount(0);
     await expect(page.getByText("+39 333 9998877")).toHaveCount(0);
-    // …e non si trova più cercandola per nome.
+    // …e non si trova più cercandola per nome (il campo ha `aria-label="Cerca"`
+    // dal 06/08: si aggancia per etichetta, come il gesto che si racconta)…
     await page.goto("/clienti");
-    await page.getByRole("searchbox").fill(`DaAnonimizzare ${id}`);
-    await page.getByRole("searchbox").press("Enter");
+    const cerca = page.getByLabel("Cerca");
+    await cerca.fill(`DaAnonimizzare ${id}`);
+    await cerca.press("Enter");
     await page.waitForURL(/\/clienti\?q=/);
     await expect(page.getByText(`DaAnonimizzare ${id}`)).toHaveCount(0);
+    // …né cercandola per il nome NUOVO: l'anonimizzato esce dal registro, che è
+    // ciò che la 021 scrive sulla colonna («esclude da ricerche, code, letture»).
+    await page.goto("/clienti?q=Anonimizzato");
+    await expect(page.getByText(/Anonimizzato-/)).toHaveCount(0);
 
     // …ma il FATTO è intatto: numero e importi della busta si leggono ancora.
     await page.goto(urlBusta);

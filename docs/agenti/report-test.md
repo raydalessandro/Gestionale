@@ -21,13 +21,53 @@ B1 pianta le fondamenta che tutte le buste successive useranno, e lo fa con
 | `tests/contratto/b1-relazioni.test.ts` (nuovo) | L2 | 16 |
 | `tests/contratto/b1-anonimizzazione.test.ts` (nuovo) | L2 | 5 |
 | `tests/contratto/b1-fondamenta-rls.test.ts` (nuovo) | L2 | 16 |
-| `e2e/m1-anagrafiche.spec.ts` (nuovo) | L3 | 6 (**tutti `fixme`**) |
-| `tests/unit/guardie.test.ts` (esteso: blocco **L4p**, +12 → 68) | L4 | 12 |
+| `e2e/m1-anagrafiche.spec.ts` (nuovo, poi **riscritto** al 2° giro) | L3 | 7 (6 vivi + 1 `fixme`) |
+| `e2e/_helpers.ts` (aggiornato al 2° giro) | L3 | — |
+| `e2e/fase4d-consensi.spec.ts` (riscritto al 2° giro) | L3 | 1 |
+| `e2e/fase3-agenda-richiami.spec.ts` (riparato al 2° giro) | L3 | 2 |
+| `tests/unit/guardie.test.ts` (esteso: **L4p** +12, poi **L4q** +6 → 74) | L4 | 18 |
 
 Nessuna nuova dipendenza (`vitest` e `@playwright/test` bastavano); nessuna
 modifica a `package.json`, `vitest.config.ts`, `playwright.config.ts` né a
 `.github/workflows/ci.yml` (il job `contratto-e2e` raccoglie i nuovi file per
 path, senza ritocchi).
+
+### 2° giro (06/08) — la UI minima del §4 è agganciata
+Il primo giro consegnò i sei scenari di M1 come `test.fixme` con una nota
+precisa: «i nomi qui dentro sono la lettura della SPEC, non un contratto con la
+UI: lo diventano solo dopo che la UI esiste». Ora esiste
+(`components/PermessiCliente.tsx` montato dalla scheda cliente, blocco «Sconti e
+fatturazione» in `ClienteForm`, marketing tolto dal form e dal banner 4d).
+Questo giro **non ha aggiunto scenari**: ha verificato sul sorgente che cosa la
+UI renda davvero e ha riportato i selettori su QUELLO.
+
+| Scenario | Prima | Ora |
+|---|---|---|
+| S1 · scheda completa col blocco P.IVA | `fixme` | **vivo** |
+| S2 · due firme, mastro a due righe, cache = l'ultima | `fixme` | **vivo** |
+| S3 · revoca: i commerciali si fermano, gli operativi restano | `fixme` | **vivo** |
+| S4 · minore + tutore-ENTE, la riga letta dai due lati | `fixme` | **vivo** |
+| S5 (1/2) · assicurazione «da rilevare» ≠ «NESSUNA» | (dentro S5) | **vivo** |
+| S5 (2/2) · cancello sconti **in cassa** | `fixme` (doppio blocco) | `fixme` (**un** blocco: M8) |
+| S6 · eliminazione definitiva protetta | `fixme` | **vivo** |
+
+**Il danno collaterale, trattato per primo perché era il rosso più probabile in
+CI**: la spunta «Consenso marketing» è sparita da `ClienteForm`, e con lei
+l'opzione `consensoMarketing` di `e2e/_helpers.ts::creaCliente`. La usavano due
+spec, ed entrambe sarebbero morte in CI su un locatore che non aggancia più:
+- `e2e/fase3-agenda-richiami.spec.ts` · S4 (GDPR) dava il consenso alla nascita
+  del cliente e lo toglieva con `uncheck()` in `/modifica`: ora **passa dal
+  mastro** (`dammiConsensoMarketing`) e revoca **dal tasto**
+  (`revocaConsensoMarketing`). Lo scenario ci guadagna: prova la stessa cosa
+  attraverso il gesto che il negozio farà davvero.
+- `e2e/fase4d-consensi.spec.ts` · S1 era **interamente** sul banner a due
+  consensi: bottoni «Registra consensi»/«Salva consensi», spunta marketing,
+  campo «data consenso marketing». Nessuno di quei cinque nomi esiste più (oggi:
+  «Consenso sanitario» / «Salva il consenso sanitario», solo sanitario).
+  Riscritto sul banner vero, con in più due asserzioni che prima non si potevano
+  scrivere: nel banner **non c'è** nessuna spunta marketing, e dopo aver
+  registrato il sanitario la cache marketing è ancora `non raccolto` — cioè il
+  flusso sanitario non tocca il marketing (C3).
 
 ### L1 · C2 — la tabella fail-closed, riga per riga (19 test)
 `valutaPermesso` è pura apposta: si collauda senza database né sessione. Una
@@ -114,30 +154,74 @@ grezzo ma efficace: il JSON del cliente non contiene più nome, CF né indirizzo
 Più i bordi: cliente inesistente, doppia anonimizzazione innocua, e **un'altra
 azienda non può anonimizzare** (per B quel cliente non esiste).
 
-### L3 · E2E M1 S1-S6 — **tutti e sei in `test.fixme`**
-`e2e/m1-anagrafiche.spec.ts` scrive per esteso i sei scenari del §8 di M1 e li
-marca `fixme` con il motivo. **Perché**: la «UI minima» del §4 della consegna non
-è agganciata. Verificato sul sorgente: **nessuna** pagina e **nessun** componente
-importa `registraConsenso`, `revocaMarketing`, `creaRelazione`,
-`eliminaRelazione`, `anonimizzaCliente`, `creaOculistaAlVolo`, `scriviParametro`.
-In scheda cliente c'è ancora solo il banner **booleano** della Fase 4d — senza
-canali, senza modalità di firma, senza mastro, senza tasto revoca, senza tasto
-eliminazione. Regola seguita alla lettera: **non si inventa la UI**.
+### L3 · E2E M1 — 6 scenari vivi, 1 `fixme` (`e2e/m1-anagrafiche.spec.ts`)
+Sei scenari su sette esercitano ora la UI vera. Come sono stati allineati, e
+dove il primo giro avrebbe sbagliato:
 
-| Scenario | Motivo del `fixme` |
-|---|---|
-| S1 · scheda completa con blocco P.IVA | `ClienteForm` non ha il blocco P.IVA (`dati_fatturazione`) né assicurazione / azienda convenzionata |
-| S2 · due firme, mastro a due righe | manca il popup-firma (canali + modalità) e la lista del mastro |
-| S3 · revoca dal tasto | manca il tasto «Revoca comunicazioni» nella sezione permessi |
-| S4 · minore + tutore-ENTE | manca il blocco famiglia/relazioni in scheda |
-| S5 · cancello sconti assicurativi | **doppio** blocco: manca il campo assicurazione **e** lo sconto assicurativo in cassa (è M8, non ancora scritto) |
-| S6 · eliminazione definitiva protetta | manca il tasto protetto e la conferma forte |
+- **S1 · scheda completa col blocco P.IVA.** Compila identità, recapiti,
+  indirizzo, `Assicurazione` = NESSUNA e i tre campi che finiscono nel jsonb
+  (`Ragione sociale`, `CF / P.IVA azienda`, `Codice SDI`); rilegge dalla scheda
+  le righe che la scheda stampa davvero — `Assicurazione: NESSUNA` e
+  `Fattura a …` — e poi **torna in `/modifica`** per i campi che la scheda NON
+  mostra (secondo nome, scala, blocco P.IVA): è lì che si prova il round-trip
+  del jsonb, non a video.
+- **S2 · due firme.** Prima asserisce lo stato di partenza `Marketing: non
+  raccolto` (che **non** è «no»: la distinzione è di C3 e conta al banco), poi
+  penna+email+cellulare, poi digitale+cartaceo. Il mastro arriva a due righe con
+  due modalità; la cache resta l'**ultima** e si asserisce esplicitamente che
+  **non** contiene i canali della prima firma (`not.toContainText("email")`):
+  cache ≠ unione, che è il cuore del contratto.
+- **S3 · revoca.** Riscritto perché quello del primo giro non dimostrava niente:
+  «i commerciali si fermano, gli operativi restano» pretende **due** richiami, e
+  il tenant nuovo non ne ha nessuno. Ora se li costruisce dalla UI, senza
+  retrodatare col service role: una **busta portata a pronta** (→ «Sollecito
+  ritiro», operativo) e una **Rx con data visita 12 mesi fa e validità 12** (→
+  «Controllo vista in scadenza», commerciale, dentro la finestra −15/+30 di
+  `calcolaProposte`). Con il consenso si vedono entrambe; dopo la revoca il
+  commerciale sparisce, compare la riga «proposte commerciali nascoste» e
+  l'operativo **resta**. Nel mastro restano due fatti, `dato` e `revocato`.
+- **S4 · relazioni.** Persona collegata dalla combobox → opzione → tipo →
+  «Collega»; poi si **clicca il link della riga** e si legge la stessa relazione
+  dal lato dell'ente, dove l'etichetta è quella **inversa** («tutelato»,
+  derivata a video). È la prova UI di C4: una riga a DB, due letture.
+- **S6 · eliminazione definitiva.** Il gesto protetto (tasto → «Scrivi ELIMINA
+  per confermare» → «Anonimizza definitivamente»), poi tre verifiche: la scheda
+  mostra `Anonimizzato-…` e non più nome e telefono; la **ricerca clienti** non
+  la trova più; la **busta resta leggibile** con numero e importi (665 + 300 =
+  965, acconto 780). Il campo-per-campo resta al L2, che non dipende dalla UI.
+
+**Strict mode — la trappola di questo giro.** `getByRole(name:)` e
+`getByText("…")` fanno match di SOTTOSTRINGA, e tre asserzioni del primo giro
+oggi pescherebbero più elementi insieme: `getByText(/email/i)` (riga di cache +
+riga del mastro + etichetta del checkbox), `getByText(/revocato/i)`,
+`getByText(/cartaceo/i)`. Sono state ancorate con due locatori condivisi in
+`e2e/_helpers.ts`:
+- `rigaMarketing(page)` → l'**unica** riga «Marketing: …» (la cache). La regex
+  comprende anche il VALORE, non solo `^Marketing:`: il testo è spezzato in due
+  `<span>` e il motore di Playwright restituisce l'elemento più **profondo** che
+  soddisfa il matcher — con `/^Marketing:/` si aggancerebbe l'etichetta, senza
+  il valore, e ogni `toHaveText` sarebbe falso.
+- `righeMastroMarketing(page)` → i `<li>` del mastro, filtrati sul testo
+  ancorato; da lì si contano le righe e si cercano `penna`/`digitale`/`revocato`
+  **dentro la lista**, non nella pagina.
+Aggiunti anche `dammiConsensoMarketing` / `revocaConsensoMarketing`: i due gesti
+del mastro in un posto solo, così il prossimo rinomino si ripara una volta.
+
+**L'unico `fixme` rimasto — S5 (2/2), e il motivo è cambiato.** Il primo giro
+scriveva «manca il campo assicurazione in scheda **e** manca lo sconto in
+cassa». Il primo blocco è **caduto**: il campo c'è, con la distinzione
+`null = da rilevare` / `NESSUNA = chiesto, non ne ha`, e la parte collaudabile è
+stata staccata in **S5 (1/2)**, che percorre tutti e tre gli stati (nasce
+da-rilevare → NESSUNA → di nuovo da-rilevare) e li asserisce **in positivo**
+dopo la chiusura del gancio 1 — il verde, come per tutto il L3, lo dirà la CI.
+Resta bloccata solo
+la seconda metà: in `/cassa/vendita/nuova` **non esiste** nessuna azione «Sconto
+assicurativo» né alcun messaggio che distingua «da rilevare» da «non ne ha» —
+è **M8**, non ancora scritto. I nomi di quel test restano la lettura della spec,
+non un contratto con la UI, ed è scritto nel file.
 
 **S7 non è stato scritto**: è cross-modulo (vendita veloce LAC col CF) e la spec
-stessa lo assegna a B5/M8. Quando la UI arriva: togliere i `fixme` uno per uno e
-**allineare le etichette a quelle vere** (i nomi nel file sono la lettura della
-spec, non ancora un contratto con la UI). L'anonimizzazione campo-per-campo resta
-comunque coperta dal L2, che non dipende dalla UI.
+stessa lo assegna a B5/M8.
 
 ### L4 · nuovo blocco **L4p** (+12 guardie → 68 in totale)
 Gated su `existsSync(021)`. Colpiscono ciò che si romperebbe **in silenzio**:
@@ -170,6 +254,49 @@ Gated su `existsSync(021)`. Colpiscono ciò che si romperebbe **in silenzio**:
   <> ''`) con `telefono_grezzo` reso nullable.
 - **G28 / G28b** — la 021 registra sé stessa; resta additiva (nessun `drop
   table`/`drop column`/`rename`).
+
+### L4 · 2° giro — il ratchet stringe e nasce **L4q** (+6 guardie → 74)
+**G22 ha stretto di un dente.** L'elenco dei punti che possono scrivere a mano
+la cache dei consensi era `clienteDaForm`, `registraConsensi`,
+`creaPrescrizione`; ora `clienteDaForm` **è uscito** (la spunta non c'è più nel
+form) e rientrarci sarebbe rosso. Era il peggiore dei tre: su «Salva modifiche»
+poteva **spegnere** il consenso senza alcun evento nel mastro. Restano i due
+sanitari della Fase 4d, sorvegliati.
+
+**L4q · il contratto UI ↔ E2E di M1** (6 guardie). Da quando la UI c'è, gli
+scenari di M1 sono un contratto con etichette e ruoli veri — ma quel contratto
+si rompe solo dentro `contratto-e2e`, che gira coi segreti e ci mette minuti.
+Queste guardie lo controllano nel job `build`, in millisecondi:
+- **G29** — la scheda cliente **importa e renderizza** `PermessiCliente` (senza,
+  cinque E2E muoiono tutti insieme e il messaggio non spiegherebbe perché).
+- **G29b** — le **18 etichette** su cui poggiano gli E2E esistono nel sorgente
+  («Registra consenso», «Salva consenso», «Revoca comunicazioni», «Conferma
+  revoca», «Modalità», «Aggiungi relazione», «Persona collegata», «Tipo di
+  relazione», «Collega», «Eliminazione definitiva», «Scrivi ELIMINA per
+  confermare», «Anonimizza definitivamente», «Assicurazione», «Ragione sociale»,
+  «CF / P.IVA azienda», «Codice SDI», «Scala / appartamento», «Secondo nome»).
+- **G29c** — i tre canali della UI sono esattamente `{email, cellulare,
+  cartaceo}`, cioè il perimetro sigillato dal CHECK a DB (G23): un quarto canale
+  fallirebbe al banco, non nei test.
+- **G29d** — **una sola** riga «Marketing: …» in tutta la UI. È insieme un
+  invariante di prodotto (C3: una cache, un posto) e la condizione perché l'E2E
+  possa asserire senza ambiguità: se due componenti la stampassero, S2 e S3
+  morirebbero in strict mode con un errore che non spiega niente.
+- **G29e** — nessun `name="consenso_marketing"` / `consenso_canali` /
+  `data_consenso` in `app/` e `components/`: è il modo esatto in cui la spunta
+  rientrerebbe dalla finestra.
+- **G29f** (aggiunta dopo la chiusura del gancio 1) — la riga
+  «Assicurazione: …» si stampa **sempre**, e la vecchia condizione
+  `(assicurazione || fatt)` non torna. Senza, lo stato «da rilevare» ridiventa
+  invisibile e S5 (1/2) perde due delle sue tre asserzioni. *Ratchet verificato
+  contro il file com'era*: sul sorgente vecchio è rossa, sul nuovo verde.
+
+*Trade-off dichiarato (G29b e G29f soprattutto): sono guardie di **testo**. Un
+rinomino legittimo («Registra consenso» → «Raccogli consenso»), o un refactor
+che estrae la riga assicurazione in un componente, le fanno diventare rosse
+anche se il prodotto migliora. È voluto — quel cambiamento deve passare per
+l'E2E e per la spec, non avvenire di soppiatto — e il messaggio d'errore dice
+quale etichetta e quale file. Riparazione: una riga qui, una riga nello spec.*
 
 ### ⚠️ Dove la 021 (o le sue funzioni) NON fa ciò che i contratti dichiarano
 Sono i rilievi veri di questo giro. I primi due sono **buchi funzionali**: i test
@@ -250,26 +377,92 @@ saranno rossi in CI — è il segnale, non un errore del test.
    rosso), ma è il tipo di buco che si chiude meglio adesso che fra sei mesi.
 
 ### Ganci richiesti (nessuno applicato: fuori dalla proprietà dell'agente test)
-1. **La UI minima B1** — senza, i sei E2E di M1 restano `fixme` e sette server
-   action restano fantasma (allowlist temporanea in G8, vedi sotto).
-2. **G8 · allowlist temporanea**: la guardia «nessuna server action fantasma»
-   sarebbe rossa oggi perché le sette azioni B1 non sono chiamate da nessuna
-   pagina. È stata aggiunta un'allowlist **documentata** con quei sette nomi (la
-   guardia resta severa su qualunque altra) e un controllo che i nomi
-   nell'allowlist esistano davvero. *Trade-off dichiarato*: finché l'allowlist
-   c'è, quelle sette non sono sorvegliate da G8 — lo sono però dal L2, che le
-   esercita tutte. **Da svuotare appena la UI arriva.**
-3. I due fix ai punti (1) e (2) della sezione precedente: sono le uniche due
-   cose che, oggi, rendono rossi due test di contratto.
+Aggiornati al 2° giro. I primi due del giro 1 sono **caduti**: la UI minima c'è
+(gli E2E sono vivi) e l'allowlist di G8 si è svuotata delle cinque azioni dei
+contratti — ne restano due, `creaOculistaAlVolo` (M2) e `scriviParametro` (M10),
+la cui schermata appartiene a un altro modulo per esplicita scelta della
+consegna («niente UI oltre il minimo degli E2E»).
 
-### Esito auto-verifica (locale) — B1
-`npm test` (L1 + L4): **196 passed**, 11 file — guardie 55 → **68**.
-`npx tsc --noEmit`: pulito (nota: `tsconfig.json` esclude `tests/` ed `e2e/`, il
-typecheck copre l'app; i file di test sono verificati dal transform di Vitest e
-da `playwright test --list`).
-`npx playwright test --list e2e/m1-anagrafiche.spec.ts`: 6 test elencati.
-`npx vitest run tests/contratto/b1-*.test.ts` senza segreti: **57 test skippati
-puliti** (nessun errore d'import). L2 ed L3 li esegue la CI.
+**Tutti e tre i ganci di questo giro sono stati CHIUSI dal codificatore mentre
+lavoravo** (06/08). Li lascio scritti col loro esito: uno dei tre ha **cambiato
+un'asserzione**, e questo è il caso interessante.
+
+1. ~~«Assicurazione: da rilevare» non si vede in scheda.~~ **CHIUSO — e mi ha
+   fatto riscrivere un'asserzione.** Il blocco era dietro `(assicurazione ||
+   fatt)`: lo stato `null` (*non gliel'abbiamo ancora chiesto*) era invisibile e
+   S5 (1/2) poteva solo constatare l'**assenza** della riga — un segnale muto,
+   che non distingueva «non chiesto» da «la scheda non lo dice». Ora la riga si
+   stampa sempre e dice `Assicurazione: da rilevare`.
+   *Conseguenza sui test (fatta)*: il passo (a) di S5 (1/2) era
+   `toHaveCount(0)` e **sarebbe diventato rosso**: rovesciato in
+   `toHaveText("Assicurazione: da rilevare")`; il passo (c) non si accontenta
+   più della sparizione di «NESSUNA» ma asserisce il ritorno a «da rilevare».
+   I tre stati di M1 §2 sono ora collaudati **tutti e tre in positivo**, che era
+   il punto dello scenario.
+   *Aggiunta*: nuova guardia **G29f** — la riga si stampa sempre e la vecchia
+   condizione non torna (ratchet sulla forma esatta da cui si è usciti).
+   Verificata contro il file com'era prima: sul vecchio sorgente la guardia è
+   rossa, sul nuovo verde — cioè morde davvero.
+2. ~~Il cliente anonimizzato resta nell'elenco `/clienti`.~~ **RISOLTO mentre
+   scrivevo** (commit `ce5ee52`, `.is("anonimizzato_il", null)` sulla lista).
+   Era un gancio vero: la 021 dichiara che `anonimizzato_il` «esclude da
+   ricerche, code e letture» e la lista non filtrava. Ora S6 lo **collauda**:
+   dopo l'anonimizzazione cerca prima il vecchio nome (zero risultati) e poi
+   «Anonimizzato» (zero risultati) — cioè la riga è uscita dal registro, non si
+   è solo travestita.
+3. ~~Il campo di ricerca clienti non ha etichetta accessibile.~~ **CHIUSO**:
+   ora ha `aria-label="Cerca"`. S6 è passato da `getByRole("searchbox")` a
+   `getByLabel("Cerca")`: stessa robustezza, ma il test si legge come il gesto
+   («cerca DaAnonimizzare…»). Nessun'altra spec toccava quel campo.
+4. ~~`<li role="option">` con dentro un `<button>`~~ **CHIUSO**: ora è un
+   `<div role="listbox">` con `<button role="option">` figli diretti — il ruolo
+   sta sull'elemento che si preme, quindi è raggiungibile da tastiera.
+   *Conseguenza sui test: nessuna.* Il selettore di S4 è
+   `getByRole("option", { name })` e non è cambiato di una lettera — è
+   esattamente il motivo per cui l'ordine di lavoro impone ruolo/etichetta e
+   vieta i selettori strutturali: la UI si è riscritta sotto, il test no.
+   Verificato sul nuovo markup, non dedotto.
+5. **Restano i due fix di contratto** dei punti (1) e (2) della sezione «Dove la
+   021 NON fa ciò che i contratti dichiarano»: la persona del portale non
+   anonimizzata e il CHECK che lascia passare `canali = '{}'`. Sono le uniche
+   due cose che, oggi, rendono rossi due test di contratto.
+6. **Debito che resta in carico all'app** (già sorvegliato da G22): il consenso
+   **sanitario** si scrive ancora come cache diretta da `registraConsensi` e
+   `creaPrescrizione`. Per C3 non dovrebbe esistere alcuna cache sanitaria: si
+   legge dal mastro, per prescrizione. Finché è così, il banner 4d e il gate
+   delle prescrizioni restano fuori dal mastro.
+
+### Esito auto-verifica — B1 (2° giro): misurato vs NON misurato
+**Misurato davvero, qui, adesso:**
+- `npm test` (L1 + L4): **202 passed**, 11 file, 0 falliti — guardie 68 → **74**
+  (ratchet G22 stretto + blocco L4q). È la baseline richiesta: era 196, i +6
+  sono le guardie nuove, nessun test preesistente è cambiato di esito.
+- `npx tsc --noEmit`: **pulito** (l'app; `tsconfig.json` esclude `tests/` ed
+  `e2e/`).
+- Typecheck **mirato degli E2E** con un tsconfig usa-e-getta fuori dal repo
+  (stessi `paths`, `strict`): **nessun errore** oltre ai `process` non tipizzati
+  (manca `@types/node` in quel config ad hoc, non nel progetto).
+- `npx playwright test --list`: **42 test in 14 file**, tutti compilano
+  (`m1-anagrafiche.spec.ts` ne elenca 7: 6 vivi + 1 `fixme`).
+
+**NON misurato — e nessuno lo dichiari verde al posto mio:**
+- **Tutto il L3**. Gli E2E qui non girano: servono il progetto Supabase di test
+  (segreti `TEST_SUPABASE_*`) e l'app in esecuzione contro quel progetto. Il
+  lavoro fatto su S1-S6 è **allineamento statico** — sorgente alla mano,
+  etichetta per etichetta, ruolo per ruolo — non un'esecuzione. **Il verde lo dà
+  la CI di Ray** (job `contratto-e2e`), ed è la prima cosa da guardare su questa
+  PR: se qualcosa si è mosso fra la lettura del sorgente e il DOM vero, esce lì.
+- **Tutto il L2** (`tests/contratto/**`): nessun segreto in questo ambiente.
+  Invariato in questo giro (nessuna migrazione nuova: la 021 è l'ultima).
+- `npm run build` non è stato lanciato (fuori dal perimetro dell'agente test);
+  lo fa il job `build` della CI.
+
+**Dove guardare per primo se la CI va rossa sull'E2E**, in ordine di rischio:
+(1) S3, il più lungo — è marcato `test.slow()`, attraversa wizard busta +
+prescrizione + due letture di `/richiami`; (2) le asserzioni su `toHaveText`
+della riga cache, se il markup della riga «Marketing:» cambia forma; (3) S6, che
+dipende dal formato euro `965,00 €` — l'asserzione è ancorata alla sola parte
+numerica proprio per non dipendere dal simbolo e dallo spazio unificatore.
 
 ## Era 2 · S0 · Bonifica (branch `era2/S0-bonifica`, migrazione 020)
 
@@ -983,12 +1176,15 @@ tenant usa-e-getta (`e2e/_helpers.ts`).
   causale sulla vendita veloce → RE- nel registro, vendita ancora emessa); S8
   (chiusura serale con +1 € di eccedenza contanti → causale pretesa, redirect
   al dettaglio chiusura, una sola per oggi).
-- **Fase 4d** (`fase4d-consensi.spec.ts`): S1 (cliente nuovo senza consensi →
-  banner con le due voci mancanti; registro il marketing con data di ieri →
-  resta solo il sanitario; registro anche il sanitario → banner sparito, la
-  sezione privacy mostra "Marketing: sì" / "Dati sanitari: sì"). Tenant e
-  cliente usa-e-getta; selettori solo su testo/etichetta reali del banner
-  (`Registra consensi`, `Salva consensi`, `data consenso marketing`).
+- **Fase 4d** (`fase4d-consensi.spec.ts`): S1 (cliente nuovo senza consenso →
+  banner persistente; lo registro con data di ieri → banner sparito e la card
+  Privacy mostra "Dati sanitari: sì, dal …"). ⚠️ **Riscritto in B1** (vedi la
+  sezione in cima): il banner chiedeva DUE consensi, il marketing è passato al
+  mastro (C3) e con lui sono spariti `Registra consensi`, `Salva consensi` e
+  `data consenso marketing`. Oggi i selettori sono `Consenso sanitario` /
+  `Salva il consenso sanitario` / `data consenso sanitario`, più due asserzioni
+  di separazione (nel banner non c'è spunta marketing; la cache marketing resta
+  «non raccolto» dopo aver registrato il sanitario).
 
 ### L4 · Guardie statiche — `tests/unit/guardie.test.ts`
 Base (regressioni di contratto):
@@ -1082,12 +1278,18 @@ ricerche cliente/catalogo vanno validati al primo run CI (probabile un giro di
 aggiustamenti). Fase 3 S3/S4 dipendono dal tempo: si retrodatano via service
 role. La numerazione per anno riparte da 1 a Capodanno (atteso).
 
-**Fase 4d S1 (nuovo)**: punto sensibile atteso è il re-render del banner dopo
-la server action `registraConsensi` (che fa `revalidatePath`): il test assume
-che il dialogo resti aperto (stato client `aperto`) dopo il primo salvataggio e
-prosegue col consenso sanitario senza riaprirlo. Se al primo run CI il form si
-chiudesse, basta riaprire con "Registra consensi". Le date retrodatate usano il
-fuso del runner (l'action ancora a `T12:00:00`, margine ampio).
+**Fase 4d S1** (riscritto in B1): punto sensibile atteso è il re-render del
+banner dopo la server action `registraConsensi` (che fa `revalidatePath`) — ora
+il test registra **un solo** consenso, quindi non dipende più dal fatto che il
+dialogo resti aperto. Le date retrodatate usano il fuso del runner (l'action
+ancora a `T12:00:00`, margine ampio) e il test ricostruisce la data attesa allo
+stesso modo, per non sbagliare giorno su un run a cavallo della mezzanotte.
+
+**M1 S1-S6 (B1, 2° giro)**: scritti contro il sorgente, **mai eseguiti in
+locale** (serve il Supabase di test + l'app viva). Il più esposto è S3, che è
+anche il più lungo (`test.slow()`); gli altri sono lineari. Se il primo run CI
+dà rosso, il sospetto numero uno è un locatore di *label* che il DOM presenta in
+modo diverso da come lo legge il sorgente, non la logica dello scenario.
 
 ## Ganci richiesti (al codice app e agli altri agenti)
 1. **Manuale utente — capitoli mancanti (gancio per l'agente manuali).** La
