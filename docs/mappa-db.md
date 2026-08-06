@@ -747,6 +747,7 @@
 - `crea_sala_default()` → trigger · *security definer*
 - `diag_intervallo_immutabile()` → TABLE(volatile_immutabile boolean, corpo_minuti boolean) · *security definer*
 - `diag_normalizza_telefono()` → TABLE(volatile_immutabile boolean, corpo_ok boolean) · *security definer*
+- `elimina_relazione(p_id uuid)` → void
 - `get_azienda_id()` → uuid · *security definer*
 - `normalizza_telefono(p text)` → text
 - `prendi_persona_come_cliente(p_prenotazione_id uuid, p_cliente_id uuid)` → uuid · *security definer*

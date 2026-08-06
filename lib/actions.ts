@@ -81,7 +81,20 @@ export async function completaOnboarding(
 /* ── Clienti ───────────────────────────────────────────────────────── */
 
 function clienteDaForm(fd: FormData) {
-  const consenso = fd.get("consenso_marketing") === "on";
+  // B1 · blocco P.IVA → `dati_fatturazione` (jsonb). Se il negozio non compila
+  // nulla la colonna resta null: «non fattura a azienda» ≠ «azienda vuota».
+  const ragioneSociale = str(fd, "ragione_sociale");
+  const pivaAzienda = str(fd, "piva_azienda")?.toUpperCase() ?? null;
+  const codiceSdi = str(fd, "codice_sdi")?.toUpperCase() ?? null;
+  const datiFatturazione =
+    ragioneSociale || pivaAzienda || codiceSdi
+      ? {
+          ragione_sociale: ragioneSociale,
+          cf_piva: pivaAzienda,
+          codice_sdi: codiceSdi,
+        }
+      : null;
+
   return {
     nome: str(fd, "nome") ?? "",
     cognome: str(fd, "cognome") ?? "",
@@ -105,10 +118,15 @@ function clienteDaForm(fd: FormData) {
     nazione: str(fd, "nazione"),
     lingua: str(fd, "lingua"),
     fonte: (str(fd, "fonte") ?? "banco") as Fonte,
-    consenso_marketing: consenso,
-    data_consenso: consenso ? new Date().toISOString() : null,
+    // M1 §2: null = DA RILEVARE · la voce NESSUNA = chiesto, non ne ha.
+    assicurazione_id: str(fd, "assicurazione_id"),
+    dati_fatturazione: datiFatturazione,
     note: str(fd, "note"),
   };
+  // NB · `consenso_marketing` e `consenso_canali` NON stanno qui: sono la CACHE
+  // dell'ultimo evento del mastro e il contratto C3 vieta di scriverla
+  // direttamente («la cache non si scrive MAI direttamente, solo l'azione del
+  // mastro»). Si raccoglie e si revoca dalla sezione Permessi della scheda.
 }
 
 export async function creaCliente(
@@ -170,41 +188,36 @@ export async function aggiornaCliente(
   redirect(`/clienti/${clienteId}`);
 }
 
-/** Registra i consensi raccolti (anche su carta, con data retrodatabile) — audit A6. */
+/**
+ * Registra il consenso ai DATI SANITARI raccolto al banco (anche su carta, con
+ * data retrodatabile) — audit A6, gate delle prescrizioni.
+ *
+ * B1 · qui è rimasto SOLO il sanitario. Il marketing è passato al mastro
+ * (`registraConsenso` / `revocaMarketing`): il contratto C3 dice che
+ * `consenso_marketing` + `consenso_canali` sono la proiezione dell'ultimo evento
+ * e «la cache non si scrive MAI direttamente». Per i dati sanitari C3 prevede
+ * NESSUNA cache e un evento legato alla prescrizione: finché la raccolta al
+ * banco è slegata dalla ricetta resta questa colonna della Fase 4d, che il
+ * mastro non può rappresentare senza `prescrizione_id`.
+ */
 export async function registraConsensi(
   clienteId: string,
   _prev: { errore: string } | null,
   formData: FormData
 ): Promise<{ errore: string } | null> {
   const supabase = await createClient();
-  const marketing = formData.get("consenso_marketing") === "on";
   const sanitario = formData.get("consenso_dati_sanitari") === "on";
-  if (!marketing && !sanitario) {
-    return { errore: "Spunta almeno un consenso da registrare." };
+  if (!sanitario) {
+    return { errore: "Spunta il consenso da registrare." };
   }
-  const tsDa = (campo: string): string => {
-    const d = str(formData, campo);
-    return d ? new Date(`${d}T12:00:00`).toISOString() : new Date().toISOString();
-  };
+  const d = str(formData, "data_sanitario");
+  const ts = d ? new Date(`${d}T12:00:00`).toISOString() : new Date().toISOString();
 
-  const patch: {
-    consenso_marketing?: boolean;
-    data_consenso?: string;
-    consenso_dati_sanitari?: string;
-    consenso_sanitario_il?: string;
-  } = {};
-  if (marketing) {
-    patch.consenso_marketing = true;
-    patch.data_consenso = tsDa("data_marketing");
-  }
-  if (sanitario) {
-    const ts = tsDa("data_sanitario");
-    patch.consenso_dati_sanitari = ts;
-    patch.consenso_sanitario_il = ts;
-  }
-
-  const { error } = await supabase.from("clienti").update(patch).eq("id", clienteId);
-  if (error) return { errore: `Consensi non salvati: ${error.message}` };
+  const { error } = await supabase
+    .from("clienti")
+    .update({ consenso_dati_sanitari: ts, consenso_sanitario_il: ts })
+    .eq("id", clienteId);
+  if (error) return { errore: `Consenso non salvato: ${error.message}` };
 
   revalidatePath(`/clienti/${clienteId}`);
   return null;

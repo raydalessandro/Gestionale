@@ -2,16 +2,30 @@
 
 import { useActionState } from "react";
 import { creaCliente, aggiornaCliente } from "@/lib/actions";
-import type { ClienteRow } from "@/lib/database.types";
+import type { ClienteRow, AssicurazioneRow } from "@/lib/database.types";
 import { FONTI_MANUALI } from "@/lib/database.types";
 import { Card, Field, inputCls, Errore } from "@/components/ui";
 import { ETICHETTE_CANALE_PREFERITO, ETICHETTE_FONTE } from "@/lib/utils";
 
-export default function ClienteForm({ cliente }: { cliente?: ClienteRow }) {
+/** Il blocco P.IVA vive in `clienti.dati_fatturazione` (jsonb), non in colonne. */
+type DatiFatturazione = {
+  ragione_sociale?: string | null;
+  cf_piva?: string | null;
+  codice_sdi?: string | null;
+};
+
+export default function ClienteForm({
+  cliente,
+  assicurazioni = [],
+}: {
+  cliente?: ClienteRow;
+  assicurazioni?: AssicurazioneRow[];
+}) {
   const azioneBound = cliente
     ? aggiornaCliente.bind(null, cliente.id)
     : creaCliente;
   const [stato, azione, inCorso] = useActionState(azioneBound, null);
+  const fatt = (cliente?.dati_fatturazione ?? {}) as DatiFatturazione;
 
   return (
     <form action={azione} className="space-y-4">
@@ -123,10 +137,50 @@ export default function ClienteForm({ cliente }: { cliente?: ClienteRow }) {
         </div>
       </Card>
 
-      {/* 4 · Privacy e note */}
+      {/* 4 · Sconti e fatturazione (M1 §2 e §4) */}
       <Card className="space-y-4">
         <p className="text-xs font-semibold uppercase tracking-wide text-faint">
-          Privacy e note
+          Sconti e fatturazione
+        </p>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field
+            label="Assicurazione"
+            hint="Vuoto = da rilevare. «NESSUNA» vuol dire chiesto: non ne ha."
+            className="sm:col-span-2"
+          >
+            <select
+              name="assicurazione_id"
+              className={inputCls}
+              defaultValue={cliente?.assicurazione_id ?? ""}
+            >
+              <option value="">— da rilevare</option>
+              {assicurazioni.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.nome}
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field
+            label="Ragione sociale"
+            hint="Solo se la fattura va intestata a un'azienda."
+            className="sm:col-span-2"
+          >
+            <input name="ragione_sociale" className={inputCls} defaultValue={fatt.ragione_sociale ?? ""} placeholder="Bianchi SRL" />
+          </Field>
+          <Field label="CF / P.IVA azienda">
+            <input name="piva_azienda" className={`${inputCls} f-mono uppercase`} maxLength={16} defaultValue={fatt.cf_piva ?? ""} placeholder="12345678901" />
+          </Field>
+          <Field label="Codice SDI" hint="Sette caratteri per la fattura elettronica.">
+            <input name="codice_sdi" className={`${inputCls} f-mono uppercase`} maxLength={7} defaultValue={fatt.codice_sdi ?? ""} placeholder="ABCDEFG" />
+          </Field>
+        </div>
+      </Card>
+
+      {/* 5 · Provenienza e note */}
+      <Card className="space-y-4">
+        <p className="text-xs font-semibold uppercase tracking-wide text-faint">
+          Provenienza e note
         </p>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Fonte" hint="Da dove arriva il cliente — alimenta il ROI.">
@@ -153,20 +207,14 @@ export default function ClienteForm({ cliente }: { cliente?: ClienteRow }) {
           <Field label="Lingua" hint="Vuoto = italiano.">
             <input name="lingua" className={inputCls} defaultValue={cliente?.lingua ?? ""} placeholder="Italiano" />
           </Field>
-          <label className="flex items-start gap-3 self-end rounded-xl border border-linea bg-carta px-3.5 py-3 sm:col-span-2">
-            <input
-              type="checkbox"
-              name="consenso_marketing"
-              defaultChecked={cliente?.consenso_marketing ?? false}
-              className="mt-0.5 h-4 w-4 accent-[#A67C42]"
-            />
-            <span className="text-sm text-inchiostro">
-              Consenso marketing
-              <span className="block text-xs text-faint">
-                Necessario per richiami e promozioni (modulo Recall).
-              </span>
-            </span>
-          </label>
+          {/* Il consenso marketing NON si spunta più qui: è la proiezione
+              dell'ultimo evento del mastro (contratto C3) e si raccoglie o si
+              revoca dalla sezione «Permessi» della scheda cliente. */}
+          <p className="self-end rounded-xl border border-linea bg-carta px-3.5 py-3 text-xs text-faint sm:col-span-2">
+            Il consenso alle comunicazioni si raccoglie e si revoca dalla scheda
+            del cliente, sezione <strong className="text-soft">Permessi</strong>:
+            lì resta scritto quando è stato dato, come e per quali canali.
+          </p>
         </div>
         <Field label="Note">
           <textarea name="note" rows={3} className={inputCls} defaultValue={cliente?.note ?? ""} placeholder="Preferenze, sensibilità, cose da ricordare al banco…" />

@@ -47,6 +47,12 @@ fermarsi e segnalare):**
   05/08) · **telefono_grezzo → NULL** (l'anonimo ESCE dalla dedup: il
   NULL non partecipa all'indice unico; se il vincolo è NOT NULL, la
   migrazione lo ALLENTA — modifica di vincolo, lecita, non è un drop).
+  **Ratifica 05/08 (checkpoint B1)**: sul DB reale `telefono_normalizzato`
+  è colonna GENERATA e `normalizza(NULL)` = '' → il solo NULL non
+  bastava (il secondo anonimo collideva col primo). Chiuso con
+  **unicità PARZIALE** — l'indice morde solo sui telefoni veri —
+  dentro la modifica-di-vincolo già sancita qui sopra. La dedup dei
+  numeri reali resta identica. (Misurato, non supposto: è il metodo.)
 - `ordini_occhiali` / `ordini_lac`: SI CONSERVANO (fatti + istantanee
   Rx) · note → NULL · canale_contatto → NULL (è un recapito).
 - `beni_in_custodia`: si conserva; descrizione resta (è dell'oggetto).
