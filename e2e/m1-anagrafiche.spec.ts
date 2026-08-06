@@ -379,11 +379,17 @@ test.describe("M1 · Anagrafiche & Privacy (§8 · S1-S6)", () => {
     await cerca.fill(`DaAnonimizzare ${id}`);
     await cerca.press("Enter");
     await page.waitForURL(/\/clienti\?q=/);
-    await expect(page.getByText(`DaAnonimizzare ${id}`)).toHaveCount(0);
+    // ⚠️ Si asserisce sulla RIGA del cliente, non sul testo nella pagina: lo
+    // stato vuoto CITA quello che hai cercato («Nessun cliente corrisponde a
+    // "DaAnonimizzare …"»), quindi un `getByText(nome).toHaveCount(0)` sarebbe
+    // rosso proprio nella schermata che dice che il cliente non c'è. Ci è
+    // cascato il primo giro di CI in cui questo E2E ha girato davvero.
+    await expect(page.locator(`a[href="/clienti/${clienteId}"]`)).toHaveCount(0);
+    await expect(page.getByText("Nessun risultato")).toBeVisible();
     // …né cercandola per il nome NUOVO: l'anonimizzato esce dal registro, che è
     // ciò che la 021 scrive sulla colonna («esclude da ricerche, code, letture»).
     await page.goto("/clienti?q=Anonimizzato");
-    await expect(page.getByText(/Anonimizzato-/)).toHaveCount(0);
+    await expect(page.locator(`a[href="/clienti/${clienteId}"]`)).toHaveCount(0);
 
     // …ma il FATTO è intatto: numero e importi della busta si leggono ancora.
     await page.goto(urlBusta);
