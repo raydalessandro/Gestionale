@@ -82,7 +82,7 @@ export default async function ClientePage({
       // B1 · il mastro dei consensi (C3): FATTI in ordine di accadimento.
       supabase
         .from("consensi")
-        .select("id, tipo, azione, canali, modalita, avvenuto_il")
+        .select("id, tipo, azione, canali, modalita, versione_informativa, avvenuto_il")
         .eq("cliente_id", id)
         .order("avvenuto_il", { ascending: false }),
       // B1 · le relazioni (C4): UNA riga a DB, letta nei due versi con DUE

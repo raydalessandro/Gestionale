@@ -68,6 +68,14 @@ export interface RigaConsenso {
   azione: string;
   canali: string[] | null;
   modalita: string | null;
+  /**
+   * M1 §5 vuole il mastro leggibile come «dato il 12/03, penna, informativa v2».
+   * La colonna c'è e qui si mostra quando è valorizzata, ma **nessuna schermata
+   * la scrive ancora**: da dove venga la versione corrente dell'informativa (un
+   * parametro di negozio? una costante di prodotto?) la spec non lo dice, e non
+   * è una cosa da decidere da soli. Punto aperto segnalato nella PR.
+   */
+  versione_informativa: string | null;
   avvenuto_il: string;
 }
 
@@ -279,6 +287,7 @@ function MastroConsensi({
               {new Date(c.avvenuto_il).toLocaleDateString("it-IT", { timeZone: "Europe/Rome" })}
               {c.modalita ? ` · ${c.modalita}` : ""}
               {c.canali?.length ? ` · ${c.canali.join(", ")}` : ""}
+              {c.versione_informativa ? ` · informativa ${c.versione_informativa}` : ""}
             </li>
           ))}
         </ul>
