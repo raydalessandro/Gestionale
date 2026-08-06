@@ -59,9 +59,23 @@ export default function ClienteForm({
           <Field label="Codice fiscale" hint="Servirà per Tessera Sanitaria e fatturazione.">
             <input name="codice_fiscale" className={`${inputCls} f-mono uppercase`} maxLength={16} defaultValue={cliente?.codice_fiscale ?? ""} placeholder="BNCLRA85M50F205Z" />
           </Field>
-          <Field label="Tutore legale" hint="Se il cliente è minorenne." className="sm:col-span-2">
-            <input name="tutore_legale" className={inputCls} defaultValue={cliente?.tutore_legale ?? ""} placeholder="Nome e cognome del genitore / tutore" />
-          </Field>
+          {/* Tutore legale · SOLA LETTURA (M1 §10, Annot. 3 — decisione della
+              PR #35). Il campo di testo è deprecato: scriveva un nome su un
+              segnalino, mentre la tutela vera è una RELAZIONE (C4), che si
+              legge dai due lati e sopravvive alle correzioni. Resta a DB (§7
+              vieta i drop) e si mostra come STORICO solo se popolato; il
+              travaso verso le relazioni vere è assistito, post-C0 (TODO-regia).
+              Non è un input: se lo fosse, riscriverebbe il campo a ogni
+              salvataggio della scheda. */}
+          {cliente?.tutore_legale && (
+            <Field
+              label="Tutore legale (storico)"
+              hint="Campo vecchio, in sola lettura. La tutela si registra in «Famiglia e tutela», nella scheda."
+              className="sm:col-span-2"
+            >
+              <p className="text-sm text-faint">{cliente.tutore_legale}</p>
+            </Field>
+          )}
         </div>
       </Card>
 

@@ -2003,6 +2003,28 @@ describe("L4q · contratto UI ↔ E2E di M1 (B1)", () => {
     ).toEqual([PERMESSI]);
   });
 
+  it("G29g · `tutore_legale` è STORICO in sola lettura, e nessuno lo riscrive (M1 Annot. 3)", () => {
+    const colpevoli: string[] = [];
+    for (const f of [...sorgenti("app"), ...sorgenti("components")]) {
+      const src = readFileSync(f, "utf8");
+      // Un campo di form chiamato come la colonna: è il modo in cui il testo
+      // deprecato tornerebbe scrivibile, accanto alla relazione vera di C4.
+      if (/name=["']tutore_legale["']/.test(src)) colpevoli.push(rel(f));
+    }
+    expect(
+      colpevoli,
+      `la tutela si registra come RELAZIONE (C4); il testo resta storico. Campi di form in: ${colpevoli.join(", ")}`
+    ).toEqual([]);
+    // E il gemello lato azione: finché il form non manda più il campo, lasciarlo
+    // nella mappa del payload non è «innocuo» — è una CANCELLAZIONE silenziosa
+    // dello storico a ogni salvataggio della scheda.
+    const azioni = leggi("lib/actions.ts");
+    expect(
+      /tutore_legale:\s*str\(fd,\s*["']tutore_legale["']\)/.test(azioni),
+      "aggiornaCliente non deve più leggere `tutore_legale` dal form: lo azzererebbe a ogni salvataggio"
+    ).toBe(false);
+  });
+
   it("G29f · la riga «Assicurazione: …» si stampa SEMPRE («da rilevare» è uno stato)", () => {
     // M1 §2 ha TRE stati, non due: `null` = da rilevare · voce NESSUNA =
     // chiesto, non ne ha · altra voce = quella. Fino al 06/08 il blocco era

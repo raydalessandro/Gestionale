@@ -18,10 +18,12 @@ scheda è divisa in riquadri; solo **Nome** e **Cognome** sono obbligatori (li
 vedi segnati con l'asterisco), tutto il resto lo aggiungi quando ce l'hai.
 
 1. **Identità** — **Nome**, **Secondo nome**, **Cognome**, **Data di nascita**,
-   **Sesso**, **Codice fiscale** (torna utile per Tessera Sanitaria e
-   fatturazione) e **Tutore legale** (qui scrivi solo il nome di chi risponde
-   per un minorenne; per legare davvero due schede usa **"Famiglia e tutela"**,
-   più sotto).
+   **Sesso** e **Codice fiscale** (torna utile per Tessera Sanitaria e
+   fatturazione). Per chi risponde di un minorenne non c'è più un campo da
+   scrivere qui: si usa **"Famiglia e tutela"**, più sotto, che lega davvero
+   le due schede. Se su una scheda vecchia c'era già un nome scritto a mano,
+   lo vedi comparire come **"Tutore legale (storico)"** — è lì solo da
+   leggere, non si cancella e non si corregge da qui.
 2. **Recapiti** — **Cellulare**, **Email**, **Tel. casa**, **Tel. lavoro**, il
    **Canale preferito** (Telefono, WhatsApp, SMS, Email, Cartaceo: da dove
    partire quando lo richiami) e la spunta **"Non contattare per promozioni"**
@@ -208,9 +210,11 @@ Questa operazione la può fare solo il titolare o il responsabile.
 - **Gli avvisi di servizio partono sempre.** Anche senza consenso, e anche dopo
   una revoca, puoi dire al cliente che il suo occhiale è pronto: è un avviso
   operativo, non pubblicità.
-- **Il campo "Tutore legale" e il collegamento sono due cose diverse.** Il
-  campo dell'Identità scrive solo un nome sul segnalino. Il collegamento di
-  **"Famiglia e tutela"** lega davvero due schede e si legge dai due lati.
+- **La tutela si registra in "Famiglia e tutela", non a mano.** Il vecchio
+  campo di testo dell'Identità scriveva solo un nome sul segnalino: non
+  esiste più da compilare, e dove c'era resta in sola lettura come
+  **"Tutore legale (storico)"**. Il collegamento di **"Famiglia e tutela"**
+  lega davvero due schede e si legge dai due lati.
 - **Il cliente anonimizzato esce dall'elenco.** Non lo trovi più cercandolo
   in Clienti, e non compare più in nessuna proposta di richiamo. Le sue
   vendite e i suoi ordini invece restano dove sono, coi numeri e gli importi

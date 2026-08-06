@@ -267,11 +267,13 @@ L'aver avvisato il cliente non è uno stato: è un'annotazione a parte.
 **Tipo di lavoro (busta).** Come lavori l'occhiale: occhiale completo, solo
 lenti, solo montatura, montatura del cliente.
 
-**Tutore legale.** Chi risponde per un cliente minorenne o tutelato. Due strade,
-diverse: il campo **Tutore legale** nell'Identità scrive solo un nome (in
-scheda compare il segnalino "Tutore: <nome>"); il collegamento **Tutore legale**
-in "Famiglia e tutela" lega davvero due schede — anche quella di un ente — e si
-legge dai due lati.
+**Tutore legale.** Chi risponde per un cliente minorenne o tutelato. Si
+registra in un modo solo: il collegamento **Tutore legale** in "Famiglia e
+tutela", che lega davvero due schede — anche quella di un ente — e si legge dai
+due lati. C'era anche un campo di testo nell'Identità, che scriveva solo un
+nome: non si compila più. Dove qualcuno l'aveva riempito, il nome resta
+visibile come **"Tutore legale (storico)"** e in scheda compare ancora il
+segnalino "Tutore: <nome>" — da leggere, non da correggere.
 
 **Vendita.** L'incasso registrato in cassa, con un numero suo (`VE-…`). È
 sempre per l'intero valore; i pagamenti (uno o più metodi) devono farne la

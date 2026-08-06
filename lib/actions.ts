@@ -102,7 +102,6 @@ function clienteDaForm(fd: FormData) {
     data_nascita: str(fd, "data_nascita"),
     sesso: (str(fd, "sesso") as "M" | "F" | null) ?? null,
     codice_fiscale: str(fd, "codice_fiscale")?.toUpperCase() ?? null,
-    tutore_legale: str(fd, "tutore_legale"),
     email: str(fd, "email"),
     telefono: str(fd, "telefono"),
     telefono_casa: str(fd, "telefono_casa"),
@@ -127,6 +126,13 @@ function clienteDaForm(fd: FormData) {
   // dell'ultimo evento del mastro e il contratto C3 vieta di scriverla
   // direttamente («la cache non si scrive MAI direttamente, solo l'azione del
   // mastro»). Si raccoglie e si revoca dalla sezione Permessi della scheda.
+  //
+  // NB · `tutore_legale` NON sta qui, e la ragione è la stessa in forma diversa
+  // (M1 §10, Annot. 3): il campo è deprecato e la scheda lo mostra in SOLA
+  // LETTURA come storico. Se restasse in questa mappa, il form non lo
+  // manderebbe più e `str()` tornerebbe null: ogni salvataggio della scheda
+  // CANCELLEREBBE lo storico, in silenzio. Il valore si tocca solo col travaso
+  // assistito verso le relazioni vere (post-C0, TODO-regia).
 }
 
 export async function creaCliente(
