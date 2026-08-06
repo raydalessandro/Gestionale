@@ -1,46 +1,57 @@
 import { test, expect } from "@playwright/test";
-import { registraTenant, creaCliente, unico } from "./_helpers";
+import { registraTenant, creaCliente, rigaMarketing, unico } from "./_helpers";
 
 /**
  * L3 · E2E — Fase 4d · Consensi (audit A6).
- * Collaudo S1: un cliente nuovo senza consensi mostra il banner persistente;
- * registrando i consensi (data retrodatabile, come da carta) il banner si
- * svuota una riga alla volta e la scheda mostra le date.
+ * Collaudo S1: un cliente nuovo senza consenso mostra il banner persistente;
+ * registrandolo (data retrodatabile, come da carta) il banner sparisce e la
+ * scheda mostra la data.
  *
- * Selettori: solo testo/etichetta reali del banner (getByText/getByLabel/
- * getByRole), nessun CSS/data-testid. Tenant usa-e-getta per run.
+ * ⚠️ RISCRITTO alla consegna B1. Il banner della 4d chiedeva DUE consensi
+ * (marketing + sanitario) con due spunte booleane. Il contratto C3 ha portato
+ * via il marketing: `consenso_marketing` è la CACHE dell'ultimo evento del
+ * mastro e «la cache non si scrive MAI direttamente». Oggi
+ * `components/ConsensiCliente.tsx` chiede SOLO i dati sanitari (bottoni
+ * «Consenso sanitario» e «Salva il consenso sanitario») e il marketing si
+ * raccoglie dalla sezione «Permessi» (collaudata da `m1-anagrafiche.spec.ts`
+ * S2/S3). Il pezzo di S1 che sopravvive è quello sanitario — ed è anche il più
+ * importante, perché è il gate delle prescrizioni.
+ *
+ * Selettori: solo testo/etichetta/ruolo reali del banner, nessun CSS/data-testid.
+ * Tenant usa-e-getta per run.
  */
 test.describe("Fase 4d · Consensi", () => {
-  test("S1 · il banner elenca i consensi mancanti e si svuota registrandoli", async ({ page }) => {
+  test("S1 · il banner chiede il consenso sanitario e si svuota registrandolo", async ({ page }) => {
     await registraTenant(page);
-    // Cliente nuovo SENZA consenso marketing → mancano entrambi (il sanitario
-    // nasce sempre vuoto: si raccoglie alla prima prescrizione).
     await creaCliente(page, { nome: "Nuovo", cognome: `SenzaConsensi ${unico()}` });
 
-    // Banner presente con entrambe le voci mancanti.
-    await expect(page.getByText("Consenso marketing: non raccolto")).toBeVisible();
+    // Il banner c'è, e chiede UNA cosa sola: i dati sanitari.
     await expect(page.getByText("Consenso dati sanitari: non raccolto")).toBeVisible();
+    // Il marketing NON passa più di qui (C3): niente spunta nel banner.
+    await expect(page.getByRole("checkbox", { name: /marketing/i })).toHaveCount(0);
+    // Lo stato del marketing si legge dov'è la sua verità, in «Permessi».
+    await expect(rigaMarketing(page)).toHaveText(/^Marketing:\s*non raccolto$/);
 
-    // Apro il dialogo e registro il MARKETING con data di ieri (raccolto su carta).
-    await page.getByRole("button", { name: "Registra consensi" }).click();
-    const ieri = new Date(Date.now() - 24 * 3600_000).toISOString().slice(0, 10);
-    await page.getByLabel(/^Consenso marketing/).check();
-    await page.getByLabel("data consenso marketing").fill(ieri);
-    await page.getByRole("button", { name: "Salva consensi" }).click();
+    // Apro il dialogo e registro il sanitario con data di IERI (raccolto su carta).
+    await page.getByRole("button", { name: "Consenso sanitario" }).click();
+    const ieri = new Date(Date.now() - 24 * 3600_000);
+    const ieriIso = ieri.toISOString().slice(0, 10);
+    await page.getByRole("checkbox", { name: /Consenso dati sanitari/ }).check();
+    await page.getByLabel("data consenso sanitario").fill(ieriIso);
+    await page.getByRole("button", { name: "Salva il consenso sanitario" }).click();
 
-    // Dopo il salvataggio (revalidate) la riga marketing sparisce, resta il sanitario.
-    // Questo È il collaudo S1: il banner ora elenca solo il consenso sanitario.
-    await expect(page.getByText("Consenso marketing: non raccolto")).toHaveCount(0);
-    await expect(page.getByText("Consenso dati sanitari: non raccolto")).toBeVisible();
-
-    // Il dialogo resta aperto (stato client): registro anche il SANITARIO senza
-    // riaprirlo → il banner sparisce del tutto.
-    await page.getByLabel(/^Consenso dati sanitari/).check();
-    await page.getByRole("button", { name: "Salva consensi" }).click();
-
+    // Dopo il salvataggio (revalidate) il banner sparisce del tutto…
     await expect(page.getByText("Consenso dati sanitari: non raccolto")).toHaveCount(0);
-    // La sezione privacy della scheda ora dichiara i consensi come raccolti.
-    await expect(page.getByText(/Marketing:\s*sì/i)).toBeVisible();
-    await expect(page.getByText(/Dati sanitari:\s*sì/i)).toBeVisible();
+    // …e la card Privacy dichiara il consenso con la data RETRODATATA. La data
+    // si ricostruisce come fa il server (mezzogiorno della data scelta), non da
+    // `Date.now()`: così un run a cavallo della mezzanotte non sposta il giorno.
+    const atteso = new Intl.DateTimeFormat("it-IT", { dateStyle: "medium" }).format(
+      new Date(`${ieriIso}T12:00:00`)
+    );
+    await expect(page.getByText(/^Dati sanitari:/)).toContainText(`sì, dal ${atteso}`);
+
+    // Prova di separazione (C3): il flusso sanitario non ha toccato la cache
+    // marketing — che infatti è ancora «non raccolto», non «no».
+    await expect(rigaMarketing(page)).toHaveText(/^Marketing:\s*non raccolto$/);
   });
 });

@@ -1495,15 +1495,18 @@ describe.skipIf(!existsSync(join(ROOT, M021)))("L4p · guardie B1 fondamenta (02
 
   it("G22 · le colonne-cache dei consensi si scrivono SOLO dai punti noti (ratchet)", () => {
     // RATCHET DOCUMENTATO (vedi report-test.md §B1 · «ganci richiesti»).
-    // Oggi la cache marketing è ancora scritta a mano da TRE punti legacy della
-    // Fase 4b/4d, che C3 vieta: `clienteDaForm` (la spunta del form cliente, che
-    // su «aggiorna» può SPEGNERE il consenso senza nessun evento nel mastro),
-    // `registraConsensi` (il banner booleano) e `creaPrescrizione` (la cache
-    // sanitaria, che per C3 non dovrebbe nemmeno esistere: «per dati_sanitari
-    // NESSUNA cache»). Non è compito dei test rimuoverli: è compito di questa
-    // guardia impedire che ne nasca un QUARTO mentre si aspetta la migrazione
-    // del flusso sul mastro.
-    const NOTI = ["clienteDaForm", "registraConsensi", "creaPrescrizione"];
+    // Il ratchet ha STRETTO di un dente: `clienteDaForm` non scrive più la cache
+    // marketing (la spunta «Consenso marketing» è uscita da `ClienteForm` con la
+    // UI minima B1), quindi esce dall'elenco e rientrarci sarebbe rosso — era il
+    // punto peggiore dei tre, perché su «aggiorna» poteva SPEGNERE il consenso
+    // senza nessun evento nel mastro.
+    // Restano due punti legacy della Fase 4d, che C3 vieta: `registraConsensi`
+    // (il banner, ormai solo sanitario) e `creaPrescrizione` (la cache sanitaria,
+    // che per C3 non dovrebbe nemmeno esistere: «per dati_sanitari NESSUNA
+    // cache, si legge dal mastro per prescrizione»). Non è compito dei test
+    // rimuoverli: è compito di questa guardia impedire che ne nasca un TERZO
+    // mentre si aspetta la migrazione del flusso sanitario sul mastro.
+    const NOTI = ["registraConsensi", "creaPrescrizione"];
     const CACHE = /\b(consenso_marketing|consenso_canali|data_consenso|consenso_dati_sanitari|consenso_sanitario_il)\s*[:=]/;
 
     const src = leggi("lib/actions.ts");
@@ -1803,5 +1806,136 @@ describe.skipIf(!existsSync(join(ROOT, M021)))("L4p · guardie B1 fondamenta (02
     ).toEqual(["clienti_relazioni"]);
     // I `drop policy if exists` / `drop trigger if exists` / `drop constraint` di
     // ricreazione sono leciti (modifiche di vincolo, non perdita di dati).
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * L4q · IL CONTRATTO UI ↔ E2E DI M1 (consegna B1, secondo giro)
+ *
+ * Da quando la «UI minima» del §4 è agganciata, gli E2E di
+ * `e2e/m1-anagrafiche.spec.ts` non sono più la lettura della spec: sono un
+ * CONTRATTO con etichette e ruoli veri. Quel contratto però si rompe solo in
+ * CI, dentro il job `contratto-e2e`, che gira con i segreti e ci mette minuti.
+ * Queste guardie lo controllano nel job `build`, in millisecondi, e dicono a
+ * chi ha rinominato un'etichetta CHE COSA ha rotto.
+ *
+ * Trade-off dichiarato (report §B1): sono guardie di TESTO. Un rinomino
+ * legittimo («Registra consenso» → «Raccogli consenso») le fa diventare rosse
+ * anche se il prodotto è migliore. È voluto: quel rinomino deve passare per
+ * l'E2E e per la spec, non avvenire di soppiatto. La riparazione è di una
+ * riga qui + una riga nello spec — e il messaggio d'errore lo dice.
+ * ════════════════════════════════════════════════════════════════════════ */
+describe("L4q · contratto UI ↔ E2E di M1 (B1)", () => {
+  const PERMESSI = "components/PermessiCliente.tsx";
+  const FORM = "components/ClienteForm.tsx";
+  const SCHEDA = "app/(app)/clienti/[id]/page.tsx";
+
+  it("G29 · la scheda cliente monta la sezione «Permessi» (senza, cinque E2E muoiono)", () => {
+    expect(existsSync(join(ROOT, PERMESSI)), `manca ${PERMESSI}`).toBe(true);
+    const scheda = leggi(SCHEDA);
+    expect(
+      /import\s*\{[^}]*PermessiCliente[^}]*\}\s*from\s*["']@\/components\/PermessiCliente["']/.test(scheda),
+      "la scheda cliente deve importare PermessiCliente"
+    ).toBe(true);
+    expect(/<PermessiCliente\b/.test(scheda), "…e renderizzarlo").toBe(true);
+  });
+
+  it("G29b · le etichette su cui poggiano gli E2E M1 esistono nel sorgente", () => {
+    // Nome → file che deve contenerlo. Sono esattamente le stringhe usate dai
+    // `getByRole`/`getByLabel` di e2e/m1-anagrafiche.spec.ts e di _helpers.ts.
+    const ATTESE: [string, string][] = [
+      // S2/S3 · il mastro dei consensi (C3)
+      ["Registra consenso", PERMESSI],
+      ["Salva consenso", PERMESSI],
+      ["Revoca comunicazioni", PERMESSI],
+      ["Conferma revoca", PERMESSI],
+      ["Modalità", PERMESSI],
+      // S4 · relazioni (C4)
+      ["Aggiungi relazione", PERMESSI],
+      ["Persona collegata", PERMESSI],
+      ["Tipo di relazione", PERMESSI],
+      ["Collega", PERMESSI],
+      // S6 · eliminazione definitiva (C1)
+      ["Eliminazione definitiva", PERMESSI],
+      ["Scrivi ELIMINA per confermare", PERMESSI],
+      ["Anonimizza definitivamente", PERMESSI],
+      // S1/S5 · sconti e fatturazione (M1 §2 e §4)
+      ["Assicurazione", FORM],
+      ["Ragione sociale", FORM],
+      ["CF / P.IVA azienda", FORM],
+      ["Codice SDI", FORM],
+      ["Scala / appartamento", FORM],
+      ["Secondo nome", FORM],
+    ];
+    const mancanti: string[] = [];
+    for (const [testo, file] of ATTESE) {
+      if (!leggi(file).includes(testo)) mancanti.push(`«${testo}» in ${file}`);
+    }
+    expect(
+      mancanti,
+      `etichette rinominate senza aggiornare e2e/m1-anagrafiche.spec.ts: ${mancanti.join(" · ")}`
+    ).toEqual([]);
+  });
+
+  it("G29c · i tre canali del consenso sono {Email, Cellulare, Cartaceo}, come il CHECK a DB", () => {
+    // Il perimetro dei canali è sigillato a DB (G23). Se la UI ne offrisse un
+    // quarto, l'insert fallirebbe al banco e l'E2E S2 pescherebbe un'etichetta
+    // che non c'è: meglio scoprirlo qui.
+    const src = leggi(PERMESSI);
+    const blocco = src.slice(src.indexOf("const CANALI"), src.indexOf("] as const", src.indexOf("const CANALI")));
+    const ids = Array.from(blocco.matchAll(/id:\s*"([a-z]+)"/g)).map((m) => m[1]);
+    expect(ids.sort()).toEqual(["cartaceo", "cellulare", "email"]);
+    for (const label of ["Email", "Cellulare", "Cartaceo"]) {
+      expect(blocco.includes(`label: "${label}"`), `manca l'etichetta ${label}`).toBe(true);
+    }
+  });
+
+  it("G29d · UNA sola riga «Marketing: …» in tutta la UI (C3: una cache, un posto)", () => {
+    // È insieme un invariante di prodotto e la condizione perché l'E2E possa
+    // asserire senza ambiguità (strict mode): se due componenti stampassero
+    // «Marketing: …», il locatore ne troverebbe due e S2/S3 morirebbero con un
+    // errore che non spiega niente.
+    const stampano = [...sorgenti("app"), ...sorgenti("components")].filter((f) =>
+      /Marketing:/.test(readFileSync(f, "utf8"))
+    );
+    expect(
+      stampano.map(rel),
+      `la riga «Marketing: …» deve stare in un posto solo (la sezione Permessi): ${stampano.map(rel).join(", ")}`
+    ).toEqual([PERMESSI]);
+  });
+
+  it("G29f · la riga «Assicurazione: …» si stampa SEMPRE («da rilevare» è uno stato)", () => {
+    // M1 §2 ha TRE stati, non due: `null` = da rilevare · voce NESSUNA =
+    // chiesto, non ne ha · altra voce = quella. Fino al 06/08 il blocco era
+    // dietro `{(assicurazione || fatt) && …}`, quindi il primo stato era
+    // INVISIBILE e l'E2E S5 (1/2) poteva solo constatare l'assenza della riga.
+    // Ora la riga c'è sempre e lo scenario asserisce i tre stati in positivo:
+    // questa guardia impedisce che la condizione torni e lo renda di nuovo muto.
+    const src = leggi(SCHEDA);
+    expect(
+      src.includes('"da rilevare"'),
+      "la scheda deve stampare «da rilevare» quando assicurazione_id è null"
+    ).toBe(true);
+    expect(
+      /\(\s*assicurazione\s*\|\|\s*fatt\s*\)/.test(src),
+      "RATCHET: la riga assicurazione non torna dietro una condizione (M1 §2, tre stati visibili)"
+    ).toBe(false);
+  });
+
+  it("G29e · il consenso marketing NON è più un campo di form (C3: la cache non si spunta)", () => {
+    const colpevoli: string[] = [];
+    for (const f of [...sorgenti("app"), ...sorgenti("components")]) {
+      const src = readFileSync(f, "utf8");
+      // Un input/checkbox chiamato come la colonna-cache: è il modo esatto in
+      // cui il consenso rientrerebbe dalla finestra (e in cui `aggiornaCliente`
+      // tornerebbe a spegnerlo senza un evento nel mastro).
+      if (/name=["'](consenso_marketing|consenso_canali|data_consenso)["']/.test(src)) {
+        colpevoli.push(rel(f));
+      }
+    }
+    expect(
+      colpevoli,
+      `C3: il marketing si raccoglie SOLO dal mastro (registra_consenso). Campi di form in: ${colpevoli.join(", ")}`
+    ).toEqual([]);
   });
 });

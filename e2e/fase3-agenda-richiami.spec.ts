@@ -2,6 +2,8 @@ import { test, expect } from "@playwright/test";
 import {
   registraTenant,
   creaCliente,
+  dammiConsensoMarketing,
+  revocaConsensoMarketing,
   aziendaIdDaSlug,
   seedBustaProntaScaduta,
   seedLacConsegnato,
@@ -58,19 +60,21 @@ test.describe("Fase 3 · Agenda & Richiami", () => {
       nome: "Ivo",
       cognome: "Mari",
       telefono: "3337776666",
-      consensoMarketing: true,
     });
+    // B1 · il consenso si dà dal MASTRO (sezione «Permessi» della scheda, dove
+    // `creaCliente` ci lascia): la spunta nel form cliente non esiste più,
+    // perché C3 vieta di scrivere la cache direttamente.
+    await dammiConsensoMarketing(page, { canali: ["Email"], modalita: "penna" });
     await seedLacConsegnato(aziendaId, clienteId);
 
     // Con consenso: la proposta commerciale compare.
     await page.goto("/richiami");
     await expect(page.getByText("LAC in esaurimento").first()).toBeVisible();
 
-    // Tolgo il consenso marketing dalla scheda cliente.
-    await page.goto(`/clienti/${clienteId}/modifica`);
-    await page.getByLabel(/Consenso marketing/).uncheck();
-    await page.getByRole("button", { name: "Salva modifiche" }).click();
-    await page.waitForURL(new RegExp(`/clienti/${clienteId}$`));
+    // Tolgo il consenso dal TASTO revoca della scheda (C3: un evento nel
+    // mastro, non una spunta tolta a un booleano).
+    await page.goto(`/clienti/${clienteId}`);
+    await revocaConsensoMarketing(page);
 
     // Ora la proposta è nascosta e compare l'avviso "proposte commerciali nascoste".
     await page.goto("/richiami");
