@@ -443,3 +443,112 @@ revoke execute on function public.crea_oculista_al_volo(text,text,text) from pub
 grant  execute on function public.crea_oculista_al_volo(text,text,text) to authenticated;
 
 insert into public._infra_migrazioni (nome) values ('021_fondamenta') on conflict (nome) do nothing;
+
+-- ============================================================================
+-- 11 · C1 · ANONIMIZZAZIONE — «possibile, non comodissima» (M1 f1e.2)
+-- ----------------------------------------------------------------------------
+-- I FATTI aziendali restano integri e leggibili; sparisce la RICONOSCIBILITÀ
+-- della persona. Una sola transazione (per questo è una funzione).
+--
+-- ⚠️ MISURATO PRIMA DI SCRIVERE (verbalizzato in PR): la risposta C1(2) dice
+-- «telefono_grezzo → NULL, così l'anonimo esce dalla dedup perché un NULL non
+-- partecipa all'indice unico». Corretto in principio, MA qui il NULL non
+-- arriva all'indice: `telefono_normalizzato` è una colonna GENERATA e
+-- `normalizza_telefono(NULL)` restituisce **''** (stringa vuota), non NULL.
+-- Col vincolo unico sulla colonna generata, il SECONDO anonimizzato
+-- collidereb­be col primo su ''.
+-- Si ottiene l'intento con la modifica di vincolo che C1 stessa sancisce
+-- lecita: l'unicità diventa PARZIALE, «solo sui telefoni veri».
+-- ----------------------------------------------------------------------------
+alter table public.persone alter column telefono_grezzo drop not null;
+
+-- L'unicità dei telefoni VERI resta intatta; le righe anonime (normalizzato
+-- vuoto) non partecipano più — è esattamente «uscire dalla dedup».
+alter table public.persone drop constraint if exists persone_telefono_normalizzato_key;
+create unique index if not exists uq_persone_telefono_reale
+  on public.persone (telefono_normalizzato)
+  where telefono_normalizzato <> '';
+
+comment on column public.persone.telefono_grezzo is
+  'Chiave di dedup della persona. NULL solo dopo l''anonimizzazione (C1): la riga esce dalla dedup — l''unicità è parziale, «solo sui telefoni veri» (uq_persone_telefono_reale).';
+
+create or replace function public.anonimizza_cliente(p_cliente_id uuid)
+returns void
+language plpgsql security invoker set search_path = public, pg_catalog as $$
+declare
+  v_az uuid;
+begin
+  select azienda_id into v_az from public.clienti where id = p_cliente_id for update;
+  if v_az is null then raise exception 'CLIENTE_NON_TROVATO'; end if;
+
+  -- ── clienti: la mappa C1, campo per campo ────────────────────────────────
+  update public.clienti set
+    nome                    = 'Cliente',
+    cognome                 = 'Anonimizzato-' || left(id::text, 8),
+    secondo_nome            = null,
+    codice_fiscale          = null,
+    data_nascita            = null,
+    sesso                   = null,
+    email                   = null,
+    telefono                = null,
+    telefono_casa           = null,
+    telefono_lavoro         = null,
+    indirizzo               = null,
+    indirizzo2              = null,
+    cap                     = null,
+    citta                   = null,
+    provincia               = null,
+    nazione                 = null,
+    note                    = null,
+    dati_fatturazione       = null,
+    canale_preferito        = null,
+    assicurazione_id        = null,
+    azienda_convenzionata_id = null,
+    tutore_legale           = null,   -- testo legacy: identifica un TERZO per nome
+    lingua                  = null,
+    tags                    = '{}',
+    non_contattare          = true,   -- i flag operativi si spengono in senso RESTRITTIVO
+    consenso_marketing      = false,  -- cache spente
+    consenso_canali         = null,
+    data_consenso           = null,
+    consenso_dati_sanitari  = null,
+    consenso_sanitario_il   = null,
+    -- `fonte` RESTA: statistica aziendale, non identifica (C1, 05/08)
+    anonimizzato_il         = now(),
+    updated_at              = now()
+  where id = p_cliente_id;
+
+  -- ── consensi: le righe SI CONSERVANO (fatti storici su identità anonima) ──
+  update public.consensi set documento_ref = null where cliente_id = p_cliente_id;
+
+  -- ── relazioni: si CANCELLANO (de-anonimizzano per prossimità) ────────────
+  delete from public.clienti_relazioni
+   where cliente_id = p_cliente_id or relativo_id = p_cliente_id;
+
+  -- ── clinico e agenda: si conservano, i testi liberi no ───────────────────
+  update public.prescrizioni  set note = null where cliente_id = p_cliente_id;
+  update public.appuntamenti  set note = null where cliente_id = p_cliente_id;
+  update public.richiami      set note = null where cliente_id = p_cliente_id;
+  update public.prenotazioni  set note = null where cliente_id = p_cliente_id;
+
+  -- ── la persona del PORTALE collegata alle prenotazioni ───────────────────
+  update public.persone p set
+    email           = 'anon-' || p.id::text || '@invalid',
+    nome            = 'Anonimo',        -- il NOT NULL si rispetta, l'identità sparisce
+    telefono_grezzo = null,             -- esce dalla dedup (indice unico parziale)
+    updated_at      = now()
+  where p.id in (select pr.persona_id from public.prenotazioni pr where pr.cliente_id = p_cliente_id);
+
+  -- ── ordini: FATTI + istantanee Rx intatti, via i testi liberi ────────────
+  update public.ordini_occhiali set note = null where cliente_id = p_cliente_id;
+  update public.ordini_lac       set note = null where cliente_id = p_cliente_id;
+
+  -- ── vendite: fatti fiscali INTATTI, via il codice fiscale ────────────────
+  update public.vendite set cf_cliente = null where cliente_id = p_cliente_id;
+
+  -- movimenti_*, resi, chiusure_cassa, fermi: INTATTI per contratto.
+end $$;
+comment on function public.anonimizza_cliente(uuid) is
+  'C1: rende irriconoscibile la persona lasciando integri i FATTI aziendali (vendite, ordini, movimenti). Una sola transazione. Il permesso «anonimizzazione» lo verifica l''azione con richiedi() PRIMA di chiamarla.';
+revoke execute on function public.anonimizza_cliente(uuid) from public, anon;
+grant  execute on function public.anonimizza_cliente(uuid) to authenticated;

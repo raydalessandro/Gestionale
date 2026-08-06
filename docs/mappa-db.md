@@ -1,6 +1,6 @@
 # Mappa del database — generata, non scritta
 
-*Estratta il 2026-08-05 da un Postgres locale con schema + migrazioni fino a `021_fondamenta.sql`.*
+*Estratta il 2026-08-06 da un Postgres locale con schema + migrazioni fino a `021_fondamenta.sql`.*
 *Per rigenerarla: `bash scripts/db-locale.sh && python3 scripts/mappa-db.py`.*
 
 ## Le tabelle (35)
@@ -377,11 +377,11 @@
 - `avvisato_il` timestamp with time zone
 
   Vincoli:
-  - ✓ stato = ANY (ARRAY['da_ordinare'::text, 'ordinato'::text, 'arrivato'::text, 'consegnato'::text, 'annullato'::text])
   - ✓ fonte = ANY (ARRAY['banco'::text, 'app'::text, 'convenzione'::text, 'qr_vetrina'::text, 'sito_negozio'::text, 'portale'::text])
-  - → (prescrizione_id) → prescrizioni(id) ON DELETE SET NULL
+  - ✓ stato = ANY (ARRAY['da_ordinare'::text, 'ordinato'::text, 'arrivato'::text, 'consegnato'::text, 'annullato'::text])
   - → (azienda_id) → aziende(id) ON DELETE CASCADE
   - → (cliente_id) → clienti(id) ON DELETE SET NULL
+  - → (prescrizione_id) → prescrizioni(id) ON DELETE SET NULL
   - ⊙ UNIQUE (azienda_id, numero)
 
 ### ordini_occhiali
@@ -430,15 +430,15 @@
 - `garanzia_tipo` text
 
   Vincoli:
-  - ✓ fonte = ANY (ARRAY['banco'::text, 'app'::text, 'convenzione'::text, 'qr_vetrina'::text, 'sito_negozio'::text, 'portale'::text])
-  - ✓ stato = ANY (ARRAY['preventivo'::text, 'lavorazione'::text, 'arrivata'::text, 'pronta'::text, 'consegnata'::text, 'annullata'::text])
-  - ✓ garanzia_tipo = ANY (ARRAY['servizio'::text, 'polizza'::text])
   - ✓ lente_tipo = ANY (ARRAY['monofocale'::text, 'progressiva'::text, 'bifocale'::text, 'office'::text])
+  - ✓ garanzia_tipo = ANY (ARRAY['servizio'::text, 'polizza'::text])
   - ✓ tipo_lavoro = ANY (ARRAY['occhiale_completo'::text, 'solo_lenti'::text, 'solo_montatura'::text, 'montatura_cliente'::text])
+  - ✓ stato = ANY (ARRAY['preventivo'::text, 'lavorazione'::text, 'arrivata'::text, 'pronta'::text, 'consegnata'::text, 'annullata'::text])
+  - ✓ fonte = ANY (ARRAY['banco'::text, 'app'::text, 'convenzione'::text, 'qr_vetrina'::text, 'sito_negozio'::text, 'portale'::text])
   - → (ispezionata_da) → utenti(id) ON DELETE SET NULL
-  - → (azienda_id) → aziende(id) ON DELETE CASCADE
-  - → (cliente_id) → clienti(id) ON DELETE SET NULL
   - → (prescrizione_id) → prescrizioni(id) ON DELETE SET NULL
+  - → (cliente_id) → clienti(id) ON DELETE SET NULL
+  - → (azienda_id) → aziende(id) ON DELETE CASCADE
   - ⊙ UNIQUE (azienda_id, numero)
 
 ### parametri
@@ -454,7 +454,7 @@
 ### persone
 
 - `id` uuid **NOT NULL** · default uuid_generate_v4()
-- `telefono_grezzo` text **NOT NULL**
+- `telefono_grezzo` text
 - `telefono_normalizzato` text · default normalizza_telefono(telefono_grezzo)
 - `nome` text **NOT NULL**
 - `email` text
@@ -462,9 +462,8 @@
 - `ottico_di_riferimento` uuid
 - `created_at` timestamp with time zone **NOT NULL** · default now()
 - `updated_at` timestamp with time zone **NOT NULL** · default now()
-  - → (ottico_di_riferimento) → aziende(id) ON DELETE SET NULL
   - → (auth_user_id) → auth.users(id) ON DELETE SET NULL
-  - ⊙ UNIQUE (telefono_normalizzato)
+  - → (ottico_di_riferimento) → aziende(id) ON DELETE SET NULL
 
 ### persone_riferimento_registro
 
@@ -475,11 +474,11 @@
 - `prenotazione_id` uuid
 - `utente_id` uuid
 - `quando` timestamp with time zone **NOT NULL** · default now()
-  - → (a_azienda_id) → aziende(id) ON DELETE RESTRICT
-  - → (utente_id) → utenti(id) ON DELETE SET NULL
-  - → (prenotazione_id) → prenotazioni(id) ON DELETE SET NULL
-  - → (persona_id) → persone(id) ON DELETE RESTRICT
   - → (da_azienda_id) → aziende(id) ON DELETE SET NULL
+  - → (persona_id) → persone(id) ON DELETE RESTRICT
+  - → (a_azienda_id) → aziende(id) ON DELETE RESTRICT
+  - → (prenotazione_id) → prenotazioni(id) ON DELETE SET NULL
+  - → (utente_id) → utenti(id) ON DELETE SET NULL
 
 ### prenotazioni
 
@@ -506,13 +505,13 @@
 
   Vincoli:
   - ✓ fonte = ANY (ARRAY['banco'::text, 'app'::text, 'convenzione'::text, 'import'::text, 'qr_vetrina'::text, 'sito_negozio'::text, 'portale'::text])
-  - ✓ stato = ANY (ARRAY['in_attesa'::text, 'accettata'::text, 'rifiutata'::text, 'annullata'::text])
   - ✓ durata_minuti > 0
-  - → (servizio_codice) → servizi(codice) ON DELETE RESTRICT
+  - ✓ stato = ANY (ARRAY['in_attesa'::text, 'accettata'::text, 'rifiutata'::text, 'annullata'::text])
+  - → (appuntamento_id) → appuntamenti(id) ON DELETE SET NULL
+  - → (cliente_id) → clienti(id) ON DELETE SET NULL
   - → (azienda_id) → aziende(id) ON DELETE CASCADE
   - → (persona_id) → persone(id) ON DELETE RESTRICT
-  - → (cliente_id) → clienti(id) ON DELETE SET NULL
-  - → (appuntamento_id) → appuntamenti(id) ON DELETE SET NULL
+  - → (servizio_codice) → servizi(codice) ON DELETE RESTRICT
 
 ### prescrizioni
 
@@ -549,18 +548,18 @@
 - `os_dnp` numeric(4,1)
 
   Vincoli:
-  - ✓ os_prisma_base = ANY (ARRAY['alto'::text, 'basso'::text, 'nasale'::text, 'temporale'::text])
-  - ✓ od_prisma_base = ANY (ARRAY['alto'::text, 'basso'::text, 'nasale'::text, 'temporale'::text])
-  - ✓ (os_asse >= 0) AND (os_asse <= 180)
-  - ✓ (os_dnp IS NULL) OR ((os_dnp >= (20)::numeric) AND (os_dnp <= (45)::numeric))
-  - ✓ tipo = ANY (ARRAY['occhiali'::text, 'lac'::text])
   - ✓ (od_dnp IS NULL) OR ((od_dnp >= (20)::numeric) AND (od_dnp <= (45)::numeric))
-  - ✓ uso = ANY (ARRAY['lontano'::text, 'vicino'::text, 'progressivo'::text, 'bifocale'::text, 'office'::text])
   - ✓ origine = ANY (ARRAY['interna'::text, 'esterna'::text, 'lenti_precedenti'::text])
+  - ✓ os_prisma_base = ANY (ARRAY['alto'::text, 'basso'::text, 'nasale'::text, 'temporale'::text])
+  - ✓ (os_asse >= 0) AND (os_asse <= 180)
+  - ✓ od_prisma_base = ANY (ARRAY['alto'::text, 'basso'::text, 'nasale'::text, 'temporale'::text])
   - ✓ (od_asse >= 0) AND (od_asse <= 180)
+  - ✓ uso = ANY (ARRAY['lontano'::text, 'vicino'::text, 'progressivo'::text, 'bifocale'::text, 'office'::text])
+  - ✓ tipo = ANY (ARRAY['occhiali'::text, 'lac'::text])
+  - ✓ (os_dnp IS NULL) OR ((os_dnp >= (20)::numeric) AND (os_dnp <= (45)::numeric))
+  - → (cliente_id) → clienti(id) ON DELETE CASCADE
   - → (azienda_id) → aziende(id) ON DELETE CASCADE
   - → (utente_id) → utenti(id) ON DELETE SET NULL
-  - → (cliente_id) → clienti(id) ON DELETE CASCADE
 
 ### prodotti
 
@@ -731,6 +730,7 @@
 
 ## Le funzioni (RPC)
 
+- `anonimizza_cliente(p_cliente_id uuid)` → void
 - `applica_movimento_magazzino()` → trigger
 - `appuntamento_intervallo(inizio timestamp with time zone, durata_minuti integer)` → tstzrange
 - `assegna_sala_appuntamento()` → trigger · *security definer*
