@@ -434,23 +434,27 @@ function SceltaPersona({
         />
       </Field>
       {trovati.length > 0 && (
-        <ul role="listbox" className="divide-y divide-linea rounded-xl border border-linea bg-white">
+        // `role="option"` sta sull'elemento che si preme, non su un guscio che
+        // lo contiene: altrimenti l'opzione non è né focalizzabile né premibile
+        // da tastiera, e i lettori di schermo annunciano due cose diverse.
+        <div role="listbox" className="divide-y divide-linea rounded-xl border border-linea bg-white">
           {trovati.map((c) => (
-            <li key={c.id} role="option" aria-selected={false}>
-              <button
-                type="button"
-                className="w-full px-3 py-2 text-left text-sm text-inchiostro hover:bg-carta"
-                onClick={() => {
-                  onScegli(c.id);
-                  setQ(`${c.nome} ${c.cognome}`);
-                  setAperta(false);
-                }}
-              >
-                {c.nome} {c.cognome}
-              </button>
-            </li>
+            <button
+              key={c.id}
+              type="button"
+              role="option"
+              aria-selected={false}
+              className="block w-full px-3 py-2 text-left text-sm text-inchiostro hover:bg-carta"
+              onClick={() => {
+                onScegli(c.id);
+                setQ(`${c.nome} ${c.cognome}`);
+                setAperta(false);
+              }}
+            >
+              {c.nome} {c.cognome}
+            </button>
           ))}
-        </ul>
+        </div>
       )}
     </div>
   );

@@ -258,21 +258,21 @@ export default async function ClientePage({
             </p>
           )}
 
-          {(assicurazione || fatt) && (
-            <div className="mt-3 space-y-1 border-t border-linea pt-3">
+          {/* «Da rilevare» è uno STATO, non un vuoto (M1 §2): si vede sempre,
+              altrimenti non si distingue da «gliel'ho chiesto, non ne ha». */}
+          <div className="mt-3 space-y-1 border-t border-linea pt-3">
+            <p className="text-sm text-soft">
+              Assicurazione: {assicurazione?.nome ?? "da rilevare"}
+            </p>
+            {fatt && (
               <p className="text-sm text-soft">
-                Assicurazione: {assicurazione?.nome ?? "da rilevare"}
+                Fattura a{" "}
+                <span className="text-inchiostro">{fatt.ragione_sociale ?? "—"}</span>
+                {fatt.cf_piva ? ` · ${fatt.cf_piva}` : ""}
+                {fatt.codice_sdi ? ` · SDI ${fatt.codice_sdi}` : ""}
               </p>
-              {fatt && (
-                <p className="text-sm text-soft">
-                  Fattura a{" "}
-                  <span className="text-inchiostro">{fatt.ragione_sociale ?? "—"}</span>
-                  {fatt.cf_piva ? ` · ${fatt.cf_piva}` : ""}
-                  {fatt.codice_sdi ? ` · SDI ${fatt.codice_sdi}` : ""}
-                </p>
-              )}
-            </div>
-          )}
+            )}
+          </div>
         </Card>
 
         <Card className="space-y-3">

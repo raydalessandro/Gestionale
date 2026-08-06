@@ -60,6 +60,7 @@ export default async function ClientiPage({
         <input
           type="search"
           name="q"
+          aria-label="Cerca"
           defaultValue={q ?? ""}
           placeholder="Cerca per nome, telefono, email…"
           className={`${inputCls} !pl-10`}
