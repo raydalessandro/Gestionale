@@ -415,11 +415,14 @@ describe.skipIf(!haEnv())("021 · C1 · anonimizzazione (la mappa, campo per cam
       .in("id", [p1, p2]);
     expect(persone!.length).toBe(2);
     for (const p of persone!) {
-      // ⚠️ PUNTO SORVEGLIATO (vedi report-test.md · B1): `anonimizza_cliente` è
-      // `security invoker` e `persone` ha RLS attiva SENZA policy (ID-01, 011) —
-      // l'UPDATE su `persone` fatto da un utente autenticato non trova righe e
-      // passa in SILENZIO. Se questi expect sono rossi, il buco è lì: serve una
-      // funzione `security definer` per la parte-persone, non un test diverso.
+      // ⚠️ PUNTO SORVEGLIATO — ora CHIUSO, e questo test è ciò che lo tiene
+      // chiuso. `persone` ha RLS attiva SENZA policy (ID-01, 011): sotto
+      // `security invoker` l'UPDATE fatto da un utente autenticato non trovava
+      // righe e passava in SILENZIO — l'anonimizzazione diceva «fatto» e
+      // lasciava in piedi nome, email e telefono. La parte-persone vive ora in
+      // `anonimizza_persone_del_cliente`, `security definer`, con la guardia di
+      // tenant scritta dentro. Se questi expect tornano rossi, si guarda LÌ:
+      // o la funzione è tornata invoker, o la delega si è persa.
       expect(p.nome, "nome → 'Anonimo' (il NOT NULL si rispetta, l'identità sparisce)").toBe(
         "Anonimo"
       );
@@ -470,5 +473,29 @@ describe.skipIf(!haEnv())("021 · C1 · anonimizzazione (la mappa, campo per cam
     const { data } = await A.cli.from("clienti").select("nome, anonimizzato_il").eq("id", c).single();
     expect(data!.nome, "e infatti il cliente di A è intatto").toBe(PERSONALI.nome);
     expect(data!.anonimizzato_il).toBeNull();
+  });
+
+  it("TENANT · la definer della parte-persone si difende DA SOLA (la RLS lì non c'è più)", async () => {
+    // `anonimizza_persone_del_cliente` è `security definer`: dentro, la RLS non
+    // filtra più nulla. Il tenant lo tiene la guardia scritta a mano — e questo
+    // test la punta dritta, chiamando la RPC come farebbe un altro negozio che
+    // conosce l'id del cliente altrui (non è un'ipotesi: gli id girano negli
+    // URL). Se un giorno la guardia cade, è QUI che si vede, non nella prova
+    // che passa da `anonimizza_cliente` (quella è invoker e la RLS la copre).
+    const B = await creaTenant("c1c");
+    const c = await creaCliente(A, { ...PERSONALI, cognome: `Definer ${RUN_ID}` });
+    const p = await personaCollegata(c);
+
+    const { error } = await B.cli.rpc("anonimizza_persone_del_cliente", { p_cliente_id: c });
+    expect(error, "per B quel cliente non esiste, e la funzione lo dice").not.toBeNull();
+    expect(error!.message).toMatch(/CLIENTE_NON_TROVATO/);
+
+    const { data: persona } = await svc
+      .from("persone")
+      .select("nome, telefono_grezzo")
+      .eq("id", p)
+      .single();
+    expect(persona!.nome, "la persona del portale di A non è stata toccata").not.toBe("Anonimo");
+    expect(persona!.telefono_grezzo, "e il suo telefono è ancora al suo posto").not.toBeNull();
   });
 });

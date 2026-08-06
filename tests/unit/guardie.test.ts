@@ -1730,6 +1730,71 @@ describe.skipIf(!existsSync(join(ROOT, M021)))("L4p · guardie B1 fondamenta (02
     }
   });
 
+  it("G25b · l'UNICA `security definer` della 021 è la parte-persone, e nessun'altra", () => {
+    const sql = sql021();
+    const definer = Array.from(
+      sql.matchAll(/create or replace function public\.(\w+)\([\s\S]*?security\s+(invoker|definer)/gi)
+    )
+      .filter((m) => m[2].toLowerCase() === "definer")
+      .map((m) => m[1]);
+    // Se ne compare una seconda va discussa, non aggiunta: una definer scavalca
+    // la RLS e con lei il tenant, e il tenant torna a dipendere da una guardia
+    // scritta a mano invece che dall'ambiente.
+    expect(definer, "la 021 ammette UNA sola security definer, la parte-persone di C1").toEqual([
+      "anonimizza_persone_del_cliente",
+    ]);
+  });
+
+  it("G25c · la definer della parte-persone ha search_path pinnato, grant chiusi e guardia di tenant esplicita", () => {
+    const sql = sql021();
+    const corpo = corpoFunzione("anonimizza_persone_del_cliente");
+    expect(
+      /security\s+definer\s+set search_path = public, pg_catalog/i.test(corpo),
+      "una definer senza search_path pinnato è dirottabile: lo schema si fissa nella firma"
+    ).toBe(true);
+    expect(
+      /revoke execute on function public\.anonimizza_persone_del_cliente\(uuid\) from public, anon/i.test(sql),
+      "manca la revoca di EXECUTE a public/anon (igiene 021)"
+    ).toBe(true);
+    expect(
+      /grant\s+execute on function public\.anonimizza_persone_del_cliente\(uuid\) to authenticated/i.test(sql),
+      "manca il grant execute ad authenticated"
+    ).toBe(true);
+    // La guardia di tenant: l'azienda si prende dal JWT, MAI da un parametro
+    // (un parametro sarebbe scavalcabile chiamando la RPC fuori dall'azione),
+    // e il cliente dev'essere di quell'azienda.
+    expect(
+      /v_az\s*:=\s*public\.get_azienda_id\(\)/i.test(corpo),
+      "l'azienda deve venire dal JWT del chiamante, non da un argomento"
+    ).toBe(true);
+    expect(
+      /\(p_cliente_id uuid\)/i.test(corpo.slice(0, corpo.indexOf("as $$"))),
+      "la firma deve restare a un solo argomento: nessun p_azienda_id da fuori"
+    ).toBe(true);
+    expect(
+      /from public\.clienti c\s*\n?\s*where c\.id = p_cliente_id and c\.azienda_id = v_az/i.test(corpo),
+      "manca il controllo «il cliente è della MIA azienda»: dentro una definer la RLS non filtra più"
+    ).toBe(true);
+    // E il perimetro dell'UPDATE: solo prenotazioni di quel cliente E di quella
+    // azienda — è la condizione che la policy della 011 dava gratis sotto invoker.
+    expect(
+      /where pr\.cliente_id = p_cliente_id and pr\.azienda_id = v_az/i.test(corpo),
+      "l'UPDATE deve restare dentro il tenant: la policy delle prenotazioni qui non si applica"
+    ).toBe(true);
+  });
+
+  it("G25d · `anonimizza_cliente` resta invoker e DELEGA la parte-persone (non la riscrive)", () => {
+    const corpo = corpoFunzione("anonimizza_cliente");
+    expect(
+      /perform public\.anonimizza_persone_del_cliente\(p_cliente_id\)/i.test(corpo),
+      "la parte-persone va delegata alla definer"
+    ).toBe(true);
+    expect(
+      /update public\.persone/i.test(corpo),
+      "sotto invoker un UPDATE su `persone` passa a 0 righe IN SILENZIO (RLS senza policy): non deve tornare qui"
+    ).toBe(false);
+  });
+
   it("G26 · `registra_consenso`: LOCK, poi evento, poi cache — nella stessa funzione (C3)", () => {
     const corpo = corpoFunzione("registra_consenso");
     const lock = corpo.search(/from public\.clienti where id = p_cliente_id for update/i);

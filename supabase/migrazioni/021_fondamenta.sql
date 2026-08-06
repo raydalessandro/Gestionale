@@ -515,6 +515,67 @@ create unique index if not exists uq_persone_telefono_reale
 comment on column public.persone.telefono_grezzo is
   'Chiave di dedup della persona. NULL solo dopo l''anonimizzazione (C1): la riga esce dalla dedup — l''unicità è parziale, «solo sui telefoni veri» (uq_persone_telefono_reale).';
 
+-- ⚠️ L'UNICA `security definer` della 021, e la ragione è una sola.
+-- `persone` ha RLS attiva **senza policy** (011 §8, ID-01): nessuno la legge né
+-- la scrive, nemmeno l'ottico autenticato — ci arrivano solo le funzioni
+-- definer. Sotto `security invoker` l'UPDATE della parte-persone non trovava
+-- righe e passava in **silenzio**: `anonimizza_cliente` rispondeva «fatto» e
+-- lasciava in piedi nome, email e telefono della persona del portale. È il
+-- «punto sorvegliato» che il test di contratto prediceva per nome.
+--
+-- Il prezzo di una definer è che la RLS non protegge più il tenant. Qui il
+-- tenant lo protegge la GUARDIA ESPLICITA dei punti (1) e (2): l'azienda si
+-- prende dal JWT del chiamante, mai da un parametro (un parametro sarebbe
+-- scavalcabile chiamando la funzione fuori dall'azione), e il cliente deve
+-- essere di quell'azienda. Il perimetro resta quello che la policy della 011
+-- dava gratis sotto invoker, riscritto a mano perché qui non c'è.
+create or replace function public.anonimizza_persone_del_cliente(p_cliente_id uuid)
+returns integer
+language plpgsql security definer set search_path = public, pg_catalog as $$
+declare
+  v_az uuid;
+  v_n  integer;
+begin
+  -- (1) l'azienda del CHIAMANTE, dal suo JWT
+  v_az := public.get_azienda_id();
+  if v_az is null then raise exception 'CLIENTE_NON_TROVATO'; end if;
+
+  -- (2) il cliente dev'essere SUO. Dentro una definer la RLS non filtra più:
+  --     questo confronto è ciò che sta al posto della policy. Il messaggio è
+  --     lo stesso del cliente inesistente, apposta: da fuori non si distingue
+  --     «non è tuo» da «non c'è», che è quanto dice il tenant di sé.
+  if not exists (
+    select 1 from public.clienti c
+     where c.id = p_cliente_id and c.azienda_id = v_az
+  ) then
+    raise exception 'CLIENTE_NON_TROVATO';
+  end if;
+
+  -- (3) solo le persone collegate a prenotazioni di QUEL cliente e di QUELLA
+  --     azienda.
+  --     NOTA (in carico alla regia, non decisa qui): `persone` è del PORTALE e
+  --     non ha azienda_id — la stessa riga può essere collegata a prenotazioni
+  --     di negozi diversi (la dedup sul telefono è globale). Anonimizzare qui
+  --     la sbianca anche per l'altro negozio. Prima era un non-problema solo
+  --     perché l'UPDATE non passava affatto; ora che passa, la domanda è vera
+  --     e sta in TODO-regia.
+  update public.persone p set
+    email           = 'anon-' || p.id::text || '@invalid',
+    nome            = 'Anonimo',        -- il NOT NULL si rispetta, l'identità sparisce
+    telefono_grezzo = null,             -- esce dalla dedup (indice unico parziale)
+    updated_at      = now()
+  where p.id in (
+    select pr.persona_id from public.prenotazioni pr
+     where pr.cliente_id = p_cliente_id and pr.azienda_id = v_az
+  );
+  get diagnostics v_n = row_count;
+  return v_n;
+end $$;
+comment on function public.anonimizza_persone_del_cliente(uuid) is
+  'C1, parte-persone. UNICA security DEFINER della 021: `persone` ha RLS senza policy (ID-01), quindi sotto invoker l''UPDATE passava a 0 righe in silenzio. Il tenant NON è più protetto dalla RLS ma dalla guardia esplicita interna (azienda dal JWT + cliente della propria azienda). Torna il numero di persone toccate.';
+revoke execute on function public.anonimizza_persone_del_cliente(uuid) from public, anon;
+grant  execute on function public.anonimizza_persone_del_cliente(uuid) to authenticated;
+
 create or replace function public.anonimizza_cliente(p_cliente_id uuid)
 returns void
 language plpgsql security invoker set search_path = public, pg_catalog as $$
@@ -575,12 +636,11 @@ begin
   update public.prenotazioni  set note = null where cliente_id = p_cliente_id;
 
   -- ── la persona del PORTALE collegata alle prenotazioni ───────────────────
-  update public.persone p set
-    email           = 'anon-' || p.id::text || '@invalid',
-    nome            = 'Anonimo',        -- il NOT NULL si rispetta, l'identità sparisce
-    telefono_grezzo = null,             -- esce dalla dedup (indice unico parziale)
-    updated_at      = now()
-  where p.id in (select pr.persona_id from public.prenotazioni pr where pr.cliente_id = p_cliente_id);
+  -- Sta in una sotto-funzione a privilegio del proprietario, non qui: `persone`
+  -- ha RLS senza policy, e da questa funzione — che è e resta INVOKER — quel-
+  -- l'UPDATE non troverebbe righe e passerebbe in silenzio. Perimetro e guardia
+  -- di tenant sono scritti dentro la sotto-funzione, esplicitamente.
+  perform public.anonimizza_persone_del_cliente(p_cliente_id);
 
   -- ── ordini: FATTI + istantanee Rx intatti, via i testi liberi ────────────
   update public.ordini_occhiali set note = null where cliente_id = p_cliente_id;

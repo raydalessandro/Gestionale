@@ -53,6 +53,27 @@ fermarsi e segnalare):**
   **unicità PARZIALE** — l'indice morde solo sui telefoni veri —
   dentro la modifica-di-vincolo già sancita qui sopra. La dedup dei
   numeri reali resta identica. (Misurato, non supposto: è il metodo.)
+  **Ratifica 06/08 (rilievo 1 dell'agente-test, chiuso)**: la mappa
+  qui sopra non veniva eseguita affatto. `persone` ha RLS attiva
+  **senza policy** (ID-01, 011) e `anonimizza_cliente` è `security
+  invoker`: quell'UPDATE, fatto da un utente autenticato, non trovava
+  righe e passava **in silenzio** — l'anonimizzazione rispondeva
+  «fatto» lasciando in piedi nome, email e telefono. La parte-persone
+  vive ora in `anonimizza_persone_del_cliente`, **unica `security
+  definer` della 021**, chiamata dalla principale che resta invoker.
+  Una definer scavalca la RLS e con lei il tenant: qui il tenant lo
+  tiene una **guardia esplicita** dentro la funzione — azienda dal JWT
+  del chiamante (mai da un argomento, che sarebbe scavalcabile
+  chiamando la RPC fuori dall'azione) e cliente della propria azienda,
+  con lo stesso `CLIENTE_NON_TROVATO` che dà il cliente inesistente.
+  Sorvegliata da G25b/G25c/G25d e da un caso di contratto che punta la
+  RPC dritta, come farebbe un altro negozio che conosce l'id.
+  **Resta aperto, e non è stato deciso qui**: `persone` è del PORTALE e
+  non ha `azienda_id` — la stessa riga può essere collegata a
+  prenotazioni di negozi diversi (la dedup sul telefono è globale), e
+  anonimizzare la sbianca anche per l'altro negozio. Prima era un
+  non-problema solo perché l'UPDATE non passava; ora la domanda è vera
+  ed è in `TODO-regia.md`.
 - `ordini_occhiali` / `ordini_lac`: SI CONSERVANO (fatti + istantanee
   Rx) · note → NULL · canale_contatto → NULL (è un recapito).
 - `beni_in_custodia`: si conserva; descrizione resta (è dell'oggetto).
