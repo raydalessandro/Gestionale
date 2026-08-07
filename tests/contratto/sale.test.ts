@@ -62,14 +62,14 @@ function piuGiorni(iso: string, n: number): string {
 
 /** Telefoni italiani UNICI per RUN_ID (stessa meccanica di crea-prenotazione). */
 let telSeq = 0;
+const TEL_BASE = String(Date.now()).slice(-7);
 function telefonoUnico(): string {
-  const seed = Array.from(RUN_ID)
-    .map((c) => c.charCodeAt(0) % 10)
-    .join("")
-    .padEnd(6, "0")
-    .slice(0, 6);
-  const coda = String(2000 + telSeq++).slice(-4);
-  return `3${seed}${coda}`.slice(0, 10);
+  // Base = ms di avvio del run: unica TRA i run e TRA le suite. La vecchia
+  // base (RUN_ID %10) collideva tra run diversi e, con l'indice parziale al
+  // suo posto, la collisione non esplode piu all'INSERT: aggancia per DEDUP
+  // la persona sporca di un run/suite precedente (visto in CI: g8b riceveva
+  // "Prova Bonifica", la persona della suite contratto). 10 cifre esatte.
+  return `3${TEL_BASE}${String(telSeq++).padStart(2, "0")}`;
 }
 
 type Sala = { id: string; nome: string; ordine: number; attiva: boolean };

@@ -36,14 +36,9 @@ function anonClient(): SupabaseClient {
 
 /** Telefono italiano UNICO per run — 10 cifre esatte, contatore intero. */
 let telSeq = 0;
+const TEL_BASE = String(Date.now()).slice(-7);
 function telefonoUnico(): string {
-  const base = Array.from(RUN_ID)
-    .map((c) => c.charCodeAt(0) % 10)
-    .join("")
-    .padEnd(3, "0")
-    .slice(0, 3);
-  const coda = String(telSeq++).padStart(6, "0");
-  return `3${base}${coda}`; // 1 + 3 + 6 = 10 cifre
+  return `3${TEL_BASE}${String(telSeq++).padStart(2, "0")}`; // 10 cifre, base=ms avvio: unica tra run e suite
 }
 
 const TZ = "Europe/Rome";
