@@ -10,18 +10,25 @@
    somma? (le altre: in coda alla PR #35). Nessun impatto-codice
    finché non decise: raffinano copy e, al più, additive.
 4. **Cinture dal dashboard** — default privileges di `supabase_admin`
-   · secret `TEST_SUPABASE_DB_URL` in CI — **stasera (Ray)**: chiude il
-   buco di processo dei rossi 125-126 (repo↔DB); fino ad allora vale
-   la regola-toppa «migrazione applicata a mano al test prima del
-   verde». **Il secondo non è più
-   facoltativo, ed è misurato**: nel job «L2 contratto» di CI 125
-   `TEST_SUPABASE_DB_URL` è **vuoto** (URL e chiavi ci sono, l'accesso
-   diretto al database no). Conseguenza pratica: la CI **non può
-   applicarsi le migrazioni da sola**, quindi ogni volta che una
-   migrazione cambia, L2 resta rosso finché qualcuno non la applica a
-   mano al progetto di test — e il rosso somiglia a un difetto del
-   codice, mentre è disallineamento fra repo e DB (successo due volte
-   in un giorno). Finché il secret manca, la regola è: **la migrazione
+   · secret `TEST_SUPABASE_DB_URL` in CI — **stasera (Ray)**.
+   ⚠️ **Rettifica 07/08**: prima qui era scritto che senza quel secret
+   «la CI non può applicarsi le migrazioni da sola». È FALSO, ed è un
+   errore mio: la CI non applica migrazioni **in nessun caso**, né con
+   né senza il secret — nel job «L2 contratto» non esiste alcun passo
+   che lo faccia. Le migrazioni si applicano SOLO a mano, con
+   `npm run db:applica-migrazioni` (idempotente, tiene
+   `_infra_migrazioni`, salta il già fatto, si ferma alla prima che
+   fallisce). Il secret serve a un'altra cosa: è la connessione
+   Postgres DIRETTA che i due test di `bonifica-020.test.ts` usano per
+   leggere il CATALOGO di sistema (grant e default privileges, che via
+   API non si vedono). Senza, quei due skippano puliti — non è un
+   rosso, è copertura che manca.
+   Resta vero, e misurato due volte in un giorno, che
+   **quando la migrazione cambia L2 va rosso** finché non la si applica
+   al progetto di test, e che quel rosso somiglia a un difetto del
+   codice mentre è disallineamento fra repo e DB. Ma la causa non è il
+   secret: è che il passo di applicazione non è automatizzato. La
+   regola operativa non cambia: **la migrazione
    si applica al DB di test PRIMA di aspettarsi il verde**.
 5. **021 in produzione** — dopo l'OK e il merge, SOLO dalla strada
    che registra. Il DB di **test** è invece già in pari al 06/08
