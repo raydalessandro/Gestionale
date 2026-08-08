@@ -85,15 +85,9 @@ function piuGiorni(iso: string, n: number): string {
 
 /** Telefoni italiani UNICI per RUN_ID: cifre stabili dal run + un contatore. */
 let telSeq = 0;
+const TEL_BASE = String(Date.now()).slice(-7);
 function telefonoUnico(): { grezzo: string; normalizzato: string } {
-  // 9 cifre dopo il 3xx: derivo un blocco dal RUN_ID (base36→cifre) + contatore.
-  const seed = Array.from(RUN_ID)
-    .map((c) => c.charCodeAt(0) % 10)
-    .join("")
-    .padEnd(6, "0")
-    .slice(0, 6);
-  const coda = String(1000 + telSeq++).slice(-4); // 4 cifre progressive
-  const nazionale = `3${seed}${coda}`.slice(0, 10); // 10 cifre totali (3 + 9)
+  const nazionale = `3${TEL_BASE}${String(telSeq++).padStart(2, "0")}`; // 10 cifre, base=ms avvio: unica tra run e suite
   return { grezzo: nazionale, normalizzato: `+39${nazionale}` };
 }
 

@@ -71,6 +71,13 @@ export type FonteOrdine = Exclude<Fonte, "import">;
 export const FONTI_MANUALI = ["banco", "convenzione", "import"] as const;
 
 export type ClienteRow = {
+  // B1 (021): additive. `consenso_marketing`/`consenso_canali` sono CACHE del
+  // mastro (C3) — non si scrivono mai direttamente.
+  assicurazione_id?: string | null;
+  azienda_convenzionata_id?: string | null;
+  dati_fatturazione?: Json | null;
+  consenso_canali?: string[] | null;
+  anonimizzato_il?: string | null;
   id: string;
   azienda_id: string;
   nome: string;
@@ -240,7 +247,9 @@ export type RisorsaRow = {
 export type PrenotazioneRow = {
   id: string;
   azienda_id: string;
-  persona_id: string;
+  /** NULL dopo lo SGANCIO dell'anonimizzazione (C1 voce 6): il fatto resta,
+   *  il filo verso l'identità di piattaforma no. Non presumerlo valorizzato. */
+  persona_id: string | null;
   cliente_id: string | null;
   appuntamento_id: string | null;
   servizio_codice: string;
@@ -513,6 +522,11 @@ export type Database = {
       appuntamenti: { Row: AppuntamentoRow; Insert: Ins<AppuntamentoRow>; Update: Upd<AppuntamentoRow>; Relationships: [] };
       prenotazioni: { Row: PrenotazioneRow; Insert: Ins<PrenotazioneRow>; Update: Upd<PrenotazioneRow>; Relationships: [] };
       servizi: { Row: ServizioRow; Insert: never; Update: never; Relationships: [] };
+      consensi: { Row: ConsensoRow; Insert: Ins<ConsensoRow>; Update: Upd<ConsensoRow>; Relationships: [] };
+      clienti_relazioni: { Row: ClienteRelazioneRow; Insert: Ins<ClienteRelazioneRow>; Update: Upd<ClienteRelazioneRow>; Relationships: [] };
+      oculisti: { Row: OculistaRow; Insert: Ins<OculistaRow>; Update: Upd<OculistaRow>; Relationships: [] };
+      parametri: { Row: ParametroRow; Insert: Ins<ParametroRow>; Update: Upd<ParametroRow>; Relationships: [] };
+      assicurazioni: { Row: AssicurazioneRow; Insert: Ins<AssicurazioneRow>; Update: Upd<AssicurazioneRow>; Relationships: [] };
       risorse: { Row: RisorsaRow; Insert: Ins<RisorsaRow>; Update: Upd<RisorsaRow>; Relationships: [] };
       richiami: { Row: RichiamoRow; Insert: Ins<RichiamoRow>; Update: Upd<RichiamoRow>; Relationships: [] };
       metodi_pagamento: { Row: MetodoPagamentoRow; Insert: Ins<MetodoPagamentoRow>; Update: Upd<MetodoPagamentoRow>; Relationships: [] };
@@ -536,6 +550,26 @@ export type Database = {
         Args: { p_telefono: string };
         Returns: { id: string; nome: string; cognome: string }[];
       };
+      // B1 (021): i contratti che pretendono una transazione.
+      registra_consenso: {
+        Args: {
+          p_cliente_id: string; p_tipo: string; p_azione: string;
+          p_canali?: string[] | null; p_modalita?: string | null;
+          p_prescrizione_id?: string | null; p_versione?: string | null; p_documento_ref?: string | null;
+        };
+        Returns: string;
+      };
+      revoca_marketing: { Args: { p_cliente_id: string; p_modalita?: string | null }; Returns: string };
+      crea_relazione: {
+        Args: { p_cliente_id: string; p_relativo_id: string; p_tipo: string; p_note?: string | null };
+        Returns: string;
+      };
+      crea_oculista_al_volo: {
+        Args: { p_nome: string; p_studio?: string | null; p_citta?: string | null };
+        Returns: string;
+      };
+      anonimizza_cliente: { Args: { p_cliente_id: string }; Returns: undefined };
+      elimina_relazione: { Args: { p_id: string }; Returns: undefined };
       prendi_persona_come_cliente: {
         Args: { p_prenotazione_id: string; p_cliente_id?: string | null };
         Returns: string;
@@ -544,6 +578,63 @@ export type Database = {
     Enums: { [_ in never]: never };
     CompositeTypes: { [_ in never]: never };
   };
+}
+
+
+/* ── B1 · Fondamenta (Era 2, migrazione 021) ─────────────────────────── */
+
+/** Libro mastro dei consensi (M1 §4, contratto C3). Eventi immutabili. */
+export type ConsensoRow = {
+  id: string;
+  azienda_id: string;
+  cliente_id: string;
+  tipo: "marketing" | "dati_sanitari";
+  prescrizione_id: string | null;
+  azione: "dato" | "revocato";
+  canali: string[] | null;
+  modalita: "penna" | "digitale" | null;
+  versione_informativa: string | null;
+  documento_ref: string | null;
+  utente_id: string | null;
+  avvenuto_il: string;
+}
+
+/** Relazione fra clienti (C4): UNA riga, letta nei due versi. */
+export type ClienteRelazioneRow = {
+  id: string;
+  azienda_id: string;
+  cliente_id: string;
+  relativo_id: string;
+  tipo: "tutore_legale" | "padre" | "madre" | "figlio" | "fratello" | "sorella";
+  note: string | null;
+  created_at: string;
+}
+
+export type OculistaRow = {
+  id: string;
+  azienda_id: string;
+  nome: string;
+  studio: string | null;
+  citta: string | null;
+  note: string | null;
+  attivo: boolean;
+  created_at: string;
+}
+
+/** Le politiche di negozio in chiave/valore (M10 §4). */
+export type ParametroRow = {
+  id: string;
+  azienda_id: string;
+  chiave: string;
+  valore: Json;
+  updated_at: string;
+}
+
+/** Registro globale delle assicurazioni: la voce NESSUNA è semantica (M1 §2). */
+export type AssicurazioneRow = {
+  id: string;
+  nome: string;
+  attivo: boolean;
 }
 
 /* ────────────────────────────────────────────────────────────────────────────

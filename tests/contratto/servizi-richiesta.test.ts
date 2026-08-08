@@ -86,14 +86,9 @@ function piuGiorni(iso: string, n: number): string {
  * deduplicano la persona; qui invece si fanno insert DIRETTI su `persone`).
  */
 let telSeq = 0;
+const TEL_BASE = String(Date.now()).slice(-7);
 function telefonoUnico(): { grezzo: string; normalizzato: string } {
-  const seed = Array.from(RUN_ID)
-    .map((c) => c.charCodeAt(0) % 10)
-    .join("")
-    .padEnd(5, "0")
-    .slice(0, 5);
-  const coda = String(2000 + telSeq++).slice(-4);
-  const nazionale = `3${seed}${coda}`; // 1 + 5 + 4 = 10 cifre, coda intera
+  const nazionale = `3${TEL_BASE}${String(telSeq++).padStart(2, "0")}`; // 10 cifre, base=ms avvio: unica tra run e suite
   return { grezzo: nazionale, normalizzato: `+39${nazionale}` };
 }
 

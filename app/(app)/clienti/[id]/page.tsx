@@ -12,6 +12,10 @@ import {
 } from "@/components/ui";
 import PrescrizioneCard from "@/components/PrescrizioneCard";
 import { BannerConsensi } from "@/components/ConsensiCliente";
+import {
+  PermessiCliente,
+  type RigaRelazione,
+} from "@/components/PermessiCliente";
 import { PillStato } from "@/components/OrdiniUI";
 import { etichettaTipoRichiamo, etichettaTipoApp, oraDi } from "@/components/AgendaUI";
 import { fmtData, ETICHETTE_FONTE, ESITI_RICHIAMO, ETICHETTE_CANALE_PREFERITO } from "@/lib/utils";
@@ -32,6 +36,10 @@ export default async function ClientePage({
     fermiAttivi,
     { data: richiamiCli },
     { data: prossimoApp },
+    { data: consensi },
+    { data: relDirette },
+    { data: relInverse },
+    { data: candidati },
   ] = await Promise.all([
       supabase.from("clienti").select("*").eq("id", id).maybeSingle(),
       supabase
@@ -71,9 +79,79 @@ export default async function ClientePage({
         .gt("inizio", new Date().toISOString())
         .order("inizio")
         .limit(1),
+      // B1 · il mastro dei consensi (C3): FATTI in ordine di accadimento.
+      supabase
+        .from("consensi")
+        .select("id, tipo, azione, canali, modalita, versione_informativa, avvenuto_il")
+        .eq("cliente_id", id)
+        .order("avvenuto_il", { ascending: false }),
+      // B1 · le relazioni (C4): UNA riga a DB, letta nei due versi con DUE
+      // letture — non si materializza mai l'inversa.
+      supabase
+        .from("clienti_relazioni")
+        .select("id, tipo, cliente_id, relativo_id")
+        .eq("cliente_id", id),
+      supabase
+        .from("clienti_relazioni")
+        .select("id, tipo, cliente_id, relativo_id")
+        .eq("relativo_id", id),
+      // Candidati da collegare: la ricerca sul registro intero è M1 completo,
+      // qui basta un elenco limitato che il selettore filtra a video.
+      supabase
+        .from("clienti")
+        .select("id, nome, cognome")
+        .neq("id", id)
+        .is("anonimizzato_il", null)
+        .order("cognome")
+        .limit(200),
     ]);
 
   if (!cliente) notFound();
+
+  // I nomi dell'altro capo di ogni relazione, in una lettura sola.
+  const righeRel = [...(relDirette ?? []), ...(relInverse ?? [])];
+  const altriIds = [...new Set(righeRel.map((r) => (r.cliente_id === id ? r.relativo_id : r.cliente_id)))];
+  const { data: altri } = altriIds.length
+    ? await supabase.from("clienti").select("id, nome, cognome").in("id", altriIds)
+    : { data: [] as { id: string; nome: string; cognome: string }[] };
+  const nomeDi = new Map((altri ?? []).map((c) => [c.id, `${c.nome} ${c.cognome}`]));
+
+  // Chi risponde per QUESTO cliente, dalla relazione vera. La riga è una sola e
+  // si legge dal verso giusto (C4): sulla scheda di X, «tutore_legale» in verso
+  // DRITTO (cliente_id = X) significa che l'altro capo è il suo tutore — è il
+  // gesto di «Aggiungi relazione», dove si sceglie la persona collegata.
+  const tutoreDaRelazione =
+    (relDirette ?? [])
+      .filter((r) => r.tipo === "tutore_legale")
+      .map((r) => nomeDi.get(r.relativo_id))
+      .find(Boolean) ?? null;
+
+  const relazioni: RigaRelazione[] = righeRel.map((r) => {
+    const altroId = r.cliente_id === id ? r.relativo_id : r.cliente_id;
+    return {
+      id: r.id,
+      tipo: r.tipo,
+      altroId,
+      altroNome: nomeDi.get(altroId) ?? "—",
+      // Se la riga PARTE da un altro cliente, qui si legge al contrario.
+      inversa: r.cliente_id !== id,
+    };
+  });
+
+  // Assicurazione: null = da rilevare · la voce NESSUNA = chiesto, non ne ha.
+  const { data: assicurazione } = cliente.assicurazione_id
+    ? await supabase
+        .from("assicurazioni")
+        .select("nome")
+        .eq("id", cliente.assicurazione_id)
+        .maybeSingle()
+    : { data: null };
+
+  const fatt = (cliente.dati_fatturazione ?? null) as {
+    ragione_sociale?: string | null;
+    cf_piva?: string | null;
+    codice_sdi?: string | null;
+  } | null;
 
   // Vitali della testata
   const eta = cliente.data_nascita
@@ -136,7 +214,6 @@ export default async function ClientePage({
 
       <BannerConsensi
         clienteId={cliente.id}
-        mancaMarketing={!cliente.consenso_marketing}
         mancaSanitario={!cliente.consenso_dati_sanitari}
       />
 
@@ -147,15 +224,22 @@ export default async function ClientePage({
               {ETICHETTE_FONTE[cliente.fonte] ?? cliente.fonte}
             </Badge>
             {eta !== null && <Badge tinta="neutro">{eta} anni</Badge>}
-            {cliente.tutore_legale && (
-              <Badge tinta="ottone">Tutore: {cliente.tutore_legale}</Badge>
+            {/* Il segnalino nasce dalla RELAZIONE vera (C4), non più dal campo
+                di testo deprecato. Prima era rovesciato: la scheda vecchia e
+                sporca accendeva il badge, quella registrata bene no — cioè
+                premiava il dato peggiore. Il testo storico resta come ripiego,
+                dichiarato tale, finché il travaso non l'avrà svuotato. */}
+            {tutoreDaRelazione ? (
+              <Badge tinta="ottone">Tutore: {tutoreDaRelazione}</Badge>
+            ) : (
+              cliente.tutore_legale && (
+                <Badge tinta="ottone">Tutore: {cliente.tutore_legale} (storico)</Badge>
+              )
             )}
             {cliente.non_contattare && <Badge tinta="neutro">Non contattare</Badge>}
-            {cliente.consenso_marketing ? (
-              <Badge tinta="verde">Consenso marketing ✓</Badge>
-            ) : (
-              <Badge tinta="neutro">No consenso marketing</Badge>
-            )}
+            {cliente.anonimizzato_il && <Badge tinta="neutro">Anonimizzato</Badge>}
+            {/* Lo stato del marketing si legge nella sezione Permessi: una
+                verità sola, dove si può anche cambiarla (C3). */}
             {cliente.data_nascita && (
               <Badge tinta="neutro">Nato/a {fmtData(cliente.data_nascita)}</Badge>
             )}
@@ -192,6 +276,22 @@ export default async function ClientePage({
               CF {cliente.codice_fiscale}
             </p>
           )}
+
+          {/* «Da rilevare» è uno STATO, non un vuoto (M1 §2): si vede sempre,
+              altrimenti non si distingue da «gliel'ho chiesto, non ne ha». */}
+          <div className="mt-3 space-y-1 border-t border-linea pt-3">
+            <p className="text-sm text-soft">
+              Assicurazione: {assicurazione?.nome ?? "da rilevare"}
+            </p>
+            {fatt && (
+              <p className="text-sm text-soft">
+                Fattura a{" "}
+                <span className="text-inchiostro">{fatt.ragione_sociale ?? "—"}</span>
+                {fatt.cf_piva ? ` · ${fatt.cf_piva}` : ""}
+                {fatt.codice_sdi ? ` · SDI ${fatt.codice_sdi}` : ""}
+              </p>
+            )}
+          </div>
         </Card>
 
         <Card className="space-y-3">
@@ -199,12 +299,8 @@ export default async function ClientePage({
             <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-faint">
               Privacy
             </p>
-            <p className="text-sm text-soft">
-              Marketing:{" "}
-              {cliente.consenso_marketing
-                ? `sì${cliente.data_consenso ? `, dal ${fmtData(cliente.data_consenso)}` : ""}`
-                : "non raccolto"}
-            </p>
+            {/* Il marketing sta nella sezione Permessi (C3: una cache sola,
+                una riga sola che la mostra). Qui resta il sanitario. */}
             <p className="text-sm text-soft">
               Dati sanitari:{" "}
               {cliente.consenso_dati_sanitari
@@ -222,6 +318,16 @@ export default async function ClientePage({
           </div>
         </Card>
       </div>
+
+      <PermessiCliente
+        clienteId={cliente.id}
+        consensi={consensi ?? []}
+        relazioni={relazioni}
+        candidati={candidati ?? []}
+        consensoMarketing={cliente.consenso_marketing}
+        canaliAttivi={cliente.consenso_canali ?? null}
+        anonimizzato={!!cliente.anonimizzato_il}
+      />
 
       <div className="mb-3 flex items-center justify-between">
         <h2 className="f-serif text-lg font-semibold text-inchiostro">

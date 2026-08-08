@@ -46,10 +46,19 @@ export async function registraTenant(page: Page): Promise<Tenant> {
   return { slug, email };
 }
 
-/** Crea un cliente dalla UI e ritorna il suo id (dall'URL di dettaglio). */
+/**
+ * Crea un cliente dalla UI e ritorna il suo id (dall'URL di dettaglio).
+ * Lascia la pagina sulla SCHEDA del cliente appena creato.
+ *
+ * ⚠️ B1 · l'opzione `consensoMarketing` NON esiste più: la spunta «Consenso
+ * marketing» è stata tolta da `ClienteForm` perché il contratto C3 dice che
+ * `consenso_marketing` è la CACHE dell'ultimo evento del mastro e «la cache non
+ * si scrive MAI direttamente». Il consenso si dà dalla sezione «Permessi» della
+ * scheda: vedi `dammiConsensoMarketing` qui sotto.
+ */
 export async function creaCliente(
   page: Page,
-  opts: { nome: string; cognome: string; telefono?: string; consensoMarketing?: boolean } = {
+  opts: { nome: string; cognome: string; telefono?: string } = {
     nome: "Laura",
     cognome: "Bianchi",
   }
@@ -62,11 +71,61 @@ export async function creaCliente(
   // gli altri due recapiti sono "Tel. casa"/"Tel. lavoro". exact per non
   // riprendere quei "Tel.".
   if (opts.telefono) await page.getByLabel("Cellulare", { exact: true }).fill(opts.telefono);
-  if (opts.consensoMarketing) await page.getByLabel(/Consenso marketing/).check();
   await page.getByRole("button", { name: "Crea cliente" }).click();
 
   await page.waitForURL(/\/clienti\/[0-9a-f-]{36}$/);
   return page.url().split("/").at(-1)!;
+}
+
+/* ── B1 · consensi dal MASTRO (contratto C3) ────────────────────────────── */
+
+/**
+ * L'UNICA riga «Marketing: …» della scheda cliente: è la **cache**, cioè la
+ * proiezione dell'ultimo evento (sezione «Permessi»).
+ *
+ * Perché una regex che comprende anche il VALORE e non solo `^Marketing:`: il
+ * testo sta in un `<p>` fatto di due `<span>` («Marketing:» + lo stato), e il
+ * motore di Playwright restituisce l'elemento più PROFONDO che soddisfa il
+ * matcher. Con `/^Marketing:/` si aggancerebbe lo span dell'etichetta, senza il
+ * valore; includendo lo stato, l'unico elemento che matcha è il `<p>` intero.
+ */
+export function rigaMarketing(page: Page) {
+  return page.getByText(/^Marketing:\s*(sì|no|non raccolto)/);
+}
+
+/**
+ * Le righe del MASTRO dei consensi marketing: i FATTI, uno per firma o revoca
+ * («Consenso marketing dato il … · penna · email, cellulare»). Sono `<li>`, e
+ * il filtro àncorato al testo li distingue dagli altri elenchi della scheda
+ * (contatti, relazioni, ordini) senza ricorrere a CSS.
+ */
+export function righeMastroMarketing(page: Page) {
+  return page.getByRole("listitem").filter({ hasText: /^Consenso marketing/ });
+}
+
+/**
+ * Dà il consenso marketing passando dal mastro (C3), dalla scheda del cliente.
+ * Presuppone che la pagina corrente SIA la scheda (dove vive «Permessi»).
+ */
+export async function dammiConsensoMarketing(
+  page: Page,
+  opts: { canali?: string[]; modalita?: "penna" | "digitale" } = {}
+): Promise<void> {
+  const canali = opts.canali ?? ["Email"];
+  await page.getByRole("button", { name: "Registra consenso" }).click();
+  for (const c of canali) {
+    await page.getByRole("checkbox", { name: c, exact: true }).check();
+  }
+  await page.getByLabel("Modalità").selectOption(opts.modalita ?? "penna");
+  await page.getByRole("button", { name: "Salva consenso" }).click();
+  await expect(rigaMarketing(page)).toHaveText(/^Marketing:\s*sì/);
+}
+
+/** Il tasto revoca + la sua conferma. La cache si spegne, il mastro resta. */
+export async function revocaConsensoMarketing(page: Page): Promise<void> {
+  await page.getByRole("button", { name: "Revoca comunicazioni" }).click();
+  await page.getByRole("button", { name: "Conferma revoca" }).click();
+  await expect(rigaMarketing(page)).toHaveText(/^Marketing:\s*no$/);
 }
 
 /* ── Seeding via service role (solo scenari temporali) ─────────────────── */

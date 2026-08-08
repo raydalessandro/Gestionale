@@ -52,13 +52,9 @@ function oraRoma(iso: string): string {
 }
 
 let telSeq = 0;
+const TEL_BASE = String(Date.now()).slice(-7);
 function telefonoUnico(): string {
-  const base = Array.from(RUN_ID)
-    .map((c) => c.charCodeAt(0) % 10)
-    .join("")
-    .padEnd(3, "0")
-    .slice(0, 3);
-  return `3${base}${String(telSeq++).padStart(6, "0")}`; // 10 cifre esatte
+  return `3${TEL_BASE}${String(telSeq++).padStart(2, "0")}`; // 10 cifre, base=ms avvio: unica tra run e suite
 }
 
 describe.skipIf(!haEnv())("019 · fuso — banco e portale sullo stesso istante (G8)", () => {

@@ -1,8 +1,682 @@
 # Report — Agente Test & CI
 
-Aggiornato: 2026-08-05 · Ultima consegna coperta: **Era 2 · S0 · Bonifica**
-(branch `era2/S0-bonifica`, migrazione **020**) — sezione qui sotto. I giri
-precedenti restano più in basso.
+Aggiornato: 2026-08-06 · Ultima consegna coperta: **Era 2 · B1 · Fondamenta**
+(branch `era2/B1-fondamenta`, migrazione **021**, contratti **C1-C4**) — sezione
+qui sotto. I giri precedenti restano più in basso.
+
+## B1 · 3° giro (06/08 sera) — la voce 6 e ciò che le è cresciuto intorno
+
+Giro di ALLINEAMENTO alla voce 6 di C1 («sgancia-e-se-orfana-anonimizza»,
+`anonimizza_persone_del_cliente`) e di caccia ai buchi che restano. Le guardie
+già scritte dall'orchestratore (G23g, G25b-f, G29g) e i due casi di contratto
+della voce 6 non sono stati duplicati: si è guardato **dove NON arrivano**.
+
+### File toccati
+| File | Livello | Che cosa |
+|---|---|---|
+| `tests/contratto/b1-anonimizzazione.test.ts` | L2 | **1 bug di setup riparato** + 7 casi nuovi (8 → 14) |
+| `tests/contratto/b1-dedup-anonimi.test.ts` (nuovo) | L2 | 2 casi: l'anonimo esce dalla dedup **anche dalla ricerca** |
+| `e2e/g8b-richieste-agenda.spec.ts` | L3 | +1 scenario: la voce 6 dal gesto vero (portale → banco → anonimizzazione) |
+| `e2e/m1-anagrafiche.spec.ts` | L3 | S6: via i due selettori **CSS** rimasti, sostituiti da `getByRole` |
+| `tests/unit/guardie.test.ts` | L4 | nuovo blocco **L4r**: G30, G31, G32, G33 (81 → **85**) |
+
+Nessuna dipendenza nuova; `package.json`, `vitest.config.ts`,
+`playwright.config.ts`, `ci.yml` invariati (i glob raccolgono i file nuovi).
+
+### 1 · Il rosso che c'era già, e nessuno aveva ancora visto
+`b1-anonimizzazione.test.ts` → «due negozi, UNA persona» (scritto con la voce 6,
+mai girato in CI) semina la prenotazione del secondo negozio **senza
+`appuntamento_id`**. Ma dalla **013** («l'agenda unica») quella colonna è
+`NOT NULL`: l'insert dà 23502, l'helper fa `throw`, e il caso muore nel setup
+con un messaggio che parla di colonne — non di contratto. Riparato dando a
+quella prenotazione il suo appuntamento; già che c'ero, il seeding di persone e
+prenotazioni è diventato tre helper (`appuntamentoDi`, `personaNuova`,
+`prenotazioneDi`) usati da tutti i casi, così il prossimo vincolo che cambia si
+ripara in un posto solo.
+
+### 2 · «Esce dalla dedup» è vero per l'INDICE, non per la RICERCA
+Il buco più serio del giro, e nasce **dalla 021 stessa** (nuovo file
+`b1-dedup-anonimi.test.ts`, ⚠️ **rosso atteso**).
+1. L'anonimizzazione mette `telefono_grezzo = NULL`; `telefono_normalizzato` è
+   GENERATA e `normalizza_telefono(NULL)` è **`''`**. La 021 lo aveva misurato e
+   ha reso PARZIALE l'unicità (`where telefono_normalizzato <> ''`): giusto, e
+   già coperto.
+2. Ma la ricerca dentro `crea_prenotazione` (013/014/016, **non toccata dalla
+   021**) è `where persone.telefono_normalizzato = v_tel` **senza filtro su
+   `v_tel <> ''`**. E `v_tel` è `''` ogni volta che il numero digitato non
+   contiene cifre: la RPC non valida il telefono e il portale chiede solo
+   `telefono.trim().length > 0` (`WizardPrenota`). Un «-», un «n/d» passano.
+3. Quindi **una persona NUOVA che prenota con un telefono illeggibile viene
+   agganciata a una riga ANONIMIZZATA**: se la riprende, quella torna non
+   orfana (irrecuperabile: l'orfanità si valuta solo nell'istante in cui si
+   tagliano i fili) e la prenotazione nuova eredita `nome = 'Anonimo'` e
+   `anon-…@invalid`. Prima della 021 non poteva succedere: l'unicità era totale.
+Il test parla **dal lato anon**, cioè dal punto esatto in cui un cliente vero
+preme «Invia», e asserisce la REGOLA («una prenotazione nuova non atterra mai su
+un'identità anonimizzata»), non l'uguaglianza con una riga specifica: sul DB di
+test le righe anonime di tutti i run stanno su `''` e la `select … into` ne
+pesca una qualunque. Un secondo caso fa da contrappeso: **il telefono vero
+continua a deduplicare** (stesso numero scritto in due forme = una persona
+sola), così la riparazione non può consistere nello spegnere la ricerca.
+
+### 3 · `per_conto_di`: la mappa C1 dimentica il nome di un terzo
+⚠️ **Rosso atteso** (`b1-anonimizzazione.test.ts`). `prenotazioni.per_conto_di`
+è il campo che il portale riempie con «Prenoto per un'altra persona»: contiene
+il **nome di un terzo**, esattamente come il `tutore_legale` che C1 manda a NULL
+«perché identifica un TERZO per nome» e come i `contatto_*` entrati in mappa il
+05/08. La regola generale del contratto è esplicita — «i quasi-identificatori e
+i testi liberi → NULL» — ma la 021 azzera solo `note`. Oggi la riga sopravvive
+all'anonimizzazione **e l'agenda la stampa ancora** (`· per Marco Rossi`, riga
+delle richieste in `app/(app)/agenda/page.tsx`).
+
+### 4 · Gli altri casi nuovi al L2 (verdi: dicono che cosa fa la funzione)
+- **due clienti dello STESSO negozio, una persona sola** — il perimetro dello
+  sgancio è `cliente_id AND azienda_id`, e dentro un negozio la seconda
+  condizione non discrimina: se si sganciasse per sola azienda, la prenotazione
+  di un cliente mai toccato perderebbe la persona in silenzio. Poi si
+  anonimizza il secondo e la catena si chiude: la riga diventa orfana e SOLO
+  ALLORA si sbianca.
+- **la lista d'attesa tiene viva la persona** — nota (c) del contratto,
+  fotografata invece che lasciata implicita. Con il suo prezzo, misurato: qui il
+  legame residuo è **del negozio stesso** che ha anonimizzato, e togliere poi la
+  riga di lista **non recupera niente** (rifare l'anonimizzazione non ritrova la
+  persona: lo sgancio ha già azzerato `persona_id`, `v_persone` è vuoto).
+  L'occasione di sbiancare la riga si presenta **una volta sola**.
+- **il valore di ritorno della definer** (0 se viva altrove, 1 se orfana): è
+  l'unico modo che ha un chiamante di sapere se la riga è stata sbiancata o solo
+  sganciata; `anonimizza_cliente` lo butta via con `perform`, ma il contratto lo
+  dichiara, quindi si collauda.
+- **`PRENOTAZIONE_SGANCIATA` esiste davvero** (G25e guarda il sorgente, questo
+  la RPC). Per arrivarci serve una prenotazione senza NESSUNO dei due legami:
+  si ottiene cancellando il cliente anonimizzato (FK `on delete set null`), e
+  l'appuntamento **non** deve puntare a quel cliente — `appuntamenti.cliente_id`
+  è `on delete cascade` e `prenotazioni.appuntamento_id` è NOT NULL, quindi la
+  cancellazione fallirebbe in cascata prima di arrivare al punto (misurato
+  leggendo le FK, non tentato a caso).
+- **anon non può chiamare le due funzioni** (42501/404: il *grant*, che è una
+  difesa diversa dalla guardia interna) e **un autenticato senza azienda** si
+  ferma su `NON_AUTENTICATO` prima di guardare il cliente — la prova che
+  l'azienda arriva dal JWT e non da un argomento.
+
+### 5 · L3 · lo sgancio dal gesto vero, e i due selettori CSS rimasti
+- **Nuovo scenario** in `e2e/g8b-richieste-agenda.spec.ts`: la persona nasce da
+  `crea_prenotazione` come dal marciapiede, il legame col cliente lo fa il
+  bottone «Prendi come cliente», l'anonimizzazione passa dalla conferma battuta
+  a mano. Poi due verifiche di natura diversa: **a video**, in agenda la riga
+  del giorno non nomina più chi ha prenotato (c'è l'anonimo, e l'appuntamento è
+  ancora lì); **a valle**, sgancio + istantanee spente + `persone` orfana
+  anonimizzata e fuori dalla dedup. Il L2 semina col service role: prova la
+  funzione, non la strada. Questo prova la strada.
+- **S6 di M1**: la riparazione del 06/08 era giusta nel merito (asserire sulla
+  riga, non sul testo: lo stato vuoto CITA il nome cercato) ma usava
+  `page.locator('a[href="/clienti/<id>"]')` — un selettore **CSS**, che l'ordine
+  di lavoro vieta. Stessa robustezza per RUOLO: `getByRole("link", { name })`,
+  perché la riga È un link e il suo nome accessibile contiene «cognome nome»,
+  mentre lo stato vuoto ha un solo link («Nuovo cliente»). Aggiunto anche il
+  controllo dello stato vuoto sulla seconda ricerca.
+- **Caccia alle asserzioni dello stesso genere**: passate al setaccio tutte le
+  27 asserzioni di assenza (`toHaveCount(0)` / `not.toBeVisible`) delle 14 spec.
+  L'unico stato vuoto che **cita ciò che hai cercato** in tutta l'app è quello di
+  `/clienti` (`testo={\`Nessun cliente corrisponde a "${q}"…\`}`, l'unico
+  template letterale in un `Vuoto`), ed era proprio quello. Gli altri candidati
+  sono stati verificati sul sorgente e **assolti**: «LAC in esaurimento» e
+  «Controllo vista in scadenza» su `/richiami` non compaiono nel `<select>` dei
+  tipi perché il pannello `NuovoRichiamo` nasce chiuso; «12:30»/«09:00» di
+  `g6-slot` sono `exact` e le fasce d'orario sono intervalli; il nome del negozio
+  spento di `g4` è su una 404 vera.
+
+### 6 · L4 · nuovo blocco **L4r** (+4 → 85 guardie)
+La voce 6 ha cambiato due verità che il resto del programma dava per scontate.
+- **G30 · ratchet** — «anonimizzato_il esclude da ricerche, code e letture» (021)
+  lo rispetta oggi solo la lista `/clienti`. I **sette** selettori-cliente che
+  aprono lavoro NUOVO (busta, ordine LAC, vendita, appuntamento, richiamo,
+  fermo, reso esterno) trovano ancora l'anonimizzato e lo lasciano scegliere.
+  La guardia elenca il debito noto e diventa rossa all'**ottavo**. Riconosce una
+  ricerca da `from("clienti")` + `nome.ilike`; le riletture per id NON sono
+  ricerche (un fatto già scritto deve restare leggibile, col nome nuovo).
+  *Trade-off*: `app/(app)/ordini/page.tsx` cerca per nome ma sui FATTI — resta in
+  lista come scelta dichiarata, non come debito.
+- **G31** — ogni `raise exception` parlante di `prendi_persona_come_cliente`
+  arriva **tradotto** all'operatore. È il modo esatto in cui questo si è rotto:
+  la 021 rifà la funzione della 018 aggiungendo un errore nuovo, l'azione non lo
+  impara, e al banco compare il nome di una costante SQL. Due eccezioni
+  dichiarate (`NON_AUTENTICATO`, `PRENOTAZIONE_SGANCIATA`): un TERZO è rosso.
+- **G32** — `PrenotazioneRow.persona_id` resta `string | null` **e** nessuno lo
+  presume valorizzato (`persona_id!`, `as string`). Oggi non lo legge nessuno in
+  `app/`, `components/`, `lib/`: la guardia serve al primo che lo leggerà, che è
+  esattamente il momento in cui lo sganciato tornerebbe a essere una sorpresa.
+- **G33** — i quattro ruoli di `permessi.json` coincidono col CHECK di
+  `utenti.ruolo`. C2 è fail-closed: un ruolo che sta nel DB ma non nella matrice
+  **nega tutto** a quell'utente, in silenzio; uno che sta nella matrice ma non
+  nel CHECK non si può nemmeno assegnare. Vale l'ULTIMA definizione del CHECK
+  (`schema.sql` nasce con `optometrista/staff`, la **006** lo riscrive): la
+  guardia scandaglia schema + migrazioni in ordine, come G21d.
+- Tutte e quattro **verificate contro una mutazione** (fuori dal repo): G30
+  segnala i file veri se si toglie l'allowlist, G31 diventa rossa togliendo la
+  traduzione di `CLIENTE_NON_TUO`, G32 riconosce `persona_id!` e
+  `persona_id as string`, G33 legge il CHECK giusto (006, non schema.sql).
+
+### 7 · Rilievi che NON diventano test (per non fare rumore)
+1. **La coda dei richiami non esclude gli anonimizzati.** `calcolaProposte`
+   (`lib/richiami-proposte.ts`) legge i clienti delle proposte senza
+   `.is("anonimizzato_il", null)`: `non_contattare = true` ferma le sole
+   COMMERCIALI, quindi un anonimizzato con una busta pronta resta in coda per
+   sempre come «Anonimizzato-… Cliente», senza recapiti (i tasti Chiama/WhatsApp
+   spariscono: `telefono` è NULL). Per la 021 «code» è una delle tre parole del
+   contratto. Non l'ho messo in G30 perché lì la lettura è per id, che altrove è
+   legittima: è un gancio, non una guardia.
+2. **Il permesso `anonimizzazione` vive solo nell'azione.** A DB
+   `anonimizza_cliente` è `grant execute to authenticated`: qualunque utente del
+   tenant, con la chiave anon e il proprio login, può chiamarla via RPC e
+   scavalcare `richiedi("anonimizzazione")`. È la postura dichiarata del
+   progetto (il DB tiene il tenant, l'app tiene i ruoli) — ma C1 dice «solo
+   titolare/responsabile» e oggi quella frase è vera solo passando dai bottoni.
+3. **Il `comment on function` di `prendi_persona_come_cliente` (021) elenca gli
+   errori e non nomina `PRENOTAZIONE_SGANCIATA`**: chi legge il commento crede
+   che i casi siano cinque. Una riga.
+4. **`persone.ottico_di_riferimento` e `persone_riferimento_registro` non sono
+   nella mappa C1**: dopo lo sgancio la riga anonima punta ancora al negozio, e
+   il registro conserva `persona_id` + `prenotazione_id`. Nessun dato personale
+   trapela (la riga è già sbiancata) e il registro è un FATTO: lo segnalo perché
+   sia una scelta scritta, non una dimenticanza.
+5. **`prescrizioni.esaminatore`** (nome del medico esterno) sopravvive
+   all'anonimizzazione: è un professionista, non un familiare, quindi non
+   de-anonimizza per prossimità. Se la lettura di C1 fosse più stretta («tutti i
+   campi testo libero»), andrebbe in mappa.
+6. **`canale_contatto`, che C1 elenca per gli ordini, non esiste nello schema**
+   (mai creato). La mappa nomina un campo fantasma: innocuo, ma la prossima
+   rilettura di C1 lo cercherà.
+7. **Verificato invece corretto** ciò che poteva rompersi in silenzio: la copia
+   di `prendi_persona_come_cliente` dalla 018 alla 021 è **identica riga per
+   riga** più la sola guardia nuova (diff fatto, non supposto) — nessuna
+   regressione nascosta nel `create or replace`.
+
+### Esito auto-verifica — 3° giro: misurato vs NON misurato
+**Misurato qui, adesso:**
+- `npm test` (L1 + L4): **213 passed**, 11 file, 0 falliti — guardie 81 → **85**.
+- Typecheck mirato di `tests/**` + `e2e/**` (tsconfig usa-e-getta fuori dal repo,
+  stessi `paths`, `strict`): **pulito**.
+- `npx vitest run tests/contratto` senza env: **224 skippati puliti**, di cui i 2
+  nuovi di `b1-dedup-anonimi` e i 14 (era 8) di `b1-anonimizzazione`.
+- `npx playwright test --list`: **43 test in 14 file** (era 42), tutti compilano.
+
+**NON misurato — e nessuno lo dichiari verde al posto mio:** tutto il L2 e tutto
+il L3 (mancano i segreti e l'app viva). **DUE casi di contratto sono ROSSI di
+proposito** finché i ganci non si chiudono, e sono il segnale, non un difetto del
+test (il commento sopra l'`expect` lo dice, con la riparazione):
+1. `b1-dedup-anonimi` → «telefono illeggibile ≠ persona anonimizzata». Verde con
+   una riga: `and persone.telefono_normalizzato <> ''` nella ricerca di
+   `crea_prenotazione` (o il rifiuto di un telefono senza cifre). L'altro caso
+   dello stesso file (la dedup dei numeri veri) è verde ed è il contrappeso.
+2. `b1-anonimizzazione` → `per_conto_di` a NULL. Verde aggiungendo il campo
+   all'UPDATE delle prenotazioni dentro `anonimizza_cliente`.
+
+**Ganci richiesti da questo giro** (nessuno applicato: fuori dalla mia
+proprietà), in ordine di gravità: (1) la ricerca di `crea_prenotazione` che
+riesuma gli anonimi; (2) `per_conto_di` in mappa C1; (3) i sette selettori-cliente
++ la coda dei richiami che non escludono `anonimizzato_il` (G30 li sorveglia dal
+settimo in poi); (4) `PRENOTAZIONE_SGANCIATA` tradotto in `eseguiPrendiCliente`
+(bassa: è difesa in profondità) e nominato nel `comment on function`.
+
+## Era 2 · B1 · Fondamenta (branch `era2/B1-fondamenta`, migrazione 021)
+
+B1 pianta le fondamenta che tutte le buste successive useranno, e lo fa con
+**quattro contratti scritti apposta perché nessuno colmi un'ambiguità da solo**
+(`docs/fasi/contratti-B1.md`). La rete si è allargata sui quattro:
+**C1** anonimizzazione · **C2** helper permessi · **C3** mastro consensi ·
+**C4** relazioni. Nessun file dell'app toccato.
+
+### File creati / aggiornati
+| File | Livello | Test |
+|---|---|---|
+| `tests/unit/permessi-c2.test.ts` (nuovo) | L1 | 19 |
+| `tests/unit/codice-fiscale.test.ts` (nuovo) | L1 | 17 |
+| `tests/contratto/b1-consensi.test.ts` (nuovo) | L2 | 22 |
+| `tests/contratto/b1-relazioni.test.ts` (nuovo) | L2 | 16 |
+| `tests/contratto/b1-anonimizzazione.test.ts` (nuovo) | L2 | 5 |
+| `tests/contratto/b1-fondamenta-rls.test.ts` (nuovo) | L2 | 16 |
+| `e2e/m1-anagrafiche.spec.ts` (nuovo, poi **riscritto** al 2° giro) | L3 | 7 (6 vivi + 1 `fixme`) |
+| `e2e/_helpers.ts` (aggiornato al 2° giro) | L3 | — |
+| `e2e/fase4d-consensi.spec.ts` (riscritto al 2° giro) | L3 | 1 |
+| `e2e/fase3-agenda-richiami.spec.ts` (riparato al 2° giro) | L3 | 2 |
+| `tests/unit/guardie.test.ts` (esteso: **L4p** +12, poi **L4q** +6 → 74) | L4 | 18 |
+
+Nessuna nuova dipendenza (`vitest` e `@playwright/test` bastavano); nessuna
+modifica a `package.json`, `vitest.config.ts`, `playwright.config.ts` né a
+`.github/workflows/ci.yml` (il job `contratto-e2e` raccoglie i nuovi file per
+path, senza ritocchi).
+
+### 2° giro (06/08) — la UI minima del §4 è agganciata
+Il primo giro consegnò i sei scenari di M1 come `test.fixme` con una nota
+precisa: «i nomi qui dentro sono la lettura della SPEC, non un contratto con la
+UI: lo diventano solo dopo che la UI esiste». Ora esiste
+(`components/PermessiCliente.tsx` montato dalla scheda cliente, blocco «Sconti e
+fatturazione» in `ClienteForm`, marketing tolto dal form e dal banner 4d).
+Questo giro **non ha aggiunto scenari**: ha verificato sul sorgente che cosa la
+UI renda davvero e ha riportato i selettori su QUELLO.
+
+| Scenario | Prima | Ora |
+|---|---|---|
+| S1 · scheda completa col blocco P.IVA | `fixme` | **vivo** |
+| S2 · due firme, mastro a due righe, cache = l'ultima | `fixme` | **vivo** |
+| S3 · revoca: i commerciali si fermano, gli operativi restano | `fixme` | **vivo** |
+| S4 · minore + tutore-ENTE, la riga letta dai due lati | `fixme` | **vivo** |
+| S5 (1/2) · assicurazione «da rilevare» ≠ «NESSUNA» | (dentro S5) | **vivo** |
+| S5 (2/2) · cancello sconti **in cassa** | `fixme` (doppio blocco) | `fixme` (**un** blocco: M8) |
+| S6 · eliminazione definitiva protetta | `fixme` | **vivo** |
+
+**Il danno collaterale, trattato per primo perché era il rosso più probabile in
+CI**: la spunta «Consenso marketing» è sparita da `ClienteForm`, e con lei
+l'opzione `consensoMarketing` di `e2e/_helpers.ts::creaCliente`. La usavano due
+spec, ed entrambe sarebbero morte in CI su un locatore che non aggancia più:
+- `e2e/fase3-agenda-richiami.spec.ts` · S4 (GDPR) dava il consenso alla nascita
+  del cliente e lo toglieva con `uncheck()` in `/modifica`: ora **passa dal
+  mastro** (`dammiConsensoMarketing`) e revoca **dal tasto**
+  (`revocaConsensoMarketing`). Lo scenario ci guadagna: prova la stessa cosa
+  attraverso il gesto che il negozio farà davvero.
+- `e2e/fase4d-consensi.spec.ts` · S1 era **interamente** sul banner a due
+  consensi: bottoni «Registra consensi»/«Salva consensi», spunta marketing,
+  campo «data consenso marketing». Nessuno di quei cinque nomi esiste più (oggi:
+  «Consenso sanitario» / «Salva il consenso sanitario», solo sanitario).
+  Riscritto sul banner vero, con in più due asserzioni che prima non si potevano
+  scrivere: nel banner **non c'è** nessuna spunta marketing, e dopo aver
+  registrato il sanitario la cache marketing è ancora `non raccolto` — cioè il
+  flusso sanitario non tocca il marketing (C3).
+
+### L1 · C2 — la tabella fail-closed, riga per riga (19 test)
+`valutaPermesso` è pura apposta: si collauda senza database né sessione. Una
+riga per ogni caso di C2 — `non_autenticato`, `profilo_mancante`,
+`utente_disattivato`, `ruolo_sconosciuto`, `permesso_inesistente` (provato con un
+permesso **inventato sul momento**, e provato su *tutti* i ruoli: mai
+default-allow), `non_autorizzato`, `policy_non_disponibile` (matrice `null` e
+matrice-guscio), più il caso OK che ritorna esattamente
+`{utente_id, azienda_id, ruolo}` e **nient'altro**. Aggiunte le sfumature che il
+contratto implica ma non nomina:
+- una casella `false` e una casella **mancante** negano allo stesso modo;
+- un valore *truthy* non-`true` (la stringa `"true"`, `1`, `{}`, `[]`) **non
+  basta**: si esige il booleano;
+- `toString`/`constructor`/`__proto__` **non** sono permessi (senza
+  `hasOwnProperty` una riga ereditata dal prototipo sarebbe truthy e passerebbe
+  al controllo successivo — l'implementazione lo fa bene, il test lo blinda);
+- coerenza della policy vera: `anonimizzazione` = titolare/responsabile,
+  `anagrafiche_consensi` = tutti e quattro, e **ogni riga di `permessi.json`
+  dichiara tutti i ruoli** (il diniego dev'essere scritto, non dimenticato).
+
+### L1 · CF e minorenne (17 test)
+`dataNascitaDaCF` / `eMinorenne` con `oggi` **sempre esplicito** (il test del 18°
+compleanno non deve scadere). Coperti: maschile e femminile (giorno +40), le
+dodici lettere dei mesi e le lettere fuori serie, minuscole e spazi, il **giorno
+esatto del 18° compleanno → maggiorenne** e il giorno prima → minorenne, l'ora
+del giorno che non sposta il verdetto, l'inferenza del secolo (un anno che
+cadrebbe nel futuro va indietro di 100 — e cambia se cambia `oggi`), le date
+inesistenti (31 febbraio, 29/02 non bisestile, 31 aprile/novembre) e i giorni
+fuori scala (00, 32-40, 72+). Tutti i casi illeggibili ritornano **`null`, non
+`false`**: il test asserisce esplicitamente `not.toBe(false)`, perché è quella la
+differenza fra «non lo so» e «è maggiorenne».
+*Comportamento dichiarato (non un bug):* per chi è nato il **29 febbraio**, il
+18° compleanno cade il **1° marzo** dell'anno non bisestile (`Date.UTC` scivola).
+Il test lo fissa; se un domani si volesse il 28, è una decisione di prodotto.
+
+### L2 · C3 — i CHECK e la gara (22 test)
+I vincoli si esercitano con **insert dirette** su `consensi` (la policy è `for
+all to authenticated`: è il CHECK che deve fermare, non la RLS). Falliscono come
+devono: sanitario senza `prescrizione_id` · sanitario con canali · marketing con
+`prescrizione_id` · marketing `dato` con canale illecito (4 varianti, `'EMAIL'`
+compresa: il confronto è case-sensitive) · marketing `dato` senza `modalita` ·
+marketing `dato` con `canali` NULL · revoca con canali · e i tre vocabolari
+chiusi (`tipo`, `azione`, `modalita`). Passano come devono: marketing con **due**
+canali, revoca **senza** modalità, sanitario con Rx, tutti e tre i canali insieme.
+Poi l'azione del mastro: evento + cache nella stessa transazione, due `dato`
+consecutivi (due righe, cache = l'ultima, **non** l'unione), `revoca_marketing`
+(cache spenta, due fatti nel mastro), il sanitario che **non** tocca la cache
+marketing, e `CLIENTE_NON_TROVATO`.
+**La gara**, in tre forme: due `registra_consenso` concorrenti (nessun errore, due
+righe, cache = **uno degli eventi per intero**, mai un misto); `dato` e
+`revocato` insieme (asserzione anti-misto vera: se `consenso_marketing` è true
+allora i canali sono quelli del `dato`, se è false i canali sono NULL); cinque
+scritture concorrenti (5 righe, cache coerente). **Nessun confronto di
+timestamp**: `avvenuto_il` vale `now()` = inizio transazione, quindi non dice
+l'ordine di commit — ed è esattamente per questo che C3 impone il lock.
+
+### L2 · C4 — relazioni (14 test)
+Due strati, come li prevede il contratto: la **guardia di coppia** dentro
+`crea_relazione` (errore parlante `gia_in_relazione`, che nomina il tipo già
+presente) e la **blindatura a DB** (indice funzionale), esercitata scavalcando la
+funzione con insert dirette. Coperti: self dalla funzione e self a DB (23514);
+doppia familiare nei **due versi**; la **matrice completa** 5×5×2 (ogni tipo
+familiare dopo ogni altro, in entrambi i versi); **una sola riga fisica** dopo i
+tentativi; l'inversa diretta a DB → **23505**; `tutore_legale` che coesiste con
+`padre` (due righe, **una sola familiare**); il tutore-**ENTE** letto dai due
+versi (stesso `id`, non due righe); tipo inventato → 23514; cliente inesistente;
+FK cross-tenant → **23514, mai 23503**; RLS (B non vede le relazioni di A).
+
+### L2 · C1 — anonimizzazione (5 test)
+Il cliente di prova nasce con **ogni** campo personale valorizzato (un campo
+vuoto passerebbe il test anche se la funzione lo dimenticasse) e con tutto il
+contorno: ente convenzionato, parente, prescrizione con note, due consensi (uno
+con `documento_ref`), relazione, busta, ordine LAC, vendita con `cf_cliente`,
+richiamo. Dopo `anonimizza_cliente` si verifica **campo per campo**: le due
+costanti (`'Cliente'`, `'Anonimizzato-'+8`), **25 campi personali a NULL** in un
+colpo solo (lista esplicita, il messaggio d'errore nomina i sopravvissuti),
+`tags` vuoto, **`non_contattare` = true**, cache spente, `anonimizzato_il`
+valorizzato, e **`fonte` RESTA**. Poi: consensi conservati con `documento_ref`
+NULL, relazioni **sparite**, prescrizione conservata col dato clinico e le note a
+NULL, richiami senza note, e **vendita e ordini ancora leggibili con numeri e
+importi** (`BL-`, `OL-`, `VE-`, totale, acconto, saldo generato, IVA, doc_numero,
+doc_data, legame `busta_id`) con il solo `cf_cliente` a NULL. Chiude un controllo
+grezzo ma efficace: il JSON del cliente non contiene più nome, CF né indirizzo.
+Più i bordi: cliente inesistente, doppia anonimizzazione innocua, e **un'altra
+azienda non può anonimizzare** (per B quel cliente non esiste).
+
+### L3 · E2E M1 — 6 scenari vivi, 1 `fixme` (`e2e/m1-anagrafiche.spec.ts`)
+Sei scenari su sette esercitano ora la UI vera. Come sono stati allineati, e
+dove il primo giro avrebbe sbagliato:
+
+- **S1 · scheda completa col blocco P.IVA.** Compila identità, recapiti,
+  indirizzo, `Assicurazione` = NESSUNA e i tre campi che finiscono nel jsonb
+  (`Ragione sociale`, `CF / P.IVA azienda`, `Codice SDI`); rilegge dalla scheda
+  le righe che la scheda stampa davvero — `Assicurazione: NESSUNA` e
+  `Fattura a …` — e poi **torna in `/modifica`** per i campi che la scheda NON
+  mostra (secondo nome, scala, blocco P.IVA): è lì che si prova il round-trip
+  del jsonb, non a video.
+- **S2 · due firme.** Prima asserisce lo stato di partenza `Marketing: non
+  raccolto` (che **non** è «no»: la distinzione è di C3 e conta al banco), poi
+  penna+email+cellulare, poi digitale+cartaceo. Il mastro arriva a due righe con
+  due modalità; la cache resta l'**ultima** e si asserisce esplicitamente che
+  **non** contiene i canali della prima firma (`not.toContainText("email")`):
+  cache ≠ unione, che è il cuore del contratto.
+- **S3 · revoca.** Riscritto perché quello del primo giro non dimostrava niente:
+  «i commerciali si fermano, gli operativi restano» pretende **due** richiami, e
+  il tenant nuovo non ne ha nessuno. Ora se li costruisce dalla UI, senza
+  retrodatare col service role: una **busta portata a pronta** (→ «Sollecito
+  ritiro», operativo) e una **Rx con data visita 12 mesi fa e validità 12** (→
+  «Controllo vista in scadenza», commerciale, dentro la finestra −15/+30 di
+  `calcolaProposte`). Con il consenso si vedono entrambe; dopo la revoca il
+  commerciale sparisce, compare la riga «proposte commerciali nascoste» e
+  l'operativo **resta**. Nel mastro restano due fatti, `dato` e `revocato`.
+- **S4 · relazioni.** Persona collegata dalla combobox → opzione → tipo →
+  «Collega»; poi si **clicca il link della riga** e si legge la stessa relazione
+  dal lato dell'ente, dove l'etichetta è quella **inversa** («tutelato»,
+  derivata a video). È la prova UI di C4: una riga a DB, due letture.
+- **S6 · eliminazione definitiva.** Il gesto protetto (tasto → «Scrivi ELIMINA
+  per confermare» → «Anonimizza definitivamente»), poi tre verifiche: la scheda
+  mostra `Anonimizzato-…` e non più nome e telefono; la **ricerca clienti** non
+  la trova più; la **busta resta leggibile** con numero e importi (665 + 300 =
+  965, acconto 780). Il campo-per-campo resta al L2, che non dipende dalla UI.
+
+**Strict mode — la trappola di questo giro.** `getByRole(name:)` e
+`getByText("…")` fanno match di SOTTOSTRINGA, e tre asserzioni del primo giro
+oggi pescherebbero più elementi insieme: `getByText(/email/i)` (riga di cache +
+riga del mastro + etichetta del checkbox), `getByText(/revocato/i)`,
+`getByText(/cartaceo/i)`. Sono state ancorate con due locatori condivisi in
+`e2e/_helpers.ts`:
+- `rigaMarketing(page)` → l'**unica** riga «Marketing: …» (la cache). La regex
+  comprende anche il VALORE, non solo `^Marketing:`: il testo è spezzato in due
+  `<span>` e il motore di Playwright restituisce l'elemento più **profondo** che
+  soddisfa il matcher — con `/^Marketing:/` si aggancerebbe l'etichetta, senza
+  il valore, e ogni `toHaveText` sarebbe falso.
+- `righeMastroMarketing(page)` → i `<li>` del mastro, filtrati sul testo
+  ancorato; da lì si contano le righe e si cercano `penna`/`digitale`/`revocato`
+  **dentro la lista**, non nella pagina.
+Aggiunti anche `dammiConsensoMarketing` / `revocaConsensoMarketing`: i due gesti
+del mastro in un posto solo, così il prossimo rinomino si ripara una volta.
+
+**L'unico `fixme` rimasto — S5 (2/2), e il motivo è cambiato.** Il primo giro
+scriveva «manca il campo assicurazione in scheda **e** manca lo sconto in
+cassa». Il primo blocco è **caduto**: il campo c'è, con la distinzione
+`null = da rilevare` / `NESSUNA = chiesto, non ne ha`, e la parte collaudabile è
+stata staccata in **S5 (1/2)**, che percorre tutti e tre gli stati (nasce
+da-rilevare → NESSUNA → di nuovo da-rilevare) e li asserisce **in positivo**
+dopo la chiusura del gancio 1 — il verde, come per tutto il L3, lo dirà la CI.
+Resta bloccata solo
+la seconda metà: in `/cassa/vendita/nuova` **non esiste** nessuna azione «Sconto
+assicurativo» né alcun messaggio che distingua «da rilevare» da «non ne ha» —
+è **M8**, non ancora scritto. I nomi di quel test restano la lettura della spec,
+non un contratto con la UI, ed è scritto nel file.
+
+**S7 non è stato scritto**: è cross-modulo (vendita veloce LAC col CF) e la spec
+stessa lo assegna a B5/M8.
+
+### L4 · nuovo blocco **L4p** (+12 guardie → 68 in totale)
+Gated su `existsSync(021)`. Colpiscono ciò che si romperebbe **in silenzio**:
+- **G22 · ratchet sulla cache dei consensi** — nessun *nuovo* punto di scrittura
+  diretta di `consenso_marketing`/`consenso_canali`/`data_consenso`/
+  `consenso_dati_sanitari`/`consenso_sanitario_il` in `lib/actions.ts`. I tre
+  punti legacy sono elencati (vedi «ganci», qui sotto): un quarto è rosso.
+- **G22b** — le sette azioni B1 chiamano `richiedi()` **prima** di qualunque
+  `createClient`/`.from`/`.rpc` (C2: l'enforcement è nell'azione).
+- **G22c** — solo `lib/permessi.ts` legge `docs/regole/permessi.json`.
+- **G23** — i quattro CHECK di C3 esistono **per nome**, il perimetro dei canali
+  è `{email, cellulare, cartaceo}` e i vocabolari sono chiusi.
+- **G23b** — C4: check anti-self + indice `least/greatest` **per-negozio** e
+  **limitato ai familiari** (senza la `where`, `tutore_legale` non potrebbe più
+  coesistere; senza `least/greatest`, l'inversa passerebbe).
+- **G24 / G24b** — le 5 tabelle nuove hanno RLS, policy `to authenticated` e
+  revoke ad anon; le `alter default privileges` del punto 0 ci sono (tabelle
+  **e** funzioni future, `from public, anon`).
+- **G25** — ogni funzione della 021 è `security INVOKER` (una `definer` per
+  sbaglio scavalcherebbe la RLS e con lei il tenant) e ha il suo `revoke … from
+  public, anon` + `grant execute … to authenticated` (senza, con le default
+  privileges del punto 0 nascerebbe inchiamabile).
+- **G26** — `registra_consenso`: lock → evento → cache, in quest'ordine, con la
+  cache condizionata al marketing, e **nessun** `order by avvenuto_il` / `max()`
+  (C3 vieta i confronti di timestamp).
+- **G27 / G27b** — la mappa C1 nomina **tutti** i 30 campi, le costanti sono
+  quelle del contratto, **`fonte` non compare fra gli assegnati**, le relazioni
+  si cancellano ma i consensi **no**, nessun `delete` sui fatti, `cf_cliente` a
+  NULL; e l'unicità dei telefoni resta **parziale** (`where telefono_normalizzato
+  <> ''`) con `telefono_grezzo` reso nullable.
+- **G28 / G28b** — la 021 registra sé stessa; resta additiva (nessun `drop
+  table`/`drop column`/`rename`).
+
+### L4 · 2° giro — il ratchet stringe e nasce **L4q** (+6 guardie → 74)
+**G22 ha stretto di un dente.** L'elenco dei punti che possono scrivere a mano
+la cache dei consensi era `clienteDaForm`, `registraConsensi`,
+`creaPrescrizione`; ora `clienteDaForm` **è uscito** (la spunta non c'è più nel
+form) e rientrarci sarebbe rosso. Era il peggiore dei tre: su «Salva modifiche»
+poteva **spegnere** il consenso senza alcun evento nel mastro. Restano i due
+sanitari della Fase 4d, sorvegliati.
+
+**L4q · il contratto UI ↔ E2E di M1** (6 guardie). Da quando la UI c'è, gli
+scenari di M1 sono un contratto con etichette e ruoli veri — ma quel contratto
+si rompe solo dentro `contratto-e2e`, che gira coi segreti e ci mette minuti.
+Queste guardie lo controllano nel job `build`, in millisecondi:
+- **G29** — la scheda cliente **importa e renderizza** `PermessiCliente` (senza,
+  cinque E2E muoiono tutti insieme e il messaggio non spiegherebbe perché).
+- **G29b** — le **18 etichette** su cui poggiano gli E2E esistono nel sorgente
+  («Registra consenso», «Salva consenso», «Revoca comunicazioni», «Conferma
+  revoca», «Modalità», «Aggiungi relazione», «Persona collegata», «Tipo di
+  relazione», «Collega», «Eliminazione definitiva», «Scrivi ELIMINA per
+  confermare», «Anonimizza definitivamente», «Assicurazione», «Ragione sociale»,
+  «CF / P.IVA azienda», «Codice SDI», «Scala / appartamento», «Secondo nome»).
+- **G29c** — i tre canali della UI sono esattamente `{email, cellulare,
+  cartaceo}`, cioè il perimetro sigillato dal CHECK a DB (G23): un quarto canale
+  fallirebbe al banco, non nei test.
+- **G29d** — **una sola** riga «Marketing: …» in tutta la UI. È insieme un
+  invariante di prodotto (C3: una cache, un posto) e la condizione perché l'E2E
+  possa asserire senza ambiguità: se due componenti la stampassero, S2 e S3
+  morirebbero in strict mode con un errore che non spiega niente.
+- **G29e** — nessun `name="consenso_marketing"` / `consenso_canali` /
+  `data_consenso` in `app/` e `components/`: è il modo esatto in cui la spunta
+  rientrerebbe dalla finestra.
+- **G29f** (aggiunta dopo la chiusura del gancio 1) — la riga
+  «Assicurazione: …» si stampa **sempre**, e la vecchia condizione
+  `(assicurazione || fatt)` non torna. Senza, lo stato «da rilevare» ridiventa
+  invisibile e S5 (1/2) perde due delle sue tre asserzioni. *Ratchet verificato
+  contro il file com'era*: sul sorgente vecchio è rossa, sul nuovo verde.
+
+*Trade-off dichiarato (G29b e G29f soprattutto): sono guardie di **testo**. Un
+rinomino legittimo («Registra consenso» → «Raccogli consenso»), o un refactor
+che estrae la riga assicurazione in un componente, le fanno diventare rosse
+anche se il prodotto migliora. È voluto — quel cambiamento deve passare per
+l'E2E e per la spec, non avvenire di soppiatto — e il messaggio d'errore dice
+quale etichetta e quale file. Riparazione: una riga qui, una riga nello spec.*
+
+### ⚠️ Dove la 021 (o le sue funzioni) NON fa ciò che i contratti dichiarano
+Sono i rilievi veri di questo giro. I primi due sono **buchi funzionali**: i test
+li asseriscono secondo il **contratto**, quindi se restano tali quei due test
+saranno rossi in CI — è il segnale, non un errore del test.
+
+1. **C1 · la persona del portale NON viene anonimizzata (silenziosamente).**
+   `anonimizza_cliente` è `security invoker`, ma `persone` ha **RLS attiva senza
+   alcuna policy** (ID-01, migrazione 011: «il negozio non legge mai `persone`»).
+   L'`update public.persone …` dentro la funzione, eseguito da un utente
+   *authenticated*, non trova righe e **passa senza errore**: nome, email e
+   `telefono_grezzo` restano quelli veri. La mappa C1 dice invece
+   `nome → 'Anonimo'`, `email → anon-<id>@invalid`, `telefono_grezzo → NULL`.
+   *Test che lo intercetta:* `b1-anonimizzazione.test.ts` → «la persona del
+   portale si anonimizza e DUE anonimi non collidono».
+   *Richiesta (tocca `supabase/`, non l'agente test)*: estrarre la parte-persone
+   in una funzione `security definer` con controllo di tenant esplicito, e
+   chiamarla da `anonimizza_cliente` (oppure rendere definer l'intera funzione
+   verificando `azienda_id` a mano). Finché resta così, anche la difesa
+   anti-collisione della nota «⚠️ MISURATO PRIMA DI SCRIVERE» della 021 non viene
+   mai esercitata in produzione.
+2. **C3 · il CHECK sui canali lascia passare l'array VUOTO.**
+   `consensi_dato_marketing_canali` verifica `array_length(canali, 1) >= 1`, ma
+   in PostgreSQL `array_length('{}', 1)` è **NULL**, e un CHECK che valuta NULL
+   **passa**. Quindi `insert … tipo='marketing', azione='dato', canali='{}',
+   modalita='penna'` entra, e `registra_consenso` propaga sulla cache un
+   `consenso_marketing = true` **senza nessun canale** — cioè esattamente ciò che
+   C3 vieta («canali non vuoto»). *Test:* `b1-consensi.test.ts` → «C3(3d)».
+   *Richiesta*: `cardinality(canali) >= 1` (o
+   `coalesce(array_length(canali,1),0) >= 1`).
+3. **C3 · la cache è ancora scritta a mano da tre punti legacy** (rilievo di
+   codice, non di migrazione). `clienteDaForm` (usata da `creaCliente` **e** da
+   `aggiornaCliente`) scrive `consenso_marketing`/`data_consenso` dalla spunta
+   del form: su un aggiornamento, togliere la spunta **spegne il consenso senza
+   alcun evento nel mastro** — la cache smentisce i fatti. `registraConsensi`
+   (banner Fase 4d) fa lo stesso, e `creaPrescrizione` scrive la **cache
+   sanitaria** (`consenso_dati_sanitari`/`consenso_sanitario_il`), che per C3 non
+   dovrebbe nemmeno esistere («per `dati_sanitari` NESSUNA cache: si legge dal
+   mastro, per prescrizione»). *Sorvegliato da G22* (ratchet: un quarto punto è
+   rosso). *Richiesta*: migrare quei tre flussi su `registra_consenso` e
+   rimuovere `consenso_marketing`/`data_consenso` da `clienteDaForm`.
+   Registrato anche a contratto: un test dichiara esplicitamente che **oggi il DB
+   non vieta** la scrittura diretta della cache (la policy di `clienti` è `for
+   all`), cioè che l'invariante vive nel codice e non nello schema.
+4. **C3 · una revoca dei dati sanitari è impossibile.** Il CHECK
+   `consensi_sanitario_per_rx` pretende `prescrizione_id NOT NULL` per
+   `tipo='dati_sanitari'` **qualunque sia l'azione**, mentre C3 dice che «la
+   revoca è totale **per tipo**» e non punta a una riga. Oggi si può revocare il
+   sanitario solo indicando *una* prescrizione. Non è testato come fallimento
+   (l'intersezione dei due contratti è ambigua): **serve una decisione**, o
+   ammettere `prescrizione_id NULL` quando `azione='revocato'`, o dichiarare che
+   il sanitario non si revoca.
+5. **C2 · ordine dei controlli invertito rispetto alla tabella.** Il commento in
+   `lib/permessi.ts` promette «l'ordine dei controlli È quello della tabella C2 e
+   non va cambiato», ma `policy_non_disponibile` è valutato **per primo** mentre
+   nella tabella è penultimo. Il **verdetto non cambia mai** (negato in entrambi
+   i casi): cambia solo quale motivo si riporta quando due condizioni sono vere
+   insieme. Nessun test rosso: i test isolano un caso per volta, e uno fotografa
+   esplicitamente la precedenza. È un rilievo di **commento**, non di logica.
+6. **Consegna §4 vs 021: `e_minorenne(cf)` a DB non esiste.** La consegna la
+   elenca fra le funzioni («funzione PURA che estrae la data di nascita dal CF»);
+   la 021 non la crea. È stata implementata in TypeScript (`lib/codice-fiscale.ts`,
+   `eMinorenne`/`dataNascitaDaCF`) e lì è coperta da 17 unit. Se serviva a DB
+   (per una query o una vista), manca; se bastava lato app, la consegna va
+   annotata. Nessun test rosso.
+7. **`elimina_relazione` cancella in silenzio quando il tenant non torna** (non è
+   un difetto, è una scelta da mettere per iscritto). La funzione fa
+   `delete … where id = p_id` e si affida alla RLS: se l'id è di un altro
+   negozio, la delete tocca **zero righe e non dà errore**. Coerente con la
+   semantica C2 di `tenant_violato` («Elemento non trovato»), ma l'azione
+   risponde comunque «rimossa». *Coperto* dal test «B non può eliminare una
+   relazione di A»: nessun errore, riga sopravvissuta. Se si vuole un esito
+   parlante serve un `get diagnostics` + `raise` nella funzione.
+8. **`registra_consenso` non verifica che la prescrizione sia dello stesso
+   cliente.** Il trigger di coerenza tenant garantisce la stessa *azienda*, non lo
+   stesso *cliente*: si può legare un consenso sanitario del cliente X alla Rx del
+   cliente Y dello stesso negozio. Non è nei contratti (quindi non è un test
+   rosso), ma è il tipo di buco che si chiude meglio adesso che fra sei mesi.
+
+### Ganci richiesti (nessuno applicato: fuori dalla proprietà dell'agente test)
+Aggiornati al 2° giro. I primi due del giro 1 sono **caduti**: la UI minima c'è
+(gli E2E sono vivi) e l'allowlist di G8 si è svuotata delle cinque azioni dei
+contratti — ne restano due, `creaOculistaAlVolo` (M2) e `scriviParametro` (M10),
+la cui schermata appartiene a un altro modulo per esplicita scelta della
+consegna («niente UI oltre il minimo degli E2E»).
+
+**Tutti e tre i ganci di questo giro sono stati CHIUSI dal codificatore mentre
+lavoravo** (06/08). Li lascio scritti col loro esito: uno dei tre ha **cambiato
+un'asserzione**, e questo è il caso interessante.
+
+1. ~~«Assicurazione: da rilevare» non si vede in scheda.~~ **CHIUSO — e mi ha
+   fatto riscrivere un'asserzione.** Il blocco era dietro `(assicurazione ||
+   fatt)`: lo stato `null` (*non gliel'abbiamo ancora chiesto*) era invisibile e
+   S5 (1/2) poteva solo constatare l'**assenza** della riga — un segnale muto,
+   che non distingueva «non chiesto» da «la scheda non lo dice». Ora la riga si
+   stampa sempre e dice `Assicurazione: da rilevare`.
+   *Conseguenza sui test (fatta)*: il passo (a) di S5 (1/2) era
+   `toHaveCount(0)` e **sarebbe diventato rosso**: rovesciato in
+   `toHaveText("Assicurazione: da rilevare")`; il passo (c) non si accontenta
+   più della sparizione di «NESSUNA» ma asserisce il ritorno a «da rilevare».
+   I tre stati di M1 §2 sono ora collaudati **tutti e tre in positivo**, che era
+   il punto dello scenario.
+   *Aggiunta*: nuova guardia **G29f** — la riga si stampa sempre e la vecchia
+   condizione non torna (ratchet sulla forma esatta da cui si è usciti).
+   Verificata contro il file com'era prima: sul vecchio sorgente la guardia è
+   rossa, sul nuovo verde — cioè morde davvero.
+2. ~~Il cliente anonimizzato resta nell'elenco `/clienti`.~~ **RISOLTO mentre
+   scrivevo** (commit `ce5ee52`, `.is("anonimizzato_il", null)` sulla lista).
+   Era un gancio vero: la 021 dichiara che `anonimizzato_il` «esclude da
+   ricerche, code e letture» e la lista non filtrava. Ora S6 lo **collauda**:
+   dopo l'anonimizzazione cerca prima il vecchio nome (zero risultati) e poi
+   «Anonimizzato» (zero risultati) — cioè la riga è uscita dal registro, non si
+   è solo travestita.
+3. ~~Il campo di ricerca clienti non ha etichetta accessibile.~~ **CHIUSO**:
+   ora ha `aria-label="Cerca"`. S6 è passato da `getByRole("searchbox")` a
+   `getByLabel("Cerca")`: stessa robustezza, ma il test si legge come il gesto
+   («cerca DaAnonimizzare…»). Nessun'altra spec toccava quel campo.
+4. ~~`<li role="option">` con dentro un `<button>`~~ **CHIUSO**: ora è un
+   `<div role="listbox">` con `<button role="option">` figli diretti — il ruolo
+   sta sull'elemento che si preme, quindi è raggiungibile da tastiera.
+   *Conseguenza sui test: nessuna.* Il selettore di S4 è
+   `getByRole("option", { name })` e non è cambiato di una lettera — è
+   esattamente il motivo per cui l'ordine di lavoro impone ruolo/etichetta e
+   vieta i selettori strutturali: la UI si è riscritta sotto, il test no.
+   Verificato sul nuovo markup, non dedotto.
+5. **Restano i due fix di contratto** dei punti (1) e (2) della sezione «Dove la
+   021 NON fa ciò che i contratti dichiarano»: la persona del portale non
+   anonimizzata e il CHECK che lascia passare `canali = '{}'`. Sono le uniche
+   due cose che, oggi, rendono rossi due test di contratto.
+6. **Debito che resta in carico all'app** (già sorvegliato da G22): il consenso
+   **sanitario** si scrive ancora come cache diretta da `registraConsensi` e
+   `creaPrescrizione`. Per C3 non dovrebbe esistere alcuna cache sanitaria: si
+   legge dal mastro, per prescrizione. Finché è così, il banner 4d e il gate
+   delle prescrizioni restano fuori dal mastro.
+
+### Esito auto-verifica — B1 (2° giro): misurato vs NON misurato
+**Misurato davvero, qui, adesso:**
+- `npm test` (L1 + L4): **202 passed**, 11 file, 0 falliti — guardie 68 → **74**
+  (ratchet G22 stretto + blocco L4q). È la baseline richiesta: era 196, i +6
+  sono le guardie nuove, nessun test preesistente è cambiato di esito.
+- `npx tsc --noEmit`: **pulito** (l'app; `tsconfig.json` esclude `tests/` ed
+  `e2e/`).
+- Typecheck **mirato degli E2E** con un tsconfig usa-e-getta fuori dal repo
+  (stessi `paths`, `strict`): **nessun errore** oltre ai `process` non tipizzati
+  (manca `@types/node` in quel config ad hoc, non nel progetto).
+- `npx playwright test --list`: **42 test in 14 file**, tutti compilano
+  (`m1-anagrafiche.spec.ts` ne elenca 7: 6 vivi + 1 `fixme`).
+
+**NON misurato — e nessuno lo dichiari verde al posto mio:**
+- **Tutto il L3**. Gli E2E qui non girano: servono il progetto Supabase di test
+  (segreti `TEST_SUPABASE_*`) e l'app in esecuzione contro quel progetto. Il
+  lavoro fatto su S1-S6 è **allineamento statico** — sorgente alla mano,
+  etichetta per etichetta, ruolo per ruolo — non un'esecuzione. **Il verde lo dà
+  la CI di Ray** (job `contratto-e2e`), ed è la prima cosa da guardare su questa
+  PR: se qualcosa si è mosso fra la lettura del sorgente e il DOM vero, esce lì.
+- **Tutto il L2** (`tests/contratto/**`): nessun segreto in questo ambiente.
+  Invariato in questo giro (nessuna migrazione nuova: la 021 è l'ultima).
+- `npm run build` non è stato lanciato (fuori dal perimetro dell'agente test);
+  lo fa il job `build` della CI.
+
+**Dove guardare per primo se la CI va rossa sull'E2E**, in ordine di rischio:
+(1) S3, il più lungo — è marcato `test.slow()`, attraversa wizard busta +
+prescrizione + due letture di `/richiami`; (2) le asserzioni su `toHaveText`
+della riga cache, se il markup della riga «Marketing:» cambia forma; (3) S6, che
+dipende dal formato euro `965,00 €` — l'asserzione è ancorata alla sola parte
+numerica proprio per non dipendere dal simbolo e dallo spazio unificatore.
 
 ## Era 2 · S0 · Bonifica (branch `era2/S0-bonifica`, migrazione 020)
 
@@ -716,12 +1390,15 @@ tenant usa-e-getta (`e2e/_helpers.ts`).
   causale sulla vendita veloce → RE- nel registro, vendita ancora emessa); S8
   (chiusura serale con +1 € di eccedenza contanti → causale pretesa, redirect
   al dettaglio chiusura, una sola per oggi).
-- **Fase 4d** (`fase4d-consensi.spec.ts`): S1 (cliente nuovo senza consensi →
-  banner con le due voci mancanti; registro il marketing con data di ieri →
-  resta solo il sanitario; registro anche il sanitario → banner sparito, la
-  sezione privacy mostra "Marketing: sì" / "Dati sanitari: sì"). Tenant e
-  cliente usa-e-getta; selettori solo su testo/etichetta reali del banner
-  (`Registra consensi`, `Salva consensi`, `data consenso marketing`).
+- **Fase 4d** (`fase4d-consensi.spec.ts`): S1 (cliente nuovo senza consenso →
+  banner persistente; lo registro con data di ieri → banner sparito e la card
+  Privacy mostra "Dati sanitari: sì, dal …"). ⚠️ **Riscritto in B1** (vedi la
+  sezione in cima): il banner chiedeva DUE consensi, il marketing è passato al
+  mastro (C3) e con lui sono spariti `Registra consensi`, `Salva consensi` e
+  `data consenso marketing`. Oggi i selettori sono `Consenso sanitario` /
+  `Salva il consenso sanitario` / `data consenso sanitario`, più due asserzioni
+  di separazione (nel banner non c'è spunta marketing; la cache marketing resta
+  «non raccolto» dopo aver registrato il sanitario).
 
 ### L4 · Guardie statiche — `tests/unit/guardie.test.ts`
 Base (regressioni di contratto):
@@ -815,12 +1492,18 @@ ricerche cliente/catalogo vanno validati al primo run CI (probabile un giro di
 aggiustamenti). Fase 3 S3/S4 dipendono dal tempo: si retrodatano via service
 role. La numerazione per anno riparte da 1 a Capodanno (atteso).
 
-**Fase 4d S1 (nuovo)**: punto sensibile atteso è il re-render del banner dopo
-la server action `registraConsensi` (che fa `revalidatePath`): il test assume
-che il dialogo resti aperto (stato client `aperto`) dopo il primo salvataggio e
-prosegue col consenso sanitario senza riaprirlo. Se al primo run CI il form si
-chiudesse, basta riaprire con "Registra consensi". Le date retrodatate usano il
-fuso del runner (l'action ancora a `T12:00:00`, margine ampio).
+**Fase 4d S1** (riscritto in B1): punto sensibile atteso è il re-render del
+banner dopo la server action `registraConsensi` (che fa `revalidatePath`) — ora
+il test registra **un solo** consenso, quindi non dipende più dal fatto che il
+dialogo resti aperto. Le date retrodatate usano il fuso del runner (l'action
+ancora a `T12:00:00`, margine ampio) e il test ricostruisce la data attesa allo
+stesso modo, per non sbagliare giorno su un run a cavallo della mezzanotte.
+
+**M1 S1-S6 (B1, 2° giro)**: scritti contro il sorgente, **mai eseguiti in
+locale** (serve il Supabase di test + l'app viva). Il più esposto è S3, che è
+anche il più lungo (`test.slow()`); gli altri sono lineari. Se il primo run CI
+dà rosso, il sospetto numero uno è un locatore di *label* che il DOM presenta in
+modo diverso da come lo legge il sorgente, non la logica dello scenario.
 
 ## Ganci richiesti (al codice app e agli altri agenti)
 1. **Manuale utente — capitoli mancanti (gancio per l'agente manuali).** La

@@ -1,4 +1,4 @@
-*Aggiornato a: v0.5.1 (Fasi 4b–4d)*
+*Aggiornato a: v0.5.2 (Era 2 · busta B1)*
 
 # Glossario
 
@@ -17,9 +17,20 @@ montature, occhiali da sole, soluzioni, servizi) o **esente / fuori campo**
 (per esempio le polizze assicurative). Si sceglie per ogni riga ed è
 modificabile a mano.
 
+**Anonimizzato.** Il segnalino sulla scheda di un cliente di cui hai eliminato
+i dati personali (vedi *Eliminazione definitiva*). Sulla sua scheda non si
+registra più niente; le vendite e gli ordini di prima restano leggibili, e le
+prenotazioni che aveva fatto dal sito restano ma senza nome ("Anonimo") e senza
+telefono.
+
 **Appuntamento.** Una voce dell'agenda. Nasce **prenotato**; poi diventa
 **completato**, **non presentato** (il cliente non si è presentato) o
 **annullato**.
+
+**Assicurazione (del cliente).** La compagnia che gli rimborsa gli occhiali,
+nella sezione "Sconti e fatturazione" della scheda. Vuota ("— da rilevare")
+vuol dire che non gliel'hai ancora chiesto; la voce **"NESSUNA"** vuol dire che
+gliel'hai chiesto e non ne ha.
 
 **Avvisato / avvisata.** L'aver avvertito il cliente che l'ordine è pronto. È
 un'**annotazione** (resta la data), non uno stato dell'ordine: una busta
@@ -28,7 +39,13 @@ avvisata è comunque "pronta", e puoi consegnarla anche senza aver premuto
 
 **Canale preferito.** Come il cliente vuole essere ricontattato: Telefono,
 WhatsApp, SMS, Email, Cartaceo. In scheda evidenzia il recapito giusto e nei
-Richiami precompila il canale quando registri un esito.
+Richiami precompila il canale quando registri un esito. Non c'entra con i
+canali del consenso: si cambia quando vuoi, senza firme.
+
+**Canali del consenso.** I mezzi che il cliente ti autorizza a usare per le
+comunicazioni commerciali: **Email**, **Cellulare**, **Cartaceo**. Se ne spunta
+almeno uno quando registri il consenso; la riga in testa ai "Permessi" mostra
+quelli attivi adesso.
 
 **Caparra confirmatoria.** La natura giuridica dell'acconto (art. 1385 c.c.):
 non è soggetta a IVA, per questo non fa scontrino. La ricevuta caparra ne
@@ -57,13 +74,22 @@ accanto al nome nella lista prodotti.
 **Centratura.** Le misure per montare le lenti sulla montatura: **DNP**
 (distanza naso-pupilla, 20–40 mm) e **altezza** (10–35 mm) per ciascun occhio.
 
-**Consenso marketing.** Il permesso del cliente a ricevere richiami e
-promozioni. È distinto dagli avvisi di servizio (come "il tuo occhiale è
-pronto"), che puoi sempre mandare.
+**Codice SDI.** Il codice di sette caratteri per la fattura elettronica, nella
+sezione "Sconti e fatturazione" della scheda cliente, insieme a ragione sociale
+e partita IVA dell'azienda a cui va intestato il documento.
+
+**Consenso marketing (o alle comunicazioni).** Il permesso del cliente a
+ricevere richiami e promozioni. Si registra e si revoca **solo** dalla sezione
+**"Permessi"** della sua scheda, con **"Registra consenso"** e **"Revoca
+comunicazioni"**: non è più una spunta del form. Ogni passaggio resta scritto
+con la sua data (vedi *Elenco delle firme*). È distinto dagli avvisi di
+servizio (come "il tuo occhiale è pronto"), che puoi sempre mandare.
 
 **Consenso dati sanitari.** Il permesso del cliente al trattamento dei dati
-sulla salute (le misure della vista, art. 9 GDPR). Si raccoglie alla prima
-prescrizione, con spunta obbligatoria; resta con la sua data nella scheda.
+sulla salute (le misure della vista, art. 9 GDPR). Te lo chiede il form della
+prima prescrizione con una spunta obbligatoria; se manca, la scheda mostra un
+riquadro con **"Consenso sanitario"**. Resta con la sua data nel riquadro
+Privacy.
 
 **Da catalogo.** Il bottone che, in un ordine di lenti a contatto o in una
 vendita, riempie una riga pescando un prodotto dal tuo magazzino.
@@ -84,6 +110,27 @@ se paga in contanti.
 prescrizione occhiali è una riga facoltativa; se compilata, finisce sulla busta
 stampata per il laboratorio.
 
+**Elenco delle firme.** Sotto la riga "Marketing:" nei "Permessi": tutte le
+volte che quel consenso è stato dato o revocato, con data, modalità e canali.
+Non si modifica e non si cancella: è la prova di quello che hai raccolto.
+
+**Eliminazione definitiva.** Il gesto con cui, su richiesta del cliente, fai
+sparire i suoi dati personali: si scrive **ELIMINA** a mano e si preme
+**"Anonimizza definitivamente"**. Spariscono nome, recapiti, indirizzo, codice
+fiscale, dati di fatturazione e le note libere su prescrizioni, appuntamenti,
+richiami e ordini; sulle prenotazioni fatte dal sito restano la data e l'orario,
+non il nome né il telefono. Vendite, ordini e movimenti restano (sono fatti
+aziendali); i collegamenti di famiglia si sciolgono. Vale per il **tuo** negozio:
+quello che un altro negozio sa della stessa persona non si tocca. Solo titolare
+o responsabile.
+
+**Famiglia e tutela.** Il riquadro dei "Permessi" dove colleghi la scheda di un
+cliente a un'altra: **Tutore legale** (anche un ente, come un centro sociale),
+**Padre**, **Madre**, **Figlio**, **Fratello**, **Sorella**. Il collegamento si
+scrive una volta e si legge da tutte e due le schede, ciascuna dal verso
+giusto. Fra due persone una sola relazione di famiglia; la tutela può
+convivere.
+
 **Fissa ritiro.** Il bottone che, da una busta pronta o da un ordine arrivato,
 apre l'agenda già compilata per fissare l'appuntamento di consegna o ritiro.
 
@@ -92,7 +139,8 @@ resta impegnata finché il cliente la ritira (**"Segna ritirato"**) o rinuncia
 (**"Annulla"**).
 
 **Fonte.** Da dove arriva un cliente o un ordine: Banco, Dal sito, Dall'app,
-Convenzione, Import.
+Convenzione, Import. Resta scritta anche dopo un'eliminazione definitiva: dice
+da dove è arrivato un cliente, non chi era.
 
 **Garanzia (tipo).** Nella busta scegli se la garanzia è un **Servizio del
 negozio** (alla consegna nasce al 22%) o una **Polizza di compagnia** (nasce
@@ -121,6 +169,10 @@ pagamenti che lasciano una traccia (tutti tranne i contanti): serve alle spese
 che la detrazione riconosce solo se pagate in modo tracciato — ma non ai
 dispositivi medici, detraibili anche in contanti.
 
+**Modalità (della firma).** Come hai raccolto il consenso: **Penna** (foglio
+firmato e archiviato) o **Digitale**. Si sceglie quando registri il consenso e
+resta scritta nell'elenco delle firme.
+
 **Movimento.** Una riga del libro giornale del magazzino: carico, scarico,
 ordine cliente, rettifica, reso a fornitore, danno/smaltimento, uso interno.
 Non si modifica né si cancella.
@@ -130,9 +182,13 @@ prelievo dal cassetto, spesa di negozio, versamento in cassaforte o in banca,
 caparra incamerata. Vuole sempre un motivo e non si modifica: l'errore si
 corregge con un movimento contrario.
 
-**Non contattare.** La spunta "Non contattare per promozioni" sulla scheda
-cliente. Toglie il cliente dalle proposte commerciali dei Richiami; la sua
-merce lo raggiunge comunque (gli avvisi operativi restano, con il badge).
+**Non contattare.** La spunta "Non contattare per promozioni" nei Recapiti
+della scheda cliente. È una decisione tua, non una firma del cliente: toglie
+quel cliente dalle proposte commerciali dei Richiami senza toccare i consensi.
+La sua merce lo raggiunge comunque (gli avvisi operativi restano, con il badge).
+
+**Non raccolto.** Come si legge la riga "Marketing:" quando quel consenso non è
+mai stato chiesto. Diverso da "no", che vuol dire chiesto e poi revocato.
 
 **Occhiale da sole.** Un tipo di prodotto a magazzino, con i suoi parametri
 montatura (calibro, ponte, asta, colore, materiale). In vendita esce al 22% con
@@ -142,6 +198,10 @@ dispositivo medico, come le montature.
 documento al Sistema Tessera Sanitaria. VISTA la registra soltanto: non invia
 nulla al Sistema TS in nessun caso.
 
+**Permessi.** La sezione della scheda cliente dove stanno il consenso alle
+comunicazioni con la sua storia, "Famiglia e tutela" e l'eliminazione
+definitiva.
+
 **Preventivo.** Una busta salvata senza impegno. Diventa un ordine vero con
 **"Conferma ordine"** (che chiede l'acconto e, se c'è, il metodo della caparra).
 
@@ -149,7 +209,8 @@ nulla al Sistema TS in nessun caso.
 dati, senza che tu debba avviare niente. Cinque motivi: sollecito ritiro,
 promessa in ritardo, LAC in esaurimento, controllo vista in scadenza, fermo in
 scadenza. I due commerciali (LAC e controllo vista) compaiono solo per i
-clienti col consenso marketing e senza la spunta "Non contattare".
+clienti col consenso alle comunicazioni acceso e senza la spunta "Non
+contattare".
 
 **Quietanza.** Il documento che il cliente firma quando gli restituisci la
 caparra: attesta che ha ricevuto la somma. Si stampa in copia cliente e copia
@@ -170,6 +231,11 @@ giornata chiusa).
 **Rettifica.** Il movimento che corregge la giacenza. Si usa anche per
 sistemare un errore precedente, con segno opposto: gli sbagli si correggono,
 non si cancellano.
+
+**Revoca (delle comunicazioni).** Il gesto con cui spegni il consenso su
+richiesta del cliente: **"Revoca comunicazioni"** e poi **"Conferma revoca"**.
+Le proposte commerciali si fermano subito; gli avvisi operativi restano leciti.
+La revoca resta scritta nell'elenco delle firme.
 
 **Riallineamento.** L'unico modo per registrare una vendita con una data
 passata: si usa dopo un guasto della cassa, per allineare VISTA al documento
@@ -208,8 +274,15 @@ L'aver avvisato il cliente non è uno stato: è un'annotazione a parte.
 **Tipo di lavoro (busta).** Come lavori l'occhiale: occhiale completo, solo
 lenti, solo montatura, montatura del cliente.
 
-**Tutore legale.** Il nome di chi risponde per un cliente minorenne. Se
-compilato, in scheda compare il badge "Tutore: <nome>".
+**Tutore legale.** Chi risponde per un cliente minorenne o tutelato. Si
+registra in un modo solo: il collegamento **Tutore legale** in "Famiglia e
+tutela", che lega davvero due schede — anche quella di un ente — e si legge dai
+due lati. C'era anche un campo di testo nell'Identità, che scriveva solo un
+nome: non si compila più. Dove qualcuno l'aveva riempito, il nome resta
+visibile come **"Tutore legale (storico)"** — da leggere, non da correggere.
+Il segnalino in testata alla scheda mostra il tutore del **collegamento**; se
+quel collegamento non c'è ancora e c'è solo il vecchio testo, il segnalino lo
+dice: **"Tutore: <nome> (storico)"**.
 
 **Vendita.** L'incasso registrato in cassa, con un numero suo (`VE-…`). È
 sempre per l'intero valore; i pagamenti (uno o più metodi) devono farne la

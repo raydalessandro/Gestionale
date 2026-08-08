@@ -72,14 +72,14 @@ function piuGiorni(iso: string, n: number): string {
  * il contatore non viene mai troncato.
  */
 let telSeq = 0;
+const TEL_BASE = String(Date.now()).slice(-7);
 function telefonoUnico(): string {
-  const base = Array.from(RUN_ID)
-    .map((c) => c.charCodeAt(0) % 10)
-    .join("")
-    .padEnd(3, "0")
-    .slice(0, 3);
-  const coda = String(telSeq++).padStart(6, "0"); // coda intera, 6 cifre
-  return `3${base}${coda}`; // 1 + 3 + 6 = 10 cifre esatte
+  // Base = ms di avvio del run: unica TRA i run e TRA le suite. La vecchia
+  // base (RUN_ID %10) collideva tra run diversi e, con l'indice parziale al
+  // suo posto, la collisione non esplode piu all'INSERT: aggancia per DEDUP
+  // la persona sporca di un run/suite precedente (visto in CI: g8b riceveva
+  // "Prova Bonifica", la persona della suite contratto). 10 cifre esatte.
+  return `3${TEL_BASE}${String(telSeq++).padStart(2, "0")}`;
 }
 
 describe.skipIf(!haEnv())("018 · prendi_persona_come_cliente — accetta e prendi (G8)", () => {

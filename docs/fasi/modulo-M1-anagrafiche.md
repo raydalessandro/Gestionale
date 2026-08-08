@@ -217,6 +217,15 @@ scheda mostra una volta aperta al banco → superfici/PWA, parcheggiate
 al lavoro UI. In attesa: passata della collega (stasera).
 
 ## 10 · Congelamento
+**Annotazione 2 · 05/08 (PR #35)** — la VERSIONE dell'informativa è
+una COSTANTE DI PIATTAFORMA per release (unica limpidia, la scrive la
+regia col legale — non l'ottico, non un parametro di negozio); il
+mastro la fotografa alla firma [ISTANTANEA]. Il TESTO vero →
+TODO-regia.
+**Annotazione 3 · 05/08 (PR #35)** — il campo di testo `tutore_legale`
+(deprecato dal §4) RESTA a DB (§7: mai drop); la UI lo mostra in SOLA
+LETTURA come «storico» se popolato; il travaso assistito verso le
+relazioni vere è in TODO-regia (fase pulizie, post-C0).
 **Annotazione 1 · 05/08 (checkpoint B1)** — `azienda_convenzionata_id`
 è FK a CLIENTI (l'ente convenzionato è una scheda cliente-ente, come
 il tutore-ente): il `references convenzioni` del §4 si legge così

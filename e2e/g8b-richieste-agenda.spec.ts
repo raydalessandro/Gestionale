@@ -36,14 +36,9 @@ function anonClient(): SupabaseClient {
 
 /** Telefono italiano UNICO per run — 10 cifre esatte, contatore intero. */
 let telSeq = 0;
+const TEL_BASE = String(Date.now()).slice(-7);
 function telefonoUnico(): string {
-  const base = Array.from(RUN_ID)
-    .map((c) => c.charCodeAt(0) % 10)
-    .join("")
-    .padEnd(3, "0")
-    .slice(0, 3);
-  const coda = String(telSeq++).padStart(6, "0");
-  return `3${base}${coda}`; // 1 + 3 + 6 = 10 cifre
+  return `3${TEL_BASE}${String(telSeq++).padStart(2, "0")}`; // 10 cifre, base=ms avvio: unica tra run e suite
 }
 
 const TZ = "Europe/Rome";
@@ -279,6 +274,95 @@ async function pulisciAzienda(aziendaId: string): Promise<void> {
       expect(cli?.consenso_marketing, "nessun consenso commerciale automatico").toBe(false);
       expect(cli?.nome).toBe("Franco");
       expect(cli?.cognome).toBe("Nuovo");
+    } finally {
+      await pulisciAzienda(s.aziendaId);
+    }
+  });
+
+  /**
+   * C1 · voce 6 — «SGANCIA, e se orfana anonimizza», dal gesto vero.
+   *
+   * Il L2 (`tests/contratto/b1-anonimizzazione.test.ts`) semina persona e
+   * prenotazione col service role: prova la funzione, non la strada. Qui la
+   * persona nasce da `crea_prenotazione` come dal marciapiede, il legame col
+   * cliente lo fa il BOTTONE «Prendi come cliente», e l'anonimizzazione passa
+   * dalla conferma battuta a mano. Se un giorno il percorso reale producesse una
+   * riga leggermente diversa da quella seminata a mano, è qui che si vede.
+   *
+   * Due cose si guardano, e sono di natura diversa:
+   *  · a video, in AGENDA: la riga del giorno non nomina più chi ha prenotato;
+   *  · a valle, nel DB: la prenotazione è sganciata (`persona_id → NULL`), le sue
+   *    istantanee di contatto sono spente, e la riga `persone` — rimasta orfana,
+   *    perché quel negozio era l'unico ad averla — è anonimizzata e fuori dalla
+   *    dedup.
+   */
+  test("Anonimizzazione dopo la presa: la richiesta resta, l'identità di piattaforma no", async ({
+    page,
+  }) => {
+    const s = await preparaRichiesta(page, { nome: "Gina Sganciata" });
+    try {
+      // 1) accetto e prendo come cliente: il giro normale del banco.
+      await page.goto(`/agenda?data=${s.giorno}`);
+      await page.getByRole("button", { name: "Accetta" }).click();
+      await page.getByRole("button", { name: "Prendi come cliente" }).click();
+      await expect(page.getByText("Preso come cliente ✓")).toBeVisible();
+
+      const svc = serviceClient();
+      const { data: pren } = await svc
+        .from("prenotazioni")
+        .select("id, cliente_id, persona_id")
+        .eq("codice", s.codice)
+        .single();
+      const clienteId = pren!.cliente_id as string;
+      const personaId = pren!.persona_id as string;
+      expect(personaId, "prima dell'anonimizzazione il filo verso la persona c'è").toBeTruthy();
+
+      // 2) il gesto protetto, sulla scheda del cliente appena creato.
+      await page.goto(`/clienti/${clienteId}`);
+      await page.getByRole("button", { name: "Eliminazione definitiva" }).click();
+      await page.getByLabel("Scrivi ELIMINA per confermare").fill("ELIMINA");
+      await page.getByRole("button", { name: "Anonimizza definitivamente" }).click();
+      await expect(page.getByText(/^Anonimizzato-/)).toBeVisible();
+
+      // 3) in AGENDA l'appuntamento resta (è un fatto), ma non porta più il nome.
+      //    Si asserisce sul LINK della riga — il nome è un link alla scheda — non
+      //    sul testo della pagina: un `getByText(nome).toHaveCount(0)` sarebbe
+      //    vero anche se la pagina non avesse caricato, e falso se una qualunque
+      //    schermata di servizio citasse il nome.
+      await page.goto(`/agenda?data=${s.giorno}`);
+      await expect(
+        page.getByRole("link", { name: /Gina Sganciata/ }),
+        "il nome di chi ha prenotato non compare più in agenda"
+      ).toHaveCount(0);
+      await expect(page.getByText("Gina Sganciata", { exact: true })).toHaveCount(0);
+      await expect(
+        page.getByRole("link", { name: /Anonimizzato-/ }),
+        "…al suo posto c'è l'anonimo, e la riga del giorno è ancora lì"
+      ).toBeVisible();
+
+      // 4) a valle: sgancio + istantanee spente + persona orfana anonimizzata.
+      const { data: dopo } = await svc
+        .from("prenotazioni")
+        .select("persona_id, contatto_nome, contatto_telefono, contatto_email, stato")
+        .eq("codice", s.codice)
+        .single();
+      expect(dopo!.stato, "la richiesta resta accettata: è un fatto").toBe("accettata");
+      expect(dopo!.persona_id, "SGANCIO: il filo verso l'identità di piattaforma è tagliato").toBeNull();
+      expect(dopo!.contatto_nome).toBe("Anonimo");
+      expect(dopo!.contatto_telefono).toBe("");
+      expect(dopo!.contatto_email).toBeNull();
+
+      const { data: persona } = await svc
+        .from("persone")
+        .select("nome, email, telefono_grezzo, telefono_normalizzato")
+        .eq("id", personaId)
+        .single();
+      expect(persona!.nome, "era agganciata solo a questo negozio: orfana → anonimizzata").toBe(
+        "Anonimo"
+      );
+      expect(persona!.email).toBe(`anon-${personaId}@invalid`);
+      expect(persona!.telefono_grezzo, "…e il numero, che era la sua chiave, non c'è più").toBeNull();
+      expect(persona!.telefono_normalizzato).toBe("");
     } finally {
       await pulisciAzienda(s.aziendaId);
     }

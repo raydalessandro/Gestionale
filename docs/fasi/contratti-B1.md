@@ -47,6 +47,73 @@ fermarsi e segnalare):**
   05/08) · **telefono_grezzo → NULL** (l'anonimo ESCE dalla dedup: il
   NULL non partecipa all'indice unico; se il vincolo è NOT NULL, la
   migrazione lo ALLENTA — modifica di vincolo, lecita, non è un drop).
+  **Ratifica 05/08 (checkpoint B1)**: sul DB reale `telefono_normalizzato`
+  è colonna GENERATA e `normalizza(NULL)` = '' → il solo NULL non
+  bastava (il secondo anonimo collideva col primo). Chiuso con
+  **unicità PARZIALE** — l'indice morde solo sui telefoni veri —
+  dentro la modifica-di-vincolo già sancita qui sopra. La dedup dei
+  numeri reali resta identica. (Misurato, non supposto: è il metodo.)
+  **La persona CONDIVISA fra negozi (decisione 05/08, esito CI 128 —
+  «voce 6»)**: `persone` non ha azienda_id, la dedup è di PIATTAFORMA
+  — quindi l'anonimizzazione di un negozio agisce sul SUO grafo, mai
+  su quello altrui: (1) le prenotazioni del cliente anonimizzato
+  **sganciano** la persona (`persona_id → NULL`; se il vincolo è NOT
+  NULL si allenta — lecito come sopra) e azzerano i PROPRI
+  `contatto_nome/telefono/email` [ENTRANO IN MAPPA: istantanee
+  personali — il fatto resta, il nome no] **e `per_conto_di` → NULL**
+  [in mappa dal 06/08, CI #131: testo libero che nomina un TERZO — la
+  regola generale già lo copriva, ora è esplicito]; (2) la riga `persone` si
+  anonimizza SOLO SE ORFANA dopo lo sgancio (nessun legame residuo
+  verso altre aziende); altrove viva → resta INTATTA: il negozio B non
+  perde nulla, il negozio A non la raggiunge più da nessun suo dato;
+  (3) la definer è «sgancia-e-se-orfana-anonimizza»: tenant-safe per
+  costruzione; (4) **l'anonimo esce anche dalla RICERCA, non solo
+  dall'indice** (06/08, CI #131): la dedup di `crea_prenotazione`
+  aggiunge `and telefono_normalizzato <> ''` — e a monte un telefono
+  SENZA CIFRE è rifiutato con `TELEFONO_NON_VALIDO` (è la chiave del
+  portale: un contatto irraggiungibile non è una prenotazione).
+  Doppia cintura, entrambe obbligatorie.
+  La cancellazione chiesta dal SOGGETTO su tutta la
+  piattaforma è un processo di regia (TODO-regia), non di busta.
+  **Ratifica 06/08 (rilievo 1 dell'agente-test, chiuso)**: la mappa
+  qui sopra non veniva eseguita affatto. `persone` ha RLS attiva
+  **senza policy** (ID-01, 011) e `anonimizza_cliente` è `security
+  invoker`: quell'UPDATE, fatto da un utente autenticato, non trovava
+  righe e passava **in silenzio** — l'anonimizzazione rispondeva
+  «fatto» lasciando in piedi nome, email e telefono. La parte-persone
+  vive ora in `anonimizza_persone_del_cliente`, **unica `security
+  definer` della 021**, chiamata dalla principale che resta invoker.
+  Una definer scavalca la RLS e con lei il tenant: qui il tenant lo
+  tiene una **guardia esplicita** dentro la funzione — azienda dal JWT
+  del chiamante (mai da un argomento, che sarebbe scavalcabile
+  chiamando la RPC fuori dall'azione) e cliente della propria azienda,
+  con lo stesso `CLIENTE_NON_TROVATO` che dà il cliente inesistente.
+  Sorvegliata da G25b/G25c/G25d e da un caso di contratto che punta la
+  RPC dritta, come farebbe un altro negozio che conosce l'id.
+  **Attuazione della voce 6 (06/08)**: la definer è ora
+  «sgancia-e-se-orfana-anonimizza». Tre note che si leggono nel codice
+  ma vanno anche dette qui, perché sono letture di questo contratto e
+  non scelte di gusto. (a) La definer serve una SECONDA volta, non solo
+  per la RLS di `persone`: sapere se la persona è orfana vuol dire
+  guardare le prenotazioni degli ALTRI negozi, che sotto invoker la RLS
+  nasconde — l'orfanità risulterebbe sempre «sì» e si tornerebbe a
+  sbiancare il grafo altrui. (b) `contatto_nome` e `contatto_telefono`
+  sono NOT NULL e RESTANO tali: si applica la regola già usata su
+  `persone.nome` («il NOT NULL si rispetta, l'identità sparisce») →
+  `'Anonimo'` e stringa vuota. Il vincolo garantisce le prenotazioni
+  NUOVE e non si allenta per ripulire le vecchie; si allenta invece
+  `prenotazioni.persona_id`, come la voce 6 prevede. (c) `lista_attesa`
+  NON è in questa mappa e non viene toccata: una sua riga tiene quindi
+  la persona NON orfana, e la persona resta intatta — scelta
+  conservativa (non sbianca mai chi è ancora agganciato). Se la mappa
+  dovrà comprenderla è decisione di regia. Sorvegliata da G25f.
+  **Conseguenza chiusa insieme**: da quando `persona_id` può essere
+  NULL, `prendi_persona_come_cliente` (018) scriverebbe quel NULL nel
+  registro, che è NOT NULL. La funzione è rifatta nella 021 con una
+  guardia parlante — `PRENOTAZIONE_SGANCIATA` — al posto di un 23502
+  crudo (G25e). È raggiungibile solo se anche `cliente_id` è NULL (FK
+  `on delete set null`): con il cliente ancora lì risponde prima
+  l'idempotenza, che è il comportamento giusto.
 - `ordini_occhiali` / `ordini_lac`: SI CONSERVANO (fatti + istantanee
   Rx) · note → NULL · canale_contatto → NULL (è un recapito).
 - `beni_in_custodia`: si conserva; descrizione resta (è dell'oggetto).
@@ -76,6 +143,10 @@ nell'azione — la UI che nasconde bottoni è cortesia, MAI sicurezza).
 da fonti mutabili a runtime); cache in memoria lecita.
 **Comportamento — FAIL CLOSED, tabella esaustiva** (se qualcosa non
 torna: NEGATO, mai «provo»):
+- **L'ORDINE è quello della tabella: l'identità si verifica PRIMA di
+  qualunque lookup di risorsa** (06/08, CI #131 — un non-autenticato
+  non deve mai ricevere `CLIENTE_NON_TROVATO`: prima chi sei, poi cosa
+  cerchi).
 - non autenticato → NEGATO `non_autenticato`
 - autenticato ma senza riga in `utenti` → NEGATO `profilo_mancante`
 - `utenti.attivo = false` → NEGATO `utente_disattivato`
@@ -114,6 +185,12 @@ riga cliente (`select … for update`), (2) inserisce l'evento, (3)
 aggiorna la cache. Due eventi simultanei si serializzano dal lock: la
 cache riflette l'ultimo commit, per costruzione — niente confronti di
 timestamp, niente pareggi possibili.
+**Retrodatazione: NON esiste (ratifica 05/08)** — il mastro registra
+FATTI al presente; `avvenuto_il` è il momento della registrazione,
+sempre. Il caso vero «firma cartacea di ieri, caricata oggi»: si
+registra OGGI, `modalita='penna'`, nota libera. Un eventuale
+`dichiarato_il` informativo sarà additive futuro e MAI letto dalla
+cache (romperebbe la semantica del lock).
 **Altre regole**: due `dato` consecutivi = lecito (aggiorna i canali)
 · la revoca non punta a una riga: vale per il tipo · la cache non si
 scrive MAI direttamente (solo l'azione del mastro).

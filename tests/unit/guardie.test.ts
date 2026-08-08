@@ -252,6 +252,20 @@ describe("L4b · guardie di coerenza (codice morto, orfani, fantasmi)", () => {
   });
 
   it("G8 · nessuna server action fantasma in lib/actions.ts (ogni export è referenziato)", () => {
+    // Allowlist DOCUMENTATA e TEMPORANEA (consegna B1, Era 2). Le cinque azioni
+    // dei contratti C1/C3/C4 sono uscite dall'elenco: la «UI minima» del §4 è
+    // agganciata (sezione Permessi in scheda cliente, blocco assicurazione e
+    // P.IVA in ClienteForm) e ora le copre l'E2E di M1.
+    // Restano queste due, e per una ragione scritta nella consegna stessa: il
+    // §4 le chiede come FUNZIONI, il §7 vieta «UI oltre il minimo degli E2E».
+    // La loro schermata è di un altro modulo — oculisti = M2 (prima ricetta),
+    // parametri = M10 (impostazioni di negozio) — e arriverà con quello.
+    // La guardia resta severa su QUALSIASI altra action fantasma.
+    const IN_ATTESA_UI_B1 = new Set([
+      "creaOculistaAlVolo", // M2 · si aggancia alla prima ricetta
+      "scriviParametro", // M10 · si aggancia alle impostazioni di negozio
+    ]);
+
     const src = leggi("lib/actions.ts");
     const re = /export\s+async\s+function\s+([A-Za-z0-9_]+)/g;
     const actionsFile = join(ROOT, "lib/actions.ts");
@@ -259,9 +273,22 @@ describe("L4b · guardie di coerenza (codice morto, orfani, fantasmi)", () => {
     let m: RegExpExecArray | null;
     while ((m = re.exec(src))) {
       const nome = m[1];
+      if (IN_ATTESA_UI_B1.has(nome)) continue;
       if (!referencedElsewhere(nome, actionsFile, tuttoIlCodice)) fantasma.push(nome);
     }
-    expect(fantasma, `server action mai referenziate: ${fantasma.join(", ")}`).toEqual([]);
+    expect(
+      fantasma,
+      `server action mai referenziate (e non nell'allowlist B1): ${fantasma.join(", ")}`
+    ).toEqual([]);
+
+    // L'allowlist non deve diventare una discarica: ogni nome elencato deve
+    // ESISTERE davvero come export, altrimenti sta coprendo un refuso.
+    const esportate = new Set(Array.from(src.matchAll(/export\s+async\s+function\s+([A-Za-z0-9_]+)/g)).map((x) => x[1]));
+    const inesistenti = [...IN_ATTESA_UI_B1].filter((n) => !esportate.has(n));
+    expect(
+      inesistenti,
+      `nomi nell'allowlist B1 che non esistono più in lib/actions.ts: ${inesistenti.join(", ")}`
+    ).toEqual([]);
   });
 
   it("G9 · ogni modulo attivo ha un capitolo di manuale (allineamento con l'agente manuali)", () => {
@@ -1398,5 +1425,933 @@ describe.skipIf(!existsSync(join(ROOT, M020)))("L4o · guardie bonifica S0 (020)
     expect(registrate.size, "il backfill deve valere 20 righe (001 + 002…020)").toBe(
       attese.length + 1
     );
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * L4p · GUARDIE B1 · FONDAMENTA (021 + contratti C1-C4)
+ *
+ * La 021 è la migrazione più «di contratto» dell'Era 2: non aggiunge una
+ * schermata, aggiunge INVARIANTI. Quelli veri si collaudano contro il DB (L2,
+ * tests/contratto/b1-*.test.ts); qui restano i pezzi che, se si rompessero, lo
+ * farebbero **in silenzio** e nessun test di prodotto diventerebbe rosso:
+ *
+ *   • G22  — le colonne-CACHE dei consensi non si scrivono a mano (C3: «la cache
+ *            non si scrive MAI direttamente, solo l'azione del mastro»). È un
+ *            RATCHET: i punti legacy noti sono elencati, uno NUOVO è rosso;
+ *   • G22b — le azioni B1 chiamano `richiedi()` IN TESTA (C2: l'enforcement è
+ *            nell'azione, la UI che nasconde un bottone è cortesia);
+ *   • G22c — solo `lib/permessi.ts` legge `docs/regole/permessi.json` (C2: «le
+ *            azioni non leggono MAI permessi.json da sole»);
+ *   • G23  — i quattro CHECK di C3 esistono per nome nella 021;
+ *   • G23b — C4: il check anti-self + l'indice funzionale least/greatest
+ *            LIMITATO ai tipi familiari (se perdesse la `where`, il tutore non
+ *            potrebbe più coesistere; se perdesse least/greatest, l'inversa
+ *            passerebbe);
+ *   • G24  — le cinque tabelle nuove: RLS attiva, policy `to authenticated`,
+ *            revoke ad anon;
+ *   • G25  — ogni funzione della 021 è `security INVOKER` (una `definer` per
+ *            sbaglio scavalcherebbe la RLS e aprirebbe il tenant) e ha il suo
+ *            `grant execute to authenticated` esplicito (le default privileges
+ *            del punto 0 tolgono EXECUTE a PUBLIC: senza grant la funzione
+ *            nasce non chiamabile);
+ *   • G26  — `registra_consenso` prende il LOCK prima di inserire e riallinea la
+ *            cache nella stessa funzione (è tutto C3 in tre righe);
+ *   • G27  — la mappa C1 nomina ogni campo, e `fonte` NON è fra gli assegnati.
+ * ════════════════════════════════════════════════════════════════════════ */
+const M021 = "supabase/migrazioni/021_fondamenta.sql";
+describe.skipIf(!existsSync(join(ROOT, M021)))("L4p · guardie B1 fondamenta (021)", () => {
+  const sql021 = () => leggi(M021);
+
+  /** Il corpo di una funzione della 021, dal `create ... function` al `$$;`. */
+  function corpoFunzione(nome: string): string {
+    const sql = sql021();
+    const i = sql.indexOf(`create or replace function public.${nome}(`);
+    expect(i, `la 021 deve definire ${nome}`).toBeGreaterThanOrEqual(0);
+    const resto = sql.slice(i);
+    const fine = resto.indexOf("$$;");
+    expect(fine, `corpo di ${nome} non terminato`).toBeGreaterThan(0);
+    return resto.slice(0, fine);
+  }
+
+  const FUNZIONI_021 = [
+    "registra_consenso",
+    "revoca_marketing",
+    "crea_relazione",
+    "elimina_relazione",
+    "crea_oculista_al_volo",
+    "anonimizza_cliente",
+  ] as const;
+
+  const TABELLE_021 = [
+    "assicurazioni",
+    "oculisti",
+    "parametri",
+    "consensi",
+    "clienti_relazioni",
+  ] as const;
+
+  /* ── C3 · la cache non si scrive a mano ───────────────────────────────── */
+
+  it("G22 · le colonne-cache dei consensi si scrivono SOLO dai punti noti (ratchet)", () => {
+    // RATCHET DOCUMENTATO (vedi report-test.md §B1 · «ganci richiesti»).
+    // Il ratchet ha STRETTO di un dente: `clienteDaForm` non scrive più la cache
+    // marketing (la spunta «Consenso marketing» è uscita da `ClienteForm` con la
+    // UI minima B1), quindi esce dall'elenco e rientrarci sarebbe rosso — era il
+    // punto peggiore dei tre, perché su «aggiorna» poteva SPEGNERE il consenso
+    // senza nessun evento nel mastro.
+    // Restano due punti legacy della Fase 4d, che C3 vieta: `registraConsensi`
+    // (il banner, ormai solo sanitario) e `creaPrescrizione` (la cache sanitaria,
+    // che per C3 non dovrebbe nemmeno esistere: «per dati_sanitari NESSUNA
+    // cache, si legge dal mastro per prescrizione»). Non è compito dei test
+    // rimuoverli: è compito di questa guardia impedire che ne nasca un TERZO
+    // mentre si aspetta la migrazione del flusso sanitario sul mastro.
+    const NOTI = ["registraConsensi", "creaPrescrizione"];
+    const CACHE = /\b(consenso_marketing|consenso_canali|data_consenso|consenso_dati_sanitari|consenso_sanitario_il)\s*[:=]/;
+
+    const src = leggi("lib/actions.ts");
+    // Spezzo il file in blocchi «una funzione ciascuno» sulle intestazioni.
+    const intestazioni = [...src.matchAll(/^(?:export\s+)?(?:async\s+)?function\s+([A-Za-z0-9_]+)/gm)];
+    expect(intestazioni.length, "lib/actions.ts deve contenere delle funzioni").toBeGreaterThan(10);
+
+    const scrittori: string[] = [];
+    for (const [i, m] of intestazioni.entries()) {
+      const da = m.index!;
+      const a = i + 1 < intestazioni.length ? intestazioni[i + 1].index! : src.length;
+      const blocco = src.slice(da, a);
+      // Solo le SCRITTURE: `x: valore` dentro un payload o un assegnamento.
+      // Le LETTURE (`.select("… consenso_marketing …")`, `cliente.consenso_marketing`)
+      // non hanno né `:` né `=` subito dopo il nome e non entrano.
+      if (CACHE.test(blocco)) scrittori.push(m[1]);
+    }
+
+    const nuovi = scrittori.filter((f) => !NOTI.includes(f));
+    expect(
+      nuovi,
+      `C3: la cache dei consensi si scrive SOLO dall'azione del mastro. ` +
+        `Nuovi punti di scrittura diretta: ${nuovi.join(", ")}`
+    ).toEqual([]);
+  });
+
+  it("G22b · ogni azione B1 chiama `richiedi()` in TESTA (C2: l'enforcement è nell'azione)", () => {
+    const AZIONI_B1 = [
+      "registraConsenso",
+      "revocaMarketing",
+      "creaRelazione",
+      "eliminaRelazione",
+      "anonimizzaCliente",
+      "creaOculistaAlVolo",
+      "scriviParametro",
+    ];
+    const src = leggi("lib/actions.ts");
+    const senzaGuardia: string[] = [];
+    const tardive: string[] = [];
+    for (const nome of AZIONI_B1) {
+      const i = src.indexOf(`export async function ${nome}`);
+      expect(i, `l'azione ${nome} deve esistere in lib/actions.ts`).toBeGreaterThanOrEqual(0);
+      const resto = src.slice(i);
+      const fine = resto.indexOf("\nexport ", 1);
+      const corpo = fine > 0 ? resto.slice(0, fine) : resto;
+
+      const posRichiedi = corpo.search(/await\s+richiedi\(/);
+      if (posRichiedi < 0) {
+        senzaGuardia.push(nome);
+        continue;
+      }
+      // «In testa» = prima di qualunque contatto col database.
+      const posDb = corpo.search(/await\s+createClient\(|\.rpc\(|\.from\(/);
+      if (posDb >= 0 && posDb < posRichiedi) tardive.push(nome);
+    }
+    expect(senzaGuardia, `azioni B1 senza richiedi(): ${senzaGuardia.join(", ")}`).toEqual([]);
+    expect(
+      tardive,
+      `azioni B1 che toccano il DB PRIMA di richiedi(): ${tardive.join(", ")}`
+    ).toEqual([]);
+  });
+
+  it("G22c · solo lib/permessi.ts legge `permessi.json` (le azioni non se lo leggono da sole)", () => {
+    const colpevoli: string[] = [];
+    for (const f of [...sorgenti("lib"), ...sorgenti("app"), ...sorgenti("components")]) {
+      if (rel(f) === "lib/permessi.ts") continue;
+      const src = readFileSync(f, "utf8");
+      if (/regole\/permessi\.json/.test(src)) colpevoli.push(rel(f));
+    }
+    expect(
+      colpevoli,
+      `C2: la policy si legge SOLO dall'helper. Letture dirette in: ${colpevoli.join(", ")}`
+    ).toEqual([]);
+  });
+
+  /* ── C3 · i CHECK a DB ─────────────────────────────────────────────────── */
+
+  it("G23 · i quattro CHECK di C3 esistono per nome nella 021", () => {
+    const sql = sql021();
+    for (const vincolo of [
+      "consensi_sanitario_per_rx",
+      "consensi_marketing_senza_rx",
+      "consensi_dato_marketing_canali",
+      "consensi_revoca_senza_canali",
+    ]) {
+      expect(
+        new RegExp(`constraint\\s+${vincolo}\\s+check`, "i").test(sql),
+        `manca il CHECK ${vincolo} (contratto C3)`
+      ).toBe(true);
+    }
+    // Il perimetro dei canali è quello del vocabolario M1 §2, non uno a piacere.
+    expect(
+      /canali\s*<@\s*array\['email','cellulare','cartaceo'\]/i.test(sql.replace(/\s+/g, " ")),
+      "il perimetro dei canali deve restare {email, cellulare, cartaceo}"
+    ).toBe(true);
+    // I due vocabolari chiusi del mastro.
+    expect(/tipo in \('marketing','dati_sanitari'\)/i.test(sql)).toBe(true);
+    expect(/azione in \('dato','revocato'\)/i.test(sql)).toBe(true);
+    expect(/modalita\s+text\s+check \(modalita in \('penna','digitale'\)\)/i.test(sql)).toBe(true);
+  });
+
+  it("G23g · «almeno un canale» si conta con `cardinality`, MAI con `array_length`", () => {
+    const sql = sql021();
+    // Su un array VUOTO `array_length(x,1)` torna NULL, non 0. Il confronto
+    // `>= 1` diventa NULL, l'intera CHECK vale NULL, e una CHECK che vale NULL
+    // ACCETTA (rifiuta solo su FALSE): un consenso marketing «dato» con canali
+    // `{}` — cioè un consenso senza alcun canale, che C3 vieta — entrava nel
+    // mastro. `cardinality('{}')` è 0 e il confronto è FALSE davvero.
+    expect(
+      /array_length\s*\(\s*canali/i.test(sql),
+      "su `canali` non si usa array_length: su un array vuoto torna NULL e la CHECK accetta"
+    ).toBe(false);
+    const compatto = sql.replace(/\s+/g, " ");
+    expect(
+      (compatto.match(/cardinality\(canali\) >= 1/gi) ?? []).length >= 1,
+      "il CHECK del marketing «dato» deve contare i canali con `cardinality(canali) >= 1`"
+    ).toBe(true);
+    // La riparazione per i DB dove la 021 è già passata col vincolo vecchio:
+    // si rifà il vincolo, `not valid` (morde in avanti senza pretendere le
+    // righe vecchie: il mastro è un libro di fatti, G28b non ammette delete),
+    // e lo si valida solo se il mastro è già pulito.
+    expect(
+      /alter table public\.consensi drop constraint if exists consensi_dato_marketing_canali/i.test(sql),
+      "il vincolo va rifatto anche su un DB dove la 021 è già passata (il create table non lo tocca)"
+    ).toBe(true);
+    expect(
+      /alter table public\.consensi\s+add\s+constraint consensi_dato_marketing_canali check \([\s\S]*?\)\s*not valid;/i.test(sql),
+      "il vincolo si rifà `not valid`: nessun fatto del mastro va cancellato per farlo passare"
+    ).toBe(true);
+    expect(
+      /validate constraint consensi_dato_marketing_canali/i.test(sql),
+      "se il mastro è pulito il vincolo va poi validato, non lasciato a metà"
+    ).toBe(true);
+  });
+
+  it("G23b · C4: check anti-self + indice funzionale least/greatest LIMITATO ai familiari", () => {
+    const sql = sql021();
+    expect(
+      /check \(cliente_id <> relativo_id\)/i.test(sql),
+      "manca il check anti-self su clienti_relazioni (C4)"
+    ).toBe(true);
+
+    const m = sql.match(/create unique index if not exists uq_relazione_familiare_per_coppia[\s\S]*?;/i);
+    expect(m, "manca l'indice unico funzionale della coppia (C4)").toBeTruthy();
+    const blocco = m![0].replace(/\s+/g, " ");
+    expect(
+      /least\(cliente_id, relativo_id\)/i.test(blocco) && /greatest\(cliente_id, relativo_id\)/i.test(blocco),
+      "senza least/greatest la relazione INVERSA passerebbe: la doppia tornerebbe possibile"
+    ).toBe(true);
+    expect(
+      /azienda_id/i.test(blocco),
+      "l'indice deve restare per-negozio (azienda_id in testa)"
+    ).toBe(true);
+    // La `where` è ciò che rende il tutore_legale una categoria a parte.
+    expect(
+      /where tipo in \('padre','madre','figlio','fratello','sorella'\)/i.test(blocco),
+      "senza la `where` sui soli familiari, tutore_legale non potrebbe più coesistere (C4)"
+    ).toBe(true);
+    expect(
+      /tutore_legale/i.test(blocco),
+      "tutore_legale NON deve comparire fra i tipi dell'indice di coppia"
+    ).toBe(false);
+  });
+
+  /* ── Sicurezza delle tabelle e delle funzioni nuove ───────────────────── */
+
+  it("G24 · le 5 tabelle della 021 hanno RLS attiva, policy `to authenticated` e revoke ad anon", () => {
+    const sql = sql021();
+    const compatta = sql.replace(/\s+/g, " ").toLowerCase();
+    const senzaRls: string[] = [];
+    const senzaRevoke: string[] = [];
+    const senzaPolicy: string[] = [];
+    for (const t of TABELLE_021) {
+      if (!compatta.includes(`alter table public.${t} enable row level security`)) senzaRls.push(t);
+      if (!compatta.includes(`revoke all on public.${t}`) || !new RegExp(`revoke all on public\\.${t}\\s+from anon`, "i").test(sql)) {
+        senzaRevoke.push(t);
+      }
+      const p = sql.match(new RegExp(`create policy\\s+"[^"]+"\\s+on public\\.${t}([\\s\\S]*?);`, "i"));
+      if (!p || !/\bto authenticated\b/i.test(p[1])) senzaPolicy.push(t);
+    }
+    expect(senzaRls, `tabelle 021 senza RLS: ${senzaRls.join(", ")}`).toEqual([]);
+    expect(senzaRevoke, `tabelle 021 senza revoke ad anon: ${senzaRevoke.join(", ")}`).toEqual([]);
+    expect(
+      senzaPolicy,
+      `tabelle 021 senza policy ristretta ad authenticated: ${senzaPolicy.join(", ")}`
+    ).toEqual([]);
+  });
+
+  it("G24b · le `alter default privileges` del punto 0 chiudono tabelle e funzioni FUTURE", () => {
+    const sql = sql021().replace(/\s+/g, " ").toLowerCase();
+    expect(
+      sql.includes("alter default privileges in schema public revoke all on tables from anon"),
+      "senza questa riga ogni tabella futura nascerebbe leggibile da anon"
+    ).toBe(true);
+    expect(
+      /alter default privileges in schema public revoke all on functions from public, anon/.test(sql),
+      "le funzioni future devono perdere EXECUTE anche a PUBLIC (anon lo eredita)"
+    ).toBe(true);
+  });
+
+  it("G25 · ogni funzione della 021 è `security INVOKER` e ha il suo grant esplicito", () => {
+    const sql = sql021();
+    for (const f of FUNZIONI_021) {
+      const corpo = corpoFunzione(f);
+      expect(
+        /security\s+invoker/i.test(corpo),
+        `${f}: deve restare security INVOKER — una definer scavalcherebbe la RLS e con lei il tenant`
+      ).toBe(true);
+      expect(
+        /security\s+definer/i.test(corpo),
+        `${f}: è diventata security DEFINER: il tenant non sarebbe più protetto dalla RLS`
+      ).toBe(false);
+      expect(
+        new RegExp(`revoke execute on function public\\.${f}\\([^)]*\\) from public, anon`, "i").test(sql),
+        `${f}: manca la revoca di EXECUTE a public/anon`
+      ).toBe(true);
+      expect(
+        new RegExp(`grant\\s+execute on function public\\.${f}\\([^)]*\\) to authenticated`, "i").test(sql),
+        `${f}: manca il grant execute ad authenticated (con le default privileges del punto 0 sarebbe inchiamabile)`
+      ).toBe(true);
+    }
+  });
+
+  it("G25g · C2 · nella definer l'identità si verifica PRIMA della risorsa", () => {
+    const corpo = corpoFunzione("anonimizza_persone_del_cliente");
+    // A chi non è nessuno non si risponde `CLIENTE_NON_TROVATO`: quella frase
+    // vorrebbe dire che siamo andati a cercare quel cliente fra quelli di
+    // TUTTI, e che la risposta dipende dall'esistenza di una riga altrui.
+    const identita = corpo.search(/if v_az is null then raise exception 'NON_AUTENTICATO'/i);
+    const risorsa = corpo.search(/from public\.clienti c/i);
+    expect(identita, "manca la guardia d'identità con NON_AUTENTICATO").toBeGreaterThanOrEqual(0);
+    expect(risorsa, "manca il lookup del cliente").toBeGreaterThan(0);
+    expect(identita < risorsa, "l'identità va verificata PRIMA del lookup (C2, 06/08)").toBe(true);
+    expect(
+      /if v_az is null then raise exception 'CLIENTE_NON_TROVATO'/i.test(corpo),
+      "a un utente senza azienda nel JWT non si dice CLIENTE_NON_TROVATO"
+    ).toBe(false);
+  });
+
+  it("G25h · C1 voce 6 · `per_conto_di` entra nello sgancio (nomina un TERZO)", () => {
+    const corpo = corpoFunzione("anonimizza_persone_del_cliente");
+    const sgancio = corpo.slice(
+      corpo.search(/update public\.prenotazioni pr set/i),
+      corpo.search(/update public\.persone p set/i)
+    );
+    expect(
+      /per_conto_di\s*=\s*null/i.test(sgancio),
+      "`per_conto_di` è il «prenoto per un'altra persona»: testo libero che nomina un terzo, in mappa C1 dal 06/08"
+    ).toBe(true);
+  });
+
+  it("G15b · C1 voce 6 · la DOPPIA CINTURA della dedup di `crea_prenotazione`", () => {
+    const corpo = corpoFunzione("crea_prenotazione");
+    const compatto = corpo.replace(/\s+/g, " ");
+    // Cintura 1 · a monte: un telefono senza cifre non identifica nessuno e non
+    // permette di richiamare. `normalizza_telefono` lo riduce a '', che è la
+    // stessa chiave su cui si posano le righe anonimizzate.
+    expect(
+      /if v_tel = '' then raise exception 'TELEFONO_NON_VALIDO'/i.test(compatto),
+      "manca il rifiuto del telefono senza cifre (TELEFONO_NON_VALIDO)"
+    ).toBe(true);
+    // Cintura 2 · e comunque la ricerca non guarda mai le righe anonime.
+    expect(
+      /and persone\.telefono_normalizzato <> ''/i.test(compatto),
+      "la dedup deve escludere le persone anonimizzate: uscire dall'indice non basta, si esce anche dalla RICERCA"
+    ).toBe(true);
+    // Entrambe, per contratto: una sola lascia scoperta una strada.
+    const rifiuto = compatto.search(/TELEFONO_NON_VALIDO/i);
+    const ricerca = compatto.search(/select persone\.id into v_persona/i);
+    expect(rifiuto < ricerca, "il rifiuto sta A MONTE della ricerca").toBe(true);
+    // E resta la RPC del portale: se perdesse il grant ad anon, il portale muore.
+    expect(
+      /grant\s+execute on function public\.crea_prenotazione\([^)]*\) to anon, authenticated/i.test(sql021()),
+      "crea_prenotazione deve restare eseguibile da anon: è la RPC del portale"
+    ).toBe(true);
+  });
+
+  it("G25b · le `security definer` della 021 sono SOLO le due dichiarate", () => {
+    const sql = sql021();
+    const definer = Array.from(
+      sql.matchAll(/create or replace function public\.(\w+)\([\s\S]*?security\s+(invoker|definer)/gi)
+    )
+      .filter((m) => m[2].toLowerCase() === "definer")
+      .map((m) => m[1])
+      .sort();
+    // Se ne compare una terza va discussa, non aggiunta: una definer scavalca la
+    // RLS e con lei il tenant, e il tenant torna a dipendere da una guardia
+    // scritta a mano invece che dall'ambiente. Le due ammesse:
+    //  · `anonimizza_persone_del_cliente` — nasce definer (C1);
+    //  · `prendi_persona_come_cliente` — ERA GIÀ definer nella 018: qui è solo
+    //    rifatta per aggiungere la guardia sullo sganciato (C1 voce 6). Non è
+    //    una definer in più nel sistema, è la stessa riscritta.
+    //  · `crea_prenotazione` — ERA GIÀ definer dalla 012 (la chiama l'ANONIMO
+    //    dal portale, e deve scrivere su tabelle che l'anon non tocca): qui è
+    //    rifatta per la doppia cintura della dedup (C1 voce 6 punto 4).
+    expect(definer, "la 021 ammette tre sole security definer, tutte motivate").toEqual([
+      "anonimizza_persone_del_cliente",
+      "crea_prenotazione",
+      "prendi_persona_come_cliente",
+    ]);
+  });
+
+  it("G25e · `prendi_persona_come_cliente` si ferma sulla prenotazione SGANCIATA", () => {
+    const corpo = corpoFunzione("prendi_persona_come_cliente");
+    // Da C1 voce 6 `persona_id` può essere NULL. Il passo (d) scrive quel valore
+    // nel registro, che è NOT NULL: senza guardia l'operatore vede un 23502
+    // crudo invece di una frase.
+    expect(
+      /if r\.persona_id is null then\s*\n?\s*raise exception 'PRENOTAZIONE_SGANCIATA'/i.test(corpo),
+      "manca la guardia sullo sganciato: il registro prenderebbe un persona_id NULL (23502)"
+    ).toBe(true);
+    // …e deve stare PRIMA della scrittura nel registro, non dopo.
+    const guardia = corpo.search(/PRENOTAZIONE_SGANCIATA/i);
+    const registro = corpo.search(/insert into public\.persone_riferimento_registro/i);
+    expect(registro, "la funzione deve ancora scrivere il registro").toBeGreaterThan(0);
+    expect(guardia < registro, "la guardia deve precedere la scrittura del registro").toBe(true);
+  });
+
+  it("G25c · la definer della parte-persone ha search_path pinnato, grant chiusi e guardia di tenant esplicita", () => {
+    const sql = sql021();
+    const corpo = corpoFunzione("anonimizza_persone_del_cliente");
+    expect(
+      /security\s+definer\s+set search_path = public, pg_catalog/i.test(corpo),
+      "una definer senza search_path pinnato è dirottabile: lo schema si fissa nella firma"
+    ).toBe(true);
+    expect(
+      /revoke execute on function public\.anonimizza_persone_del_cliente\(uuid\) from public, anon/i.test(sql),
+      "manca la revoca di EXECUTE a public/anon (igiene 021)"
+    ).toBe(true);
+    expect(
+      /grant\s+execute on function public\.anonimizza_persone_del_cliente\(uuid\) to authenticated/i.test(sql),
+      "manca il grant execute ad authenticated"
+    ).toBe(true);
+    // La guardia di tenant: l'azienda si prende dal JWT, MAI da un parametro
+    // (un parametro sarebbe scavalcabile chiamando la RPC fuori dall'azione),
+    // e il cliente dev'essere di quell'azienda.
+    expect(
+      /v_az\s*:=\s*public\.get_azienda_id\(\)/i.test(corpo),
+      "l'azienda deve venire dal JWT del chiamante, non da un argomento"
+    ).toBe(true);
+    expect(
+      /\(p_cliente_id uuid\)/i.test(corpo.slice(0, corpo.indexOf("as $$"))),
+      "la firma deve restare a un solo argomento: nessun p_azienda_id da fuori"
+    ).toBe(true);
+    expect(
+      /from public\.clienti c\s*\n?\s*where c\.id = p_cliente_id and c\.azienda_id = v_az/i.test(corpo),
+      "manca il controllo «il cliente è della MIA azienda»: dentro una definer la RLS non filtra più"
+    ).toBe(true);
+    // E il perimetro dello SGANCIO: solo prenotazioni di quel cliente E di quella
+    // azienda — è la condizione che la policy della 011 dava gratis sotto invoker.
+    const compatto = corpo.replace(/\s+/g, " ");
+    expect(
+      /where pr\.cliente_id = p_cliente_id and pr\.azienda_id = v_az/i.test(compatto),
+      "lo sgancio deve restare dentro il tenant: la policy delle prenotazioni qui non si applica"
+    ).toBe(true);
+  });
+
+  it("G25f · C1 voce 6 · si SGANCIA sempre, si anonimizza SOLO SE ORFANA", () => {
+    const corpo = corpoFunzione("anonimizza_persone_del_cliente");
+    const compatto = corpo.replace(/\s+/g, " ");
+    // (a) chi era attaccato si legge PRIMA dello sgancio: dopo l'update i valori
+    //     sono già NULL e l'orfanità non si potrebbe più chiedere a nessuno.
+    const raccolta = compatto.search(/array_agg\(distinct pr\.persona_id\)/i);
+    const sgancio = compatto.search(/update public\.prenotazioni pr set persona_id = null/i);
+    const orfana = compatto.search(/update public\.persone p set/i);
+    expect(raccolta, "manca la raccolta delle persone agganciate").toBeGreaterThanOrEqual(0);
+    expect(sgancio, "manca lo sgancio (`persona_id → NULL`)").toBeGreaterThan(0);
+    expect(raccolta < sgancio, "le persone si raccolgono PRIMA di sganciarle").toBe(true);
+    expect(sgancio < orfana, "l'orfanità si chiede DOPO lo sgancio, o non è vera").toBe(true);
+    // (b) le istantanee di contatto della prenotazione entrano in mappa C1.
+    expect(
+      /contatto_nome = 'Anonimo'/i.test(compatto) &&
+        /contatto_telefono = ''/i.test(compatto) &&
+        /contatto_email = null/i.test(compatto),
+      "i `contatto_*` della prenotazione sono in mappa C1 (istantanee personali)"
+    ).toBe(true);
+    // (c) il cuore della decisione: si anonimizza SOLO se non resta agganciata a
+    //     NULLA — e il controllo NON è ristretto all'azienda del chiamante,
+    //     altrimenti si tornerebbe a sbiancare il grafo del negozio altrui.
+    expect(
+      /not exists \( ?select 1 from public\.prenotazioni pr2 where pr2\.persona_id = p\.id ?\)/i.test(compatto),
+      "manca il controllo di orfanità sulle prenotazioni (di TUTTE le aziende)"
+    ).toBe(true);
+    expect(
+      /not exists \( ?select 1 from public\.lista_attesa la where la\.persona_id = p\.id ?\)/i.test(compatto),
+      "manca il controllo di orfanità sulla lista d'attesa"
+    ).toBe(true);
+    expect(
+      /pr2\.azienda_id|la\.azienda_id/i.test(compatto),
+      "l'orfanità NON va ristretta all'azienda del chiamante: così si sbiancherebbe il grafo altrui"
+    ).toBe(false);
+  });
+
+  it("G25d · `anonimizza_cliente` resta invoker e DELEGA la parte-persone (non la riscrive)", () => {
+    const corpo = corpoFunzione("anonimizza_cliente");
+    expect(
+      /perform public\.anonimizza_persone_del_cliente\(p_cliente_id\)/i.test(corpo),
+      "la parte-persone va delegata alla definer"
+    ).toBe(true);
+    expect(
+      /update public\.persone/i.test(corpo),
+      "sotto invoker un UPDATE su `persone` passa a 0 righe IN SILENZIO (RLS senza policy): non deve tornare qui"
+    ).toBe(false);
+  });
+
+  it("G26 · `registra_consenso`: LOCK, poi evento, poi cache — nella stessa funzione (C3)", () => {
+    const corpo = corpoFunzione("registra_consenso");
+    const lock = corpo.search(/from public\.clienti where id = p_cliente_id for update/i);
+    const insert = corpo.search(/insert into public\.consensi/i);
+    const cache = corpo.search(/update public\.clienti/i);
+    expect(lock, "manca il `select … for update` della riga cliente (C3)").toBeGreaterThanOrEqual(0);
+    expect(insert, "manca l'insert dell'evento").toBeGreaterThan(0);
+    expect(cache, "manca il riallineamento della cache").toBeGreaterThan(0);
+    expect(lock < insert, "il lock deve precedere l'evento").toBe(true);
+    expect(insert < cache, "la cache si aggiorna DOPO l'evento").toBe(true);
+    // La cache vale SOLO per il marketing: per i sanitari si legge il mastro.
+    expect(
+      /if p_tipo = 'marketing' then/i.test(corpo),
+      "la cache deve restare condizionata al marketing (per i dati sanitari nessuna cache)"
+    ).toBe(true);
+    // Nessun confronto di timestamp: la semantica dell'«ultima riga» è il lock.
+    expect(
+      /order by\s+avvenuto_il|max\(avvenuto_il\)/i.test(corpo),
+      "C3 vieta esplicitamente i confronti di timestamp: l'ordine lo dà il lock"
+    ).toBe(false);
+  });
+
+  it("G27 · la mappa C1 è completa e `fonte` NON viene toccata", () => {
+    const corpo = corpoFunzione("anonimizza_cliente");
+    // L'UPDATE su `clienti`: dal `update public.clienti set` al `where id =`.
+    const i = corpo.search(/update public\.clienti set/i);
+    expect(i, "anonimizza_cliente deve aggiornare clienti").toBeGreaterThanOrEqual(0);
+    const mappa = corpo.slice(i, corpo.indexOf("where id = p_cliente_id", i));
+
+    const CAMPI_C1 = [
+      "nome", "cognome", "secondo_nome", "codice_fiscale", "data_nascita", "sesso",
+      "email", "telefono", "telefono_casa", "telefono_lavoro",
+      "indirizzo", "indirizzo2", "cap", "citta", "provincia", "nazione",
+      "note", "dati_fatturazione", "canale_preferito",
+      "assicurazione_id", "azienda_convenzionata_id", "tutore_legale", "lingua",
+      "tags", "non_contattare", "consenso_marketing", "consenso_canali",
+      "consenso_dati_sanitari", "consenso_sanitario_il", "anonimizzato_il",
+    ];
+    const mancanti = CAMPI_C1.filter((c) => !new RegExp(`\\b${c}\\s*=`, "i").test(mappa));
+    expect(mancanti, `campi della mappa C1 non trattati: ${mancanti.join(", ")}`).toEqual([]);
+
+    // Le costanti dichiarate dal contratto, non un testo a piacere.
+    expect(/nome\s*=\s*'Cliente'/i.test(mappa), "nome → 'Cliente'").toBe(true);
+    expect(/cognome\s*=\s*'Anonimizzato-'/i.test(mappa), "cognome → 'Anonimizzato-' + id").toBe(true);
+    expect(/non_contattare\s*=\s*true/i.test(mappa), "i flag si spengono in senso RESTRITTIVO").toBe(true);
+    // `fonte` RESTA: se qualcuno la mettesse a null, si perderebbe la statistica.
+    expect(
+      /\bfonte\s*=/i.test(mappa),
+      "C1: `fonte` RESTA (statistica aziendale, non identifica): non va assegnata"
+    ).toBe(false);
+
+    // Le relazioni si CANCELLANO (de-anonimizzano per prossimità)…
+    expect(
+      /delete from public\.clienti_relazioni/i.test(corpo),
+      "C1: le relazioni si cancellano"
+    ).toBe(true);
+    // …ma i consensi NO: sono fatti storici su un'identità ormai anonima.
+    expect(
+      /delete from public\.consensi/i.test(corpo),
+      "C1: le righe del mastro SI CONSERVANO (solo documento_ref → NULL)"
+    ).toBe(false);
+    expect(/update public\.consensi set documento_ref = null/i.test(corpo)).toBe(true);
+    // E i FATTI non si cancellano mai.
+    for (const fatto of ["vendite", "ordini_occhiali", "ordini_lac", "movimenti_magazzino", "chiusure_cassa"]) {
+      expect(
+        new RegExp(`delete from public\\.${fatto}`, "i").test(corpo),
+        `C1: ${fatto} è un FATTO aziendale, non si cancella mai`
+      ).toBe(false);
+    }
+    // L'unico campo personale della vendita.
+    expect(/update public\.vendite set cf_cliente = null/i.test(corpo)).toBe(true);
+  });
+
+  it("G27b · l'unicità dei telefoni resta PARZIALE (l'anonimo esce dalla dedup)", () => {
+    const sql = sql021().replace(/\s+/g, " ");
+    expect(
+      /create unique index if not exists uq_persone_telefono_reale on public\.persone \(telefono_normalizzato\) where telefono_normalizzato <> ''/i.test(sql),
+      "senza l'unicità PARZIALE il SECONDO cliente anonimizzato collidere­bbe sul telefono vuoto"
+    ).toBe(true);
+    expect(
+      /alter table public\.persone alter column telefono_grezzo drop not null/i.test(sql),
+      "telefono_grezzo deve poter diventare NULL (C1: la riga esce dalla dedup)"
+    ).toBe(true);
+  });
+
+  it("G28 · la 021 registra sé stessa nel registro delle migrazioni", () => {
+    const sql = sql021();
+    expect(
+      /insert into public\._infra_migrazioni \(nome\) values \('021_fondamenta'\)/i.test(sql),
+      "regola permanente della 020: ogni migrazione registra sé stessa"
+    ).toBe(true);
+  });
+
+  it("G28b · la 021 resta ADDITIVA: nessun drop di tabella o di colonna", () => {
+    const sql = sql021();
+    expect(/drop table/i.test(sql), "nessun drop table").toBe(false);
+    expect(/drop column/i.test(sql), "nessun drop column").toBe(false);
+    expect(/\brename to\b/i.test(sql), "nessun rename").toBe(false);
+    // L'UNICA cancellazione fisica ammessa dalla 021 è quella delle RELAZIONI
+    // (anagrafe, non un fatto: C4 + C1). Se comparisse un `delete from` su
+    // qualunque altra tabella, sarebbe un fatto aziendale che se ne va.
+    // Eccezione DICHIARATA: `crea_prenotazione` (rifatta qui dalla 017 per la
+    // doppia cintura) cancella l'appuntamento che ESSA STESSA ha appena
+    // inserito, quando la chiave d'idempotenza scopre che la prenotazione c'era
+    // già. Non è un fatto aziendale che se ne va: è la funzione che disfa la
+    // propria scrittura, nella stessa chiamata. Per questo la si ammette SOLO
+    // nella forma `where appuntamenti.id = v_appto` — cioè legata alla
+    // variabile locale, mai a un filtro che possa pescare righe altrui.
+    const bersagli = new Set(
+      Array.from(sql.matchAll(/delete\s+from\s+public\.(\w+)([^;]*);/gi))
+        .filter(
+          (m) =>
+            !(
+              m[1].toLowerCase() === "appuntamenti" &&
+              /where\s+appuntamenti\.id\s*=\s*v_appto/i.test(m[2])
+            )
+        )
+        .map((m) => m[1].toLowerCase())
+    );
+    expect(
+      [...bersagli].sort(),
+      `la 021 cancella righe da tabelle diverse da clienti_relazioni: ${[...bersagli].join(", ")}`
+    ).toEqual(["clienti_relazioni"]);
+    // I `drop policy if exists` / `drop trigger if exists` / `drop constraint` di
+    // ricreazione sono leciti (modifiche di vincolo, non perdita di dati).
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * L4q · IL CONTRATTO UI ↔ E2E DI M1 (consegna B1, secondo giro)
+ *
+ * Da quando la «UI minima» del §4 è agganciata, gli E2E di
+ * `e2e/m1-anagrafiche.spec.ts` non sono più la lettura della spec: sono un
+ * CONTRATTO con etichette e ruoli veri. Quel contratto però si rompe solo in
+ * CI, dentro il job `contratto-e2e`, che gira con i segreti e ci mette minuti.
+ * Queste guardie lo controllano nel job `build`, in millisecondi, e dicono a
+ * chi ha rinominato un'etichetta CHE COSA ha rotto.
+ *
+ * Trade-off dichiarato (report §B1): sono guardie di TESTO. Un rinomino
+ * legittimo («Registra consenso» → «Raccogli consenso») le fa diventare rosse
+ * anche se il prodotto è migliore. È voluto: quel rinomino deve passare per
+ * l'E2E e per la spec, non avvenire di soppiatto. La riparazione è di una
+ * riga qui + una riga nello spec — e il messaggio d'errore lo dice.
+ * ════════════════════════════════════════════════════════════════════════ */
+describe("L4q · contratto UI ↔ E2E di M1 (B1)", () => {
+  const PERMESSI = "components/PermessiCliente.tsx";
+  const FORM = "components/ClienteForm.tsx";
+  const SCHEDA = "app/(app)/clienti/[id]/page.tsx";
+
+  it("G29 · la scheda cliente monta la sezione «Permessi» (senza, cinque E2E muoiono)", () => {
+    expect(existsSync(join(ROOT, PERMESSI)), `manca ${PERMESSI}`).toBe(true);
+    const scheda = leggi(SCHEDA);
+    expect(
+      /import\s*\{[^}]*PermessiCliente[^}]*\}\s*from\s*["']@\/components\/PermessiCliente["']/.test(scheda),
+      "la scheda cliente deve importare PermessiCliente"
+    ).toBe(true);
+    expect(/<PermessiCliente\b/.test(scheda), "…e renderizzarlo").toBe(true);
+  });
+
+  it("G29b · le etichette su cui poggiano gli E2E M1 esistono nel sorgente", () => {
+    // Nome → file che deve contenerlo. Sono esattamente le stringhe usate dai
+    // `getByRole`/`getByLabel` di e2e/m1-anagrafiche.spec.ts e di _helpers.ts.
+    const ATTESE: [string, string][] = [
+      // S2/S3 · il mastro dei consensi (C3)
+      ["Registra consenso", PERMESSI],
+      ["Salva consenso", PERMESSI],
+      ["Revoca comunicazioni", PERMESSI],
+      ["Conferma revoca", PERMESSI],
+      ["Modalità", PERMESSI],
+      // S4 · relazioni (C4)
+      ["Aggiungi relazione", PERMESSI],
+      ["Persona collegata", PERMESSI],
+      ["Tipo di relazione", PERMESSI],
+      ["Collega", PERMESSI],
+      // S6 · eliminazione definitiva (C1)
+      ["Eliminazione definitiva", PERMESSI],
+      ["Scrivi ELIMINA per confermare", PERMESSI],
+      ["Anonimizza definitivamente", PERMESSI],
+      // S1/S5 · sconti e fatturazione (M1 §2 e §4)
+      ["Assicurazione", FORM],
+      ["Ragione sociale", FORM],
+      ["CF / P.IVA azienda", FORM],
+      ["Codice SDI", FORM],
+      ["Scala / appartamento", FORM],
+      ["Secondo nome", FORM],
+    ];
+    const mancanti: string[] = [];
+    for (const [testo, file] of ATTESE) {
+      if (!leggi(file).includes(testo)) mancanti.push(`«${testo}» in ${file}`);
+    }
+    expect(
+      mancanti,
+      `etichette rinominate senza aggiornare e2e/m1-anagrafiche.spec.ts: ${mancanti.join(" · ")}`
+    ).toEqual([]);
+  });
+
+  it("G29c · i tre canali del consenso sono {Email, Cellulare, Cartaceo}, come il CHECK a DB", () => {
+    // Il perimetro dei canali è sigillato a DB (G23). Se la UI ne offrisse un
+    // quarto, l'insert fallirebbe al banco e l'E2E S2 pescherebbe un'etichetta
+    // che non c'è: meglio scoprirlo qui.
+    const src = leggi(PERMESSI);
+    const blocco = src.slice(src.indexOf("const CANALI"), src.indexOf("] as const", src.indexOf("const CANALI")));
+    const ids = Array.from(blocco.matchAll(/id:\s*"([a-z]+)"/g)).map((m) => m[1]);
+    expect(ids.sort()).toEqual(["cartaceo", "cellulare", "email"]);
+    for (const label of ["Email", "Cellulare", "Cartaceo"]) {
+      expect(blocco.includes(`label: "${label}"`), `manca l'etichetta ${label}`).toBe(true);
+    }
+  });
+
+  it("G29d · UNA sola riga «Marketing: …» in tutta la UI (C3: una cache, un posto)", () => {
+    // È insieme un invariante di prodotto e la condizione perché l'E2E possa
+    // asserire senza ambiguità (strict mode): se due componenti stampassero
+    // «Marketing: …», il locatore ne troverebbe due e S2/S3 morirebbero con un
+    // errore che non spiega niente.
+    const stampano = [...sorgenti("app"), ...sorgenti("components")].filter((f) =>
+      /Marketing:/.test(readFileSync(f, "utf8"))
+    );
+    expect(
+      stampano.map(rel),
+      `la riga «Marketing: …» deve stare in un posto solo (la sezione Permessi): ${stampano.map(rel).join(", ")}`
+    ).toEqual([PERMESSI]);
+  });
+
+  it("G29g · `tutore_legale` è STORICO in sola lettura, e nessuno lo riscrive (M1 Annot. 3)", () => {
+    const colpevoli: string[] = [];
+    for (const f of [...sorgenti("app"), ...sorgenti("components")]) {
+      const src = readFileSync(f, "utf8");
+      // Un campo di form chiamato come la colonna: è il modo in cui il testo
+      // deprecato tornerebbe scrivibile, accanto alla relazione vera di C4.
+      if (/name=["']tutore_legale["']/.test(src)) colpevoli.push(rel(f));
+    }
+    expect(
+      colpevoli,
+      `la tutela si registra come RELAZIONE (C4); il testo resta storico. Campi di form in: ${colpevoli.join(", ")}`
+    ).toEqual([]);
+    // E il gemello lato azione: finché il form non manda più il campo, lasciarlo
+    // nella mappa del payload non è «innocuo» — è una CANCELLAZIONE silenziosa
+    // dello storico a ogni salvataggio della scheda.
+    const azioni = leggi("lib/actions.ts");
+    expect(
+      /tutore_legale:\s*str\(fd,\s*["']tutore_legale["']\)/.test(azioni),
+      "aggiornaCliente non deve più leggere `tutore_legale` dal form: lo azzererebbe a ogni salvataggio"
+    ).toBe(false);
+  });
+
+  it("G29f · la riga «Assicurazione: …» si stampa SEMPRE («da rilevare» è uno stato)", () => {
+    // M1 §2 ha TRE stati, non due: `null` = da rilevare · voce NESSUNA =
+    // chiesto, non ne ha · altra voce = quella. Fino al 06/08 il blocco era
+    // dietro `{(assicurazione || fatt) && …}`, quindi il primo stato era
+    // INVISIBILE e l'E2E S5 (1/2) poteva solo constatare l'assenza della riga.
+    // Ora la riga c'è sempre e lo scenario asserisce i tre stati in positivo:
+    // questa guardia impedisce che la condizione torni e lo renda di nuovo muto.
+    const src = leggi(SCHEDA);
+    expect(
+      src.includes('"da rilevare"'),
+      "la scheda deve stampare «da rilevare» quando assicurazione_id è null"
+    ).toBe(true);
+    expect(
+      /\(\s*assicurazione\s*\|\|\s*fatt\s*\)/.test(src),
+      "RATCHET: la riga assicurazione non torna dietro una condizione (M1 §2, tre stati visibili)"
+    ).toBe(false);
+  });
+
+  it("G29e · il consenso marketing NON è più un campo di form (C3: la cache non si spunta)", () => {
+    const colpevoli: string[] = [];
+    for (const f of [...sorgenti("app"), ...sorgenti("components")]) {
+      const src = readFileSync(f, "utf8");
+      // Un input/checkbox chiamato come la colonna-cache: è il modo esatto in
+      // cui il consenso rientrerebbe dalla finestra (e in cui `aggiornaCliente`
+      // tornerebbe a spegnerlo senza un evento nel mastro).
+      if (/name=["'](consenso_marketing|consenso_canali|data_consenso)["']/.test(src)) {
+        colpevoli.push(rel(f));
+      }
+    }
+    expect(
+      colpevoli,
+      `C3: il marketing si raccoglie SOLO dal mastro (registra_consenso). Campi di form in: ${colpevoli.join(", ")}`
+    ).toEqual([]);
+  });
+});
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * L4r · LE CONSEGUENZE DELLA VOCE 6 (C1) SUL CODICE CHE STA INTORNO
+ *
+ * La voce 6 non ha cambiato solo una funzione: ha cambiato due VERITÀ che il
+ * resto del programma dava per scontate.
+ *   (1) `prenotazioni.persona_id` può essere NULL. Nessuno, oggi, lo legge —
+ *       ed è per questo che va sorvegliato adesso: il primo che lo leggerà
+ *       scriverà `pren.persona_id!` senza pensarci, e lo sganciato diventerà un
+ *       crash o, peggio, un `undefined` che passa (G32).
+ *   (2) `anonimizzato_il` dichiara che il cliente «esce da ricerche, code e
+ *       letture». La lista clienti lo fa; i sette selettori-cliente che aprono
+ *       lavoro NUOVO no (G30, ratchet sul debito noto).
+ * E una terza, di forma: una funzione può guadagnare un errore parlante nuovo
+ * (`PRENOTAZIONE_SGANCIATA`) senza che l'azione lo impari, e l'operatore legge
+ * il nome della costante SQL (G31).
+ * ════════════════════════════════════════════════════════════════════════ */
+describe("L4r · conseguenze di C1 voce 6 sul codice intorno", () => {
+  it("G30 · i selettori-cliente che aprono lavoro NUOVO escludono gli anonimizzati (ratchet)", () => {
+    // Il contratto della colonna, scritto nella 021: «anonimizzato_il esclude il
+    // cliente da ricerche, code e letture». Oggi lo rispetta solo la lista
+    // `/clienti`; ovunque si SCELGA un cliente per iniziare qualcosa di nuovo
+    // (una busta, una vendita, un ordine LAC, un appuntamento, un richiamo, un
+    // reso, un fermo) l'anonimizzato si può ancora scegliere — e da lì rientra
+    // in agenda, in cassa e nelle code, con addosso il nome «Anonimizzato-…».
+    //
+    // RATCHET DOCUMENTATO (report-test.md §ganci): i punti che oggi non
+    // filtrano sono elencati qui sotto. La guardia non li corregge — non è
+    // compito dei test — ma impedisce che ne nasca un OTTAVO mentre si aspetta
+    // il gancio. Quando uno viene riparato, si toglie da questa lista: da quel
+    // momento è protetto per sempre.
+    const DEBITO_NOTO = [
+      "components/WizardBusta.tsx",
+      "components/WizardOrdineLac.tsx",
+      "components/WizardVendita.tsx",
+      "components/FormAppuntamento.tsx",
+      "components/AzioniRichiami.tsx",
+      "components/AzioniMagazzino.tsx",
+      "components/ResoEsterno.tsx",
+      // Ricerca sui FATTI, non sull'anagrafica: `/ordini?q=` filtra le buste per
+      // nome del cliente. Un anonimizzato lì è legittimo (i suoi ordini restano
+      // leggibili): resta in lista come scelta dichiarata, non come debito.
+      "app/(app)/ordini/page.tsx",
+    ];
+    // Una ricerca-cliente si riconosce così: interroga `clienti` filtrando per
+    // NOME (è il gesto «scrivi due lettere e scegli»). Le riletture per id
+    // (`.in("id", …)`, `.eq("id", …)`) NON sono ricerche: sono la lettura di un
+    // fatto già scritto — l'anonimo lì ci deve stare, col suo nome nuovo.
+    const RICERCA = /from\("clienti"\)[\s\S]{0,400}?nome\.ilike/;
+    const senzaFiltro: string[] = [];
+    for (const f of [...sorgenti("app"), ...sorgenti("components"), ...sorgenti("lib")]) {
+      const src = readFileSync(f, "utf8");
+      if (!RICERCA.test(src)) continue;
+      if (/\.is\(\s*["']anonimizzato_il["']\s*,\s*null\s*\)/.test(src)) continue;
+      senzaFiltro.push(rel(f));
+    }
+    const nuovi = senzaFiltro.filter((f) => !DEBITO_NOTO.includes(f));
+    expect(
+      nuovi,
+      "021: «anonimizzato_il esclude da ricerche, code e letture». Nuovi punti che " +
+        `scelgono un cliente senza escluderlo: ${nuovi.join(", ")}. ` +
+        "Aggiungi `.is(\"anonimizzato_il\", null)` alla query."
+    ).toEqual([]);
+  });
+
+  it("G31 · ogni errore parlante di `prendi_persona_come_cliente` arriva tradotto all'operatore", () => {
+    // Il modo esatto in cui questo si rompe: la 021 rifà la funzione della 018
+    // aggiungendo un `raise exception` nuovo (`PRENOTAZIONE_SGANCIATA`, che
+    // nasce dalla voce 6), l'azione non lo impara, e al banco compare
+    // «Operazione non riuscita: PRENOTAZIONE_SGANCIATA» — il nome di una
+    // costante SQL dentro un messaggio d'errore, che è il modo più veloce per
+    // far perdere fiducia a chi sta lavorando.
+    const M = "supabase/migrazioni/021_fondamenta.sql";
+    if (!existsSync(join(ROOT, M))) return;
+    const sql = leggi(M);
+    const i = sql.indexOf("create or replace function public.prendi_persona_come_cliente(");
+    if (i < 0) return; // la 021 non la rifà più: la sorveglia la sua migrazione
+    const corpo = sql.slice(i, i + sql.slice(i).indexOf("$$;"));
+    const sollevati = [
+      ...new Set(
+        Array.from(corpo.matchAll(/raise exception '([A-Z_]+)'/g)).map((m) => m[1])
+      ),
+    ].sort();
+    expect(sollevati.length, "la funzione deve sollevare errori parlanti").toBeGreaterThan(3);
+
+    // Non tradotti OGGI, e con una ragione ciascuno (report §ganci):
+    //  · NON_AUTENTICATO — irraggiungibile dall'azione (la sessione c'è già,
+    //    e senza sessione risponde prima il proxy);
+    //  · PRENOTAZIONE_SGANCIATA — gancio APERTO: raggiungibile solo se anche
+    //    `cliente_id` è NULL (cliente cancellato), quindi difesa in profondità.
+    //    Quando l'azione lo tradurrà, questa lista si accorcia; se ne compare un
+    //    TERZO, la guardia è rossa.
+    const SENZA_TRADUZIONE = ["NON_AUTENTICATO", "PRENOTAZIONE_SGANCIATA"];
+    const azioni = leggi("lib/actions.ts");
+    const muti = sollevati.filter(
+      (e) => !SENZA_TRADUZIONE.includes(e) && !azioni.includes(`"${e}"`)
+    );
+    expect(
+      muti,
+      `errori sollevati dalla RPC e non tradotti in lib/actions.ts: ${muti.join(", ")}`
+    ).toEqual([]);
+  });
+
+  it("G33 · i ruoli di `permessi.json` sono ESATTAMENTE quelli che il DB sa scrivere", () => {
+    // C2 è fail-closed: un ruolo che sta nel DB ma non nella matrice dà
+    // `ruolo_sconosciuto`, cioè NEGA TUTTO a quell'utente — e lo fa in silenzio,
+    // perché nessuna migrazione e nessun test lo tocca. Il caso inverso è
+    // peggiore al contrario: un ruolo aggiunto alla matrice ma non al CHECK non
+    // si può nemmeno assegnare, e la policy nuova resta lettera morta.
+    // Le due liste sono la stessa cosa scritta in due posti: qui si tengono
+    // legate. (Stessa famiglia di G12 su FONTI ↔ check SQL.)
+    const matrice = JSON.parse(leggi("docs/regole/permessi.json")) as { ruoli: string[] };
+    // Vale l'ULTIMA definizione del CHECK: `schema.sql` nasce con il vocabolario
+    // vecchio (optometrista/staff) e la 006 lo riscrive. Si prende quella.
+    const fonti = [
+      "supabase/schema.sql",
+      ...readdirSync(join(ROOT, "supabase/migrazioni"))
+        .filter((n) => n.endsWith(".sql"))
+        .sort()
+        .map((n) => `supabase/migrazioni/${n}`),
+    ];
+    let ultimo: string[] | null = null;
+    for (const f of fonti) {
+      const m = [...leggi(f).matchAll(/check\s*\(ruolo in \(([^)]+)\)\)/gi)].at(-1);
+      if (m) ultimo = m[1].split(",").map((s) => s.trim().replace(/^'|'$/g, ""));
+    }
+    expect(ultimo, "nessun CHECK su `utenti.ruolo` trovato nello schema").toBeTruthy();
+    expect(
+      [...ultimo!].sort(),
+      "i ruoli del DB e quelli di permessi.json devono coincidere (C2 nega i ruoli sconosciuti)"
+    ).toEqual([...matrice.ruoli].sort());
+  });
+
+  it("G32 · `persona_id` resta NULLABILE nel tipo, e nessuno lo presume valorizzato", () => {
+    // La 021 fa `alter column persona_id drop not null`: da lì in poi il tipo
+    // DEVE dire `string | null`, altrimenti TypeScript autorizza in silenzio
+    // ogni lettura sbagliata (e `tsc` resta verde mentre lo sganciato passa).
+    const tipi = leggi("lib/database.types.ts");
+    const riga = tipi.match(/persona_id:\s*([^;]+);/);
+    expect(riga, "PrenotazioneRow deve dichiarare persona_id").toBeTruthy();
+    expect(
+      /string\s*\|\s*null/.test(riga![1]),
+      "C1 voce 6: `persona_id` è NULL dopo lo sgancio. Il tipo non deve tornare `string`"
+    ).toBe(true);
+
+    // E nel codice dell'app: nessun `!` e nessun cast che scavalchi il null. Oggi
+    // NESSUNO legge quel campo (la lettura vive solo dentro le funzioni SQL):
+    // la guardia serve al primo che lo leggerà, che è esattamente il momento in
+    // cui lo sganciato tornerebbe a essere una sorpresa.
+    const colpevoli: string[] = [];
+    for (const f of [...sorgenti("app"), ...sorgenti("components"), ...sorgenti("lib")]) {
+      if (rel(f) === "lib/database.types.ts") continue;
+      const src = readFileSync(f, "utf8");
+      if (/persona_id\s*!/.test(src) || /persona_id\s+as\s+string(?!\s*\|)/.test(src)) {
+        colpevoli.push(rel(f));
+      }
+    }
+    expect(
+      colpevoli,
+      `un persona_id sganciato (NULL) viene presunto valorizzato in: ${colpevoli.join(", ")}`
+    ).toEqual([]);
   });
 });

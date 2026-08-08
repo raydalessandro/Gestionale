@@ -165,7 +165,14 @@ export async function calcolaProposte(
   // ── Dati cliente + GDPR + dedupe ─────────────────────────────────
   const clienteIds = [...new Set(grezze.map((g) => g.cliente_id))];
   const { data: clienti } = clienteIds.length
-    ? await supabase.from("clienti").select("id, nome, cognome, telefono, consenso_marketing, non_contattare, canale_preferito").in("id", clienteIds)
+    // `.is("anonimizzato_il", null)`: la 021 scrive su quella colonna che
+    // l'anonimizzato «esce da ricerche, CODE e letture». Le code sono queste.
+    // Senza il filtro, un anonimizzato con una busta pronta si riaffacciava fra
+    // le proposte OPERATIVE col cognome «Anonimizzato-…» (le commerciali
+    // uscivano solo di riflesso, perché C1 alza `non_contattare`). Chi non
+    // supera questa lettura sparisce dalle proposte: il `if (!c) continue` più
+    // sotto lo scarta.
+    ? await supabase.from("clienti").select("id, nome, cognome, telefono, consenso_marketing, non_contattare, canale_preferito").is("anonimizzato_il", null).in("id", clienteIds)
     : { data: [] };
   const infoCliente = new Map((clienti ?? []).map((c) => [c.id, c]));
 
