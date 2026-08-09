@@ -1,16 +1,15 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { Icona, type NomeIcona } from "@/components/Icone";
-import { FiguraVuota } from "@/components/FigureVuote";
+
 
 /**
  * La Scrivania — la schermata che si apre alle nove.
  *
- * Portata dal prototipo `scrivania-ipad.html`, con le correzioni elencate in
- * `docs/design/RAMO-6-scrivania.md §2`. Le due che si vedono a occhio:
- * la pelle è quella di DS-01 (raggio 5, nessuna ombra, carta #F9EFEA) e non
- * quella del prototipo (raggio 14, due ombre, carta #F7F4F3); e l'ambra
- * compare due volte per schermata, non tre.
+ * Portata da `limpidia-oggi.html`, che è il prototipo di riferimento: misure,
+ * pesi e colori sono i suoi. Le correzioni che ho applicato sopra — tre
+ * contrasti sotto soglia e due opacità sul filo — sono elencate una per una
+ * in `docs/design/RAMO-6-scrivania.md §3`.
  *
  * Perché non è la dashboard di oggi. La dashboard mostra **quanto**: quattro
  * numeri e gli ultimi clienti. La scrivania mostra **cosa fare adesso**, in
@@ -35,15 +34,15 @@ export function Scheda({
 }) {
   return (
     <section className="overflow-hidden rounded border border-linea bg-white">
-      <header className="flex items-center gap-2.5 px-4 pb-3 pt-3.5">
-        <h2 className="f-serif text-[17px] font-semibold tracking-tight text-inchiostro">
+      <header className="flex items-center gap-2.5 px-4 pb-2.5 pt-3">
+        <h2 className="f-serif text-base font-semibold tracking-tight text-inchiostro">
           {titolo}
         </h2>
-        {spalla && <span className="ml-auto text-[13px] text-soft">{spalla}</span>}
+        {spalla && <span className="ml-auto text-[12.5px] text-soft">{spalla}</span>}
       </header>
       {children}
       {piede && (
-        <footer className="flex items-center gap-3 border-t border-linea bg-carta px-4 py-3">
+        <footer className="flex items-center gap-3 border-t border-linea bg-carta px-4 py-2.5">
           {piede}
         </footer>
       )}
@@ -53,7 +52,7 @@ export function Scheda({
 
 export function Etichetta({ children }: { children: ReactNode }) {
   return (
-    <span className="font-mono text-[10.5px] font-bold uppercase tracking-[0.15em] text-soft">
+    <span className="font-mono text-[9.5px] font-bold uppercase tracking-[0.15em] text-soft">
       {children}
     </span>
   );
@@ -105,15 +104,20 @@ export function ProssimoAppuntamento({
 }) {
   if (!prossimo) {
     return (
-      <section className="rounded border border-linea bg-white px-5 pb-5 pt-4">
+      <section className="rounded border border-linea bg-white px-[18px] py-5">
         <Etichetta>Prossimo appuntamento</Etichetta>
-        <div className="mt-3 flex gap-4">
-          <FiguraVuota nome="agenda" size={72} className="shrink-0" />
+        <div className="mt-3">
+          {/* Non una figura vuota da 112px: qui la scheda è piccola e la
+              notizia è buona. L'icona dell'agenda a 30px in verde dice
+              «hai finito» senza occupare mezza colonna. */}
+          <span className="mb-3 block text-verde-500">
+            <Icona nome="agenda" size={30} />
+          </span>
           <div>
-            <p className="f-serif text-[19px] font-semibold tracking-tight text-inchiostro">
+            <p className="f-serif text-[18px] font-semibold tracking-tight text-inchiostro">
               {vuoto.titolo}
             </p>
-            <p className="mt-1 max-w-[44ch] text-sm text-soft">{vuoto.testo}</p>
+            <p className="mt-1.5 max-w-[44ch] text-[13.5px] text-soft">{vuoto.testo}</p>
             <div className="mt-4">{vuoto.azione}</div>
           </div>
         </div>
@@ -126,14 +130,14 @@ export function ProssimoAppuntamento({
     // bianca si solleva da sola, ed è il meccanismo di tutta l'applicazione.
     // Qui la scheda si distingue perché è l'unica col bordo pieno `linea`.
     <section className="overflow-hidden rounded border border-inchiostro bg-white">
-      <div className="flex items-center gap-3 px-5 pt-4">
+      <div className="flex items-center gap-3 px-[18px] pt-3">
         <Etichetta>Prossimo appuntamento</Etichetta>
         <span className="ml-auto inline-flex items-center rounded border border-linea bg-carta px-3 py-1 text-[13px] font-semibold text-inchiostro">
           {prossimo.manca}
         </span>
       </div>
 
-      <div className="flex flex-wrap items-baseline gap-x-4 px-5 pt-2">
+      <div className="flex flex-wrap items-baseline gap-x-[15px] px-[18px] pt-2">
         {/* L'ora in mono con cifre tabellari: si legge in colonna e si
             confronta, come i codici busta e le diottrie. */}
         <span className="font-mono text-[31px] font-semibold leading-none tabular-nums text-inchiostro">
@@ -143,12 +147,12 @@ export function ProssimoAppuntamento({
           {prossimo.chi}
         </span>
       </div>
-      <p className="px-5 pt-1 text-[15px] text-soft">{prossimo.perche}</p>
+      <p className="px-[18px] pt-1 text-[14.5px] text-soft">{prossimo.perche}</p>
 
       {prossimo.allerta && (
         // Filetto a sinistra, come l'errore nei primitivi: sempre a sinistra,
         // sempre a dire «guarda qui prima».
-        <div className="mx-5 mt-3.5 flex items-start gap-3 rounded-r border-l-[3px] border-rosso-600 bg-rosso-50 px-3.5 py-3">
+        <div className="mx-[18px] mt-3 flex items-start gap-2.5 rounded border border-rosso-100 border-l-[3px] border-l-rosso-500 bg-rosso-50 px-3 py-2.5">
           <span className="mt-0.5 shrink-0 text-rosso-700">
             <Icona nome="attenzione" size={16} />
           </span>
@@ -159,21 +163,21 @@ export function ProssimoAppuntamento({
         </div>
       )}
 
-      <div className="flex flex-wrap items-center gap-4 px-5 pb-5 pt-4">
-        <span className="min-w-[170px] flex-1">
-          <span className="block h-1.5 overflow-hidden rounded-full bg-neutro-100">
+      <div className="flex flex-wrap items-center gap-3.5 px-[18px] pb-4 pt-3.5">
+        <span className="min-w-[160px] flex-1">
+          <span className="block h-1 overflow-hidden rounded bg-neutro-100">
             <i
-              className="block h-full rounded-full bg-neutro-400"
+              className="block h-full bg-neutro-400"
               style={{ width: `${Math.min(100, Math.max(0, prossimo.percentuale))}%` }}
             />
           </span>
-          <small className="mt-1.5 block text-xs text-soft">
+          <small className="mt-1.5 block text-[11.5px] text-soft">
             Il tempo che hai davanti prima che arrivi
           </small>
         </span>
         <Link
           href={prossimo.href}
-          className="inline-flex min-h-[44px] items-center justify-center rounded bg-inchiostro px-4 text-sm font-semibold text-carta transition-colors duration-scatto hover:bg-black"
+          className="inline-flex min-h-[48px] items-center justify-center rounded bg-inchiostro px-[18px] text-[15px] font-semibold text-carta transition-colors duration-scatto hover:bg-black"
         >
           Apri la pratica
         </Link>
@@ -186,7 +190,7 @@ export function ProssimoAppuntamento({
 
 export type Gesto = {
   id: string;
-  tinta: "verde" | "blu" | "rosso";
+  tinta: "verde" | "blu" | "rosso" | "neutro";
   icona: NomeIcona;
   cosa: string;
   motivo: string;
@@ -199,6 +203,7 @@ const PASTIGLIA: Record<Gesto["tinta"], string> = {
   verde: "bg-verde-50 border-verde-100 text-verde-700",
   blu: "bg-blu-50 border-blu-100 text-blu-700",
   rosso: "bg-rosso-50 border-rosso-100 text-rosso-700",
+  neutro: "bg-neutro-50 border-neutro-100 text-neutro-700",
 };
 
 export function CosaPuoiFareAdesso({
@@ -216,7 +221,7 @@ export function CosaPuoiFareAdesso({
       spalla={quantoTempo}
       piede={
         <>
-          <span className="min-w-0 flex-1 text-[13px] text-soft">{riassunto}</span>
+          <span className="min-w-0 flex-1 text-[12.5px] text-soft">{riassunto}</span>
           {gesti[0] && (
             <Link
               href={gesti[0].href}
@@ -232,19 +237,19 @@ export function CosaPuoiFareAdesso({
         <Link
           key={g.id}
           href={g.href}
-          className="flex min-h-[62px] w-full items-center gap-3.5 border-t border-linea px-4 py-2.5 text-left transition-colors duration-scatto hover:bg-carta"
+          className="flex min-h-[56px] w-full items-center gap-3 border-t border-neutro-100 px-4 py-2 text-left transition-colors duration-scatto hover:bg-carta"
         >
           <span
-            className={`grid h-9 w-9 shrink-0 place-content-center rounded border ${PASTIGLIA[g.tinta]}`}
+            className={`grid h-8 w-8 shrink-0 place-content-center rounded border ${PASTIGLIA[g.tinta]}`}
           >
             <Icona nome={g.icona} size={17} />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-[15px] font-semibold text-inchiostro">{g.cosa}</span>
-            <span className="block truncate text-[13px] text-soft">{g.motivo}</span>
+            <span className="block text-[14.5px] font-medium tracking-[-0.005em] text-inchiostro">{g.cosa}</span>
+            <span className="block truncate text-[12.5px] text-soft">{g.motivo}</span>
           </span>
           {g.durata && (
-            <span className="shrink-0 font-mono text-[11.5px] text-soft">{g.durata}</span>
+            <span className="shrink-0 font-mono text-[11px] text-soft">{g.durata}</span>
           )}
           <span className="shrink-0 text-neutro-400">
             <Icona nome="freccia-dx" size={14} />
@@ -284,8 +289,8 @@ export function LaTuaGiornata({ fasce, spalla }: { fasce: Fascia[]; spalla: stri
     >
       {fasce.map((f) => {
         const pausa = f.forma === "pausa";
-        const cls = `flex w-full items-center gap-3.5 border-t border-linea px-4 text-left ${
-          pausa ? "py-2" : "min-h-[44px] py-2.5"
+        const cls = `flex w-full items-center gap-3 border-t border-neutro-100 px-4 text-left ${
+          pausa ? "py-1.5" : "min-h-[56px] py-2"
         } ${
           // «Adesso» col filetto a sinistra, inchiostro e non ambra:
           // l'ambra è l'azione e questa non è un'azione, è una posizione.
@@ -294,7 +299,7 @@ export function LaTuaGiornata({ fasce, spalla }: { fasce: Fascia[]; spalla: stri
         const dentro = (
           <>
             <span
-              className={`w-12 shrink-0 font-mono text-[13.5px] tabular-nums ${
+              className={`w-11 shrink-0 font-mono text-[13px] font-semibold tabular-nums ${
                 f.forma === "ora"
                   ? "font-semibold text-inchiostro"
                   : f.forma === "finita"
@@ -306,9 +311,9 @@ export function LaTuaGiornata({ fasce, spalla }: { fasce: Fascia[]; spalla: stri
             </span>
             <span className="min-w-0 flex-1">
               <span
-                className={`block text-[15px] ${
+                className={`block text-[14.5px] font-medium tracking-[-0.005em] ${
                   pausa
-                    ? "text-[12px] text-soft"
+                    ? "text-[11.5px] font-normal text-soft"
                     : f.forma === "ora"
                       ? "font-semibold text-inchiostro"
                       : f.forma === "finita"
@@ -371,10 +376,10 @@ export function ElencoScrivania({
         const dentro = (
           <>
             <span className="min-w-0 flex-1">
-              <span className="block text-[15px] font-semibold text-inchiostro">{r.q}</span>
+              <span className="block text-[14.5px] font-medium tracking-[-0.005em] text-inchiostro">{r.q}</span>
               <span className="block text-[12.5px] text-soft">{r.m}</span>
               {r.grave && (
-                <span className="mt-1 flex items-center gap-1.5 text-[12.5px] font-semibold text-rosso-700">
+                <span className="mt-0.5 flex items-center gap-1.5 text-xs font-semibold text-rosso-700">
                   <Icona nome="attenzione" size={14} />
                   {r.grave}
                 </span>
@@ -384,7 +389,7 @@ export function ElencoScrivania({
             {r.azione}
           </>
         );
-        const cls = `flex min-h-[60px] w-full items-center gap-3 border-t border-linea px-4 py-2.5 text-left ${
+        const cls = `flex min-h-[56px] w-full items-center gap-3 border-t border-neutro-100 px-4 py-2 text-left ${
           r.grave ? "border-l-[3px] border-l-rosso-500 pl-[13px]" : ""
         }`;
         return r.href ? (
@@ -423,8 +428,8 @@ export function ImpiantoScrivania({
 }) {
   return (
     <div className="grid gap-4 lg:grid-cols-[1.28fr_1fr]">
-      <div className="flex min-w-0 flex-col gap-4">{sinistra}</div>
-      <div className="flex min-w-0 flex-col gap-4">{destra}</div>
+      <div className="flex min-w-0 flex-col gap-3.5">{sinistra}</div>
+      <div className="flex min-w-0 flex-col gap-3.5">{destra}</div>
     </div>
   );
 }
