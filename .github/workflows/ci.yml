@@ -85,6 +85,37 @@ jobs:
           cache: npm
       - run: npm ci
 
+      # Allineamento del DB di test PRIMA di ogni altra cosa: il repo non deve
+      # mai correre più avanti del database su cui gira il contratto. È la
+      # classe di rossi 125/126 (repo avanti, DB indietro) chiusa alla radice.
+      # Idempotente per costruzione — `applica-migrazioni.ts` tiene il registro
+      # `_infra_migrazioni` e salta ciò che è già applicato: su un progetto
+      # allineato questo passo non tocca nulla e costa qualche secondo.
+      #
+      # Va PRIMA di `svuota-test.ts`, e non è un dettaglio d'ordine: la funzione
+      # `svuota_dati_di_test()` è essa stessa figlia di una migrazione (015). Su
+      # un progetto ricostruito da zero, pulire prima di migrare significa
+      # chiamare una funzione che non esiste ancora.
+      #
+      # ⚠️ `MARCA_AMBIENTE_TEST` NON si passa qui, mai. Marcherebbe come 'test'
+      # QUALUNQUE database il segreto stia puntando, e quella riga è il cancello
+      # che abilita `svuota_dati_di_test()`: un segreto compilato male, una volta
+      # sola, e la CI acquisirebbe il diritto di svuotare ciò che tocca. La riga
+      # ('test') sul progetto di test la scrive il provisioning a mano una volta
+      # (docs/ambienti.md, `scripts/migra-cloud.sh test`). Se un giorno mancasse,
+      # il passo successivo si ferma — ed è esattamente il modo giusto di
+      # accorgersene.
+      - name: Allinea il DB di test al repo (migrazioni)
+        if: ${{ env.TEST_SUPABASE_DB_URL != '' }}
+        env:
+          # Lo script legge `SUPABASE_DB_URL`; il segreto è e resta quello di
+          # TEST. La mappatura vive QUI, in un solo passo, e non a livello di
+          # job: `SUPABASE_DB_URL` non deve esistere per gli altri passi (in una
+          # shell locale quel nome può puntare a prod — vedi la nota in testa a
+          # `tests/contratto/bonifica-020.test.ts`).
+          SUPABASE_DB_URL: ${{ secrets.TEST_SUPABASE_DB_URL }}
+        run: npm run db:applica-migrazioni
+
       # Pulizia del residuo PRIMA del contratto: se il giro precedente è fallito
       # a metà, questo parte pulito lo stesso. La funzione si rifiuta di girare se
       # il progetto non è marcato 'test' (public.ambiente), quindi è al sicuro.
