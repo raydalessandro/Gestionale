@@ -12,7 +12,7 @@ si ricostruisce il progetto di test da zero.
 | Progetto Supabase | A cosa serve | Chi ci punta |
 |---|---|---|
 | **`vista-gestionale`** (`uijfhhctrgirglmkrgoo`) | Anteprima **e** produzione (un solo DB, per ora) | l'app deployata su Vercel (`main` e le preview di ramo) |
-| **`gestionale-test`** | Solo la CI: contratto (L2) ed E2E (L3) girano qui | i job `contratto-e2e` di `.github/workflows/ci.yml`, via i segreti |
+| **`gestionale-test`** (`ktjzsjvmutfqnxbatisa`) | Solo la CI: contratto (L2) ed E2E (L3) girano qui | i job `contratto-e2e` di `.github/workflows/ci.yml`, via i segreti |
 
 Lo sviluppo locale usa un file `.env.local` (non versionato) che punta, a scelta,
 al progetto di anteprima o a uno personale. La CI non usa mai il progetto di
@@ -28,6 +28,7 @@ lo salta pulito (il job `guard` stampa `secrets=false`).
 | `TEST_SUPABASE_URL` | Project URL di `gestionale-test` |
 | `TEST_SUPABASE_ANON_KEY` | anon key di `gestionale-test` |
 | `TEST_SUPABASE_SERVICE_ROLE_KEY` | service role key di `gestionale-test` (potente: solo qui, mai nel repo) |
+| `TEST_SUPABASE_DB_URL` | connessione Postgres diretta a `gestionale-test`. **Opzionale ma consigliata**: senza, i due test di catalogo di `bonifica-020` skippano puliti e la CI non allinea da sé il DB di test. Come metterlo: runbook B in [`scripts/LEGGIMI.md`](../scripts/LEGGIMI.md) |
 
 Sul progetto di test, **Authentication → «Confirm email» = OFF**: gli E2E
 registrano tenant usa-e-getta e devono entrare subito.
@@ -44,6 +45,21 @@ contratto: se un giro fallisce a metà, il successivo parte pulito lo stesso. La
 funzione cancella solo ciò che le prove creano (tenant `test-…`/`ottica-e2e-…`,
 prenotazioni/persone, utenti `@test.local`); il seed dimostrativo resta.
 
+## Come arrivano le migrazioni, ambiente per ambiente
+
+Una sola strada, quella che registra (`_infra_migrazioni`). Mai l'SQL editor del
+dashboard: esegue e non registra, e da quel momento il registro mente.
+
+| Ambiente | Chi applica | Quando |
+|---|---|---|
+| **test** | la CI, da sé | primo passo del job `contratto-e2e`, prima della pulizia e del contratto. Gira solo se `TEST_SUPABASE_DB_URL` esiste; è idempotente, su un progetto allineato non tocca nulla |
+| **prod** | una persona, a mano | `sh scripts/migra-cloud.sh prod`, **nella stessa seduta del merge** — Vercel deploya `main` da solo, e fra il merge e la migrazione il codice online chiede tabelle che non esistono ancora |
+| **locale** | chi sviluppa | `bash scripts/db-locale.sh` su un Postgres usa-e-getta |
+
+Il passo in CI **non** passa `MARCA_AMBIENTE_TEST`, e non è una dimenticanza:
+marcherebbe come `'test'` qualunque database il segreto stia puntando. La riga
+`('test')` la mette il provisioning, una volta, con `migra-cloud.sh test`.
+
 ## Ricostruire `gestionale-test` da zero
 
 1. Supabase → **New project**, nome `gestionale-test`, **stessa regione** di
@@ -52,10 +68,14 @@ prenotazioni/persone, utenti `@test.local`); il seed dimostrativo resta.
    in ambiente come `SUPABASE_DB_URL` (mai su file).
 3. Applica schema + migrazioni + marca l'ambiente di test:
    ```bash
-   SUPABASE_DB_URL='postgres://postgres:<password>@db.<ref>.supabase.co:5432/postgres' \
-     MARCA_AMBIENTE_TEST=1 npm run db:applica-migrazioni
+   sh scripts/migra-cloud.sh test
    ```
-   Idempotente: rilanciarlo non rompe nulla e salta ciò che è già applicato.
+   L'URI si incolla al prompt: non compare a schermo e non entra nella history.
+   Lo strumento verifica il ref del progetto prima di connettersi, e la
+   marcatura `'test'` la mette lui perché il bersaglio è `test` — non è una
+   variabile da ricordarsi. Idempotente: rilanciarlo non rompe nulla e salta
+   ciò che è già applicato. Il runbook completo è in
+   [`scripts/LEGGIMI.md`](../scripts/LEGGIMI.md).
 4. Semina i dati dimostrativi (i due negozi che gli E2E si aspettano):
    ```bash
    # seed SQL (via psql o SQL editor): supabase/seed/seed_demo.sql
