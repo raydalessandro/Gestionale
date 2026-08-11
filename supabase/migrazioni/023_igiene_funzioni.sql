@@ -43,6 +43,14 @@
 --     set search_path` non tocca né il corpo né la volatilità, quindi il valore
 --     calcolato non cambia e gli indici restano validi — ma è esattamente il
 --     genere di affermazione che va misurata invece che creduta, e lo è stata.
+--
+--     ⚠️ SI ESCLUDONO LE FUNZIONI DELLE ESTENSIONI (`pg_depend.deptype = 'e'`).
+--     `btree_gist` è installato dentro `public` — lo dice il linter stesso — e
+--     le sue funzioni non sono nostre: su Supabase il ruolo delle migrazioni
+--     non ne è proprietario e l'ALTER fallisce con 42501. Il collaudo locale
+--     non poteva accorgersene, perché lì si gira da superutente: è la classe di
+--     errore che si vede solo sul bersaglio vero, ed è il motivo per cui questa
+--     migrazione è stata rifiutata al primo tentativo sul TEST.
 -- ============================================================================
 
 -- ── (a) le funzioni-trigger escono dall'API ─────────────────────────────────
@@ -55,6 +63,10 @@ begin
       join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public'
        and p.prorettype = 'trigger'::regtype
+       and not exists (
+         select 1 from pg_depend d
+          where d.classid = 'pg_proc'::regclass and d.objid = p.oid and d.deptype = 'e'
+       )
   loop
     execute format('revoke execute on function %s from public', r.firma);
     execute format('revoke execute on function %s from anon', r.firma);
@@ -78,6 +90,10 @@ begin
        and p.prokind = 'f'
        and (p.proconfig is null
             or not exists (select 1 from unnest(p.proconfig) c where c like 'search\_path=%'))
+       and not exists (
+         select 1 from pg_depend d
+          where d.classid = 'pg_proc'::regclass and d.objid = p.oid and d.deptype = 'e'
+       )
   loop
     execute format('alter function %s set search_path = public, pg_catalog', r.firma);
   end loop;
