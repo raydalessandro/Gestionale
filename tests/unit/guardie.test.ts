@@ -2355,3 +2355,156 @@ describe("L4r · conseguenze di C1 voce 6 sul codice intorno", () => {
     ).toEqual([]);
   });
 });
+
+/**
+ * L4s · La pipeline non lascia indietro il database.
+ *
+ * La classe di rossi 125/126 aveva sempre la stessa forma: il repo porta una
+ * migrazione nuova, il DB di test è fermo a quella prima, e il contratto
+ * fallisce parlando d'altro — di una colonna che non c'è, di una funzione che
+ * non esiste — così che la diagnosi costa mezz'ora ogni volta e la causa vera
+ * resta invisibile. La cura non è un test: è un ORDINE dentro la CI. Queste
+ * guardie tengono quell'ordine, perché un passo di workflow si sposta con una
+ * riga e nessuno se ne accorge finché non torna il rosso di prima.
+ */
+describe("L4s · guardia della pipeline (il DB di test non resta indietro del repo)", () => {
+  const CI = ".github/workflows/ci.yml";
+  const TOOL = "scripts/migra-cloud.sh";
+
+  it("G34 · la CI allinea il DB di test PRIMA di pulire e PRIMA del contratto", () => {
+    const ci = leggi(CI);
+
+    const iMigra = ci.indexOf("npm run db:applica-migrazioni");
+    const iSvuota = ci.indexOf("scripts/svuota-test.ts");
+    const iContratto = ci.indexOf("npm run test:contratto");
+
+    expect(
+      iMigra,
+      "manca il passo che applica le migrazioni al DB di test (npm run db:applica-migrazioni)"
+    ).toBeGreaterThan(-1);
+    expect(iSvuota, "manca il passo di pulizia (svuota-test.ts)").toBeGreaterThan(-1);
+    expect(iContratto, "manca il passo del contratto (test:contratto)").toBeGreaterThan(-1);
+
+    // L'ordine NON è estetico. `svuota_dati_di_test()` è figlia della 015: su un
+    // progetto ricostruito da zero, pulire prima di migrare è chiamare una
+    // funzione che non esiste ancora.
+    expect(
+      iMigra,
+      "le migrazioni vanno applicate PRIMA della pulizia: svuota_dati_di_test() nasce da una migrazione"
+    ).toBeLessThan(iSvuota);
+    expect(
+      iMigra,
+      "le migrazioni vanno applicate PRIMA del contratto, altrimenti il contratto misura un DB indietro"
+    ).toBeLessThan(iContratto);
+  });
+
+  it("G34b · il passo legge il segreto di TEST, e `SUPABASE_DB_URL` non esiste fuori da lì", () => {
+    const ci = leggi(CI);
+
+    expect(
+      ci.includes("SUPABASE_DB_URL: ${{ secrets.TEST_SUPABASE_DB_URL }}"),
+      "il passo deve mappare il segreto di TEST sul nome che lo script legge"
+    ).toBe(true);
+
+    // Una sola occorrenza: la mappatura sta nel PASSO, mai a livello di job. Il
+    // nome generico `SUPABASE_DB_URL` in una shell locale può puntare a prod —
+    // è la ragione per cui `bonifica-020.test.ts` rifiuta il fallback su quel
+    // nome. Qui si tiene la stessa disciplina.
+    // Attenzione al confine: `TEST_SUPABASE_DB_URL:` CONTIENE `SUPABASE_DB_URL:`
+    // come sottostringa. Si conta il nome nudo, non il suo suffisso.
+    const occorrenze = [...ci.matchAll(/(^|[^A-Z_])SUPABASE_DB_URL:/gm)].length;
+    expect(
+      occorrenze,
+      "`SUPABASE_DB_URL` deve comparire in UN solo passo, non nell'env del job"
+    ).toBe(1);
+  });
+
+  it("G34c · la CI non marca MAI un ambiente come 'test'", () => {
+    // `MARCA_AMBIENTE_TEST=1` scrive la riga ('test') in public.ambiente, che è
+    // il cancello positivo di `svuota_dati_di_test()`. In CI marcherebbe
+    // QUALUNQUE database il segreto stia puntando: un segreto compilato male,
+    // una volta sola, e la pipeline acquisirebbe il diritto di svuotare ciò che
+    // tocca. La marcatura è un gesto di provisioning, umano e una volta sola.
+    //
+    // Si guardano le righe ESEGUITE, non i commenti: il divieto va spiegato lì
+    // dove qualcuno sarebbe tentato di aggiungerlo, e una guardia che vieta
+    // anche di NOMINARLO impedirebbe di scrivere il perché.
+    const eseguite = leggi(CI)
+      .split("\n")
+      .filter((r) => !/^\s*#/.test(r));
+    const colpevoli = eseguite.filter((r) => /MARCA_AMBIENTE_TEST\s*[:=]/.test(r));
+    expect(
+      colpevoli,
+      `la CI non deve poter marcare un ambiente come 'test': ${colpevoli.join(" | ")}`
+    ).toEqual([]);
+  });
+
+  it("G35 · lo strumento a mano esiste e ha le due cinture (segnaposto e ref)", () => {
+    expect(existsSync(join(ROOT, TOOL)), `manca ${TOOL}`).toBe(true);
+    const sh = leggi(TOOL);
+
+    expect(
+      sh.includes("YOUR-PASSWORD"),
+      "prima cintura: l'URI col segnaposto della password non deve partire"
+    ).toBe(true);
+    expect(
+      /\*"\$REF"\*/.test(sh),
+      "seconda cintura: il ref del progetto si verifica PRIMA di connettersi"
+    ).toBe(true);
+    expect(
+      /stty -echo/.test(sh) && /read -r URI/.test(sh),
+      "l'URI si digita e non compare a schermo: niente history, niente contesto altrui"
+    ).toBe(true);
+  });
+
+  it("G35b · lo strumento non stampa mai l'URI che ha letto", () => {
+    // Un `echo "$URI"` messo per diagnosticare, e il segreto finisce nel log —
+    // che su una CI o in uno screenshot è pubblico. Il valore entra, non esce.
+    const righe = leggi(TOOL).split("\n");
+    const colpevoli = righe.filter(
+      (r) => /^\s*(echo|printf)\b/.test(r) && r.includes("$URI")
+    );
+    expect(
+      colpevoli,
+      `l'URI non deve essere stampato: ${colpevoli.join(" | ")}`
+    ).toEqual([]);
+  });
+
+  it("G35c · la marcatura 'test' vive SOLO nel ramo `test` dello strumento", () => {
+    const sh = leggi(TOOL);
+    const iIf = sh.indexOf('if [ "$BERSAGLIO" = test ]');
+    const iElse = sh.indexOf("\nelse", iIf);
+    // L'occorrenza che conta è quella ESEGUITA (la variabile davanti al
+    // comando), non la menzione nel commento che la spiega poco sopra.
+    const iMarca = sh.indexOf("MARCA_AMBIENTE_TEST=1 npm run");
+
+    expect(iIf, "lo strumento deve distinguere il bersaglio per NOME, non per URI").toBeGreaterThan(-1);
+    expect(iElse, "manca il ramo non-test").toBeGreaterThan(iIf);
+    expect(iMarca, "il ramo test deve marcare l'ambiente").toBeGreaterThan(iIf);
+    expect(
+      iMarca,
+      "prod non si marca MAI come 'test': abiliterebbe svuota_dati_di_test() in produzione"
+    ).toBeLessThan(iElse);
+  });
+
+  it("G35d · i ref dei progetti nello strumento sono quelli documentati in `docs/ambienti.md`", () => {
+    // Due liste della stessa cosa in due posti: qui si tengono legate. Se un
+    // giorno prod cambia progetto (il debito «anteprima ≠ produzione» aperto in
+    // ambienti.md), lo strumento e il documento si muovono INSIEME o questa
+    // guardia è rossa — e il cancello del ref non si trova a difendere il
+    // bersaglio sbagliato.
+    const sh = leggi(TOOL);
+    const ambienti = leggi("docs/ambienti.md");
+
+    const refs = [...sh.matchAll(/REF=([a-z]{20})\b/g)].map((m) => m[1]);
+    expect(refs.length, "lo strumento deve dichiarare un ref per bersaglio").toBe(2);
+    expect(new Set(refs).size, "i due bersagli non possono avere lo stesso ref").toBe(2);
+
+    for (const r of refs) {
+      expect(
+        ambienti.includes(r),
+        `il ref ${r} non è documentato in docs/ambienti.md: il documento e lo strumento devono dire la stessa cosa`
+      ).toBe(true);
+    }
+  });
+});
