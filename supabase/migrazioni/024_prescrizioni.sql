@@ -192,6 +192,15 @@ create policy "prescrizioni_lac: della propria azienda" on public.prescrizioni_l
   with check (azienda_id = public.get_azienda_id());
 revoke all on public.prescrizioni_lac from anon;
 
+-- Auto-registrazione, come dalla 021 in poi. Il runner
+-- (`scripts/applica-migrazioni.ts`) scriverebbe comunque questa riga: serve
+-- quando la migrazione arriva al DB da un'ALTRA strada — il canale MCP, una
+-- ricostruzione del database da zero, una mano umana in console. È già successo:
+-- questa 024 è stata applicata a PROD dal canale MCP e la riga di registro è
+-- stata aggiunta a mano. `on conflict do nothing` la rende inerte dove c'è già.
+insert into public._infra_migrazioni (nome) values ('024_prescrizioni')
+on conflict (nome) do nothing;
+
 -- ============================================================================
 -- Fine 024. La scheda unica non usa il tipo legacy come verità clinica; le LAC
 -- definitive sono normalizzate per occhio e restano protette da RLS e tenant.

@@ -1426,6 +1426,51 @@ describe.skipIf(!existsSync(join(ROOT, M020)))("L4o · guardie bonifica S0 (020)
       attese.length + 1
     );
   });
+
+  it("G21f · dalla 021 in poi OGNI migrazione registra sé stessa (col proprio nome)", () => {
+    // Perché esiste questa guardia, e perché parte dalla 021 e non dalla 002.
+    //
+    // Il registro lo tiene il runner (`scripts/applica-migrazioni.ts`): finché il
+    // DB si aggiorna DA LÌ, la riga arriva comunque e il file non deve fare
+    // nulla — è il motivo per cui le migrazioni 002…019 non si registrano da sé
+    // e stanno bene così (le copre il backfill della 020, vedi G21e).
+    //
+    // Ma la strada del runner non è più l'unica. La 024 è arrivata a PROD dal
+    // canale MCP, e la riga di registro è stata aggiunta a mano da chi
+    // applicava: se se ne fosse dimenticato, il registro avrebbe detto «024 mai
+    // applicata» su un DB che invece ce l'aveva, e il giro successivo del runner
+    // l'avrebbe RI-eseguita. Lo stesso vale per una ricostruzione del database
+    // da zero a partire dai file. Una migrazione che si registra da sé è
+    // corretta su OGNI strada, e costa due righe.
+    //
+    // Dalla 021 in poi è la convenzione di casa, e questa guardia la rende una
+    // regola: vale anche per chi scrive le migrazioni senza averla mai letta.
+    const files = readdirSync(join(ROOT, "supabase/migrazioni"))
+      .filter((n) => n.endsWith(".sql"))
+      .map((n) => n.replace(/\.sql$/, ""))
+      .filter((n) => n >= "021")
+      .sort();
+    expect(files.length, "dalla 021 in poi ci deve essere almeno una migrazione").toBeGreaterThan(0);
+
+    for (const nome of files) {
+      const sql = spoglio(leggi(`supabase/migrazioni/${nome}.sql`));
+      const atteso = new RegExp(
+        `insert\\s+into\\s+public\\._infra_migrazioni\\s*\\(\\s*nome\\s*\\)\\s*values\\s*\\(\\s*'${nome}'\\s*\\)`,
+        "i"
+      );
+      expect(
+        atteso.test(sql),
+        `${nome}.sql non si registra da sé: aggiungi in coda\n` +
+          `  insert into public._infra_migrazioni (nome) values ('${nome}')\n` +
+          `  on conflict (nome) do nothing;\n` +
+          "(senza, chi la applica fuori dal runner deve ricordarsi la riga a mano)"
+      ).toBe(true);
+      expect(
+        /on conflict\s*\(\s*nome\s*\)\s*do nothing/i.test(sql),
+        `${nome}.sql: la registrazione deve essere idempotente (\`on conflict (nome) do nothing\`)`
+      ).toBe(true);
+    }
+  });
 });
 
 /* ══════════════════════════════════════════════════════════════════════════
