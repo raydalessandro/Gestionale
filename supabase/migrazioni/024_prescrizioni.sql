@@ -129,6 +129,9 @@ create index if not exists idx_prescrizioni_derivata
 
 -- Additiva: la guardia storica resta intatta; B2 aggiunge la propria guardia
 -- per le nuove FK, così non si sostituisce alcun oggetto preesistente.
+-- Idempotenza: se una precedente applicazione è arrivata a questo punto, il
+-- trigger B2 viene ricreato in modo deterministico dal runner registrato.
+drop trigger if exists trg_tenant_prescrizioni_b2 on public.prescrizioni;
 create trigger trg_tenant_prescrizioni_b2 before insert or update on public.prescrizioni
   for each row execute function public.assicura_coerenza_tenant(
     'oculista_id','oculisti', 'derivata_da','prescrizioni'
@@ -169,8 +172,11 @@ comment on column public.prescrizioni_lac.extra is
 
 create index if not exists idx_prescrizioni_lac_azienda
   on public.prescrizioni_lac (azienda_id, prescrizione_id);
+-- Idempotenza: i trigger B2 possono essere ricreati dopo un arresto parziale.
+drop trigger if exists trg_prescrizioni_lac_updated on public.prescrizioni_lac;
 create trigger trg_prescrizioni_lac_updated before update on public.prescrizioni_lac
   for each row execute function public.tocca_updated_at();
+drop trigger if exists trg_tenant_prescrizioni_lac_b2 on public.prescrizioni_lac;
 create trigger trg_tenant_prescrizioni_lac_b2
   before insert or update on public.prescrizioni_lac
   for each row execute function public.assicura_coerenza_tenant(
@@ -178,6 +184,8 @@ create trigger trg_tenant_prescrizioni_lac_b2
   );
 
 alter table public.prescrizioni_lac enable row level security;
+-- Idempotenza: la policy B2 viene ricreata se l'applicazione precedente si è arrestata a metà.
+drop policy if exists "prescrizioni_lac: della propria azienda" on public.prescrizioni_lac;
 create policy "prescrizioni_lac: della propria azienda" on public.prescrizioni_lac
   for all to authenticated
   using (azienda_id = public.get_azienda_id())

@@ -30,7 +30,7 @@ Il perimetro conserva il ponte verso B4: una LAC definitiva può essere inserita
 
 I CHECK incompatibili vengono allargati seguendo RV-01: `drop constraint` e `add constraint` nella stessa transazione, nomi `chk_*_v2`, commento SQL con migrazione e motivo. Nessun vincolo viene ristretto e nessuna colonna parallela viene introdotta. In particolare sono coperti quattro origini M2, tipologie Occhiali incluse `office` e `mista`, e basi prisma M2 senza perdere i valori legacy già ammessi.
 
-La migrazione crea `public.prescrizioni_lac` con una sola riga indipendente per `occhio` (`od`/`os`) e relativo vincolo unico; include tipologia, sottotipo, geometria, fornitore/modello/prodotto, parametri, BC/DIA, `extra`, visus, dominante e note. Applica RLS, policy tenant, trigger di coerenza tenant ed esplicita assenza di grant ad anon. Non crea `prove_lac`.
+La migrazione crea `public.prescrizioni_lac` con una sola riga indipendente per `occhio` (`od`/`os`) e relativo vincolo unico; include tipologia, sottotipo, geometria, fornitore/modello/prodotto, parametri, BC/DIA, `extra`, visus, dominante e note. Applica RLS, policy tenant, trigger di coerenza tenant ed esplicita assenza di grant ad anon. I tre trigger B2 e la policy tenant sono preceduti dai rispettivi `drop … if exists`, così il runner registrato può riprendere in modo deterministico dopo un arresto parziale senza toccare colonne o dati. Non crea `prove_lac`.
 
 ## 4 · Azioni, funzioni e superfici
 
@@ -51,7 +51,7 @@ La superficie prescrizioni viene aggiornata al minimo indispensabile per gli sce
 
 ## 6 · Definition of Done
 
-Il rito resta verbalizzato sul log Notion e nella descrizione della PR. La PR contiene RV-01, le Annotazioni 4–5 di M2 §10, l’addendum al mandato, una sola migrazione `024_`, test completi, regole valide, CI verde e nessuna modifica fuori perimetro. La descrizione della PR riporta i tre pezzi: verbale con differenze motivate, verità misurate e punti caldi del diff.
+Il rito resta verbalizzato sul log Notion e nella descrizione della PR. La PR contiene RV-01, le Annotazioni 4–5 di M2 §10, una sola migrazione `024_`, test completi, regole valide, CI verde e nessuna modifica fuori perimetro. La clausola di inferenza della regia resta operativa tramite il log Notion e non modifica il mandato in questa PR. La descrizione della PR riporta i tre pezzi: verbale con differenze motivate, verità misurate e punti caldi del diff.
 
 ## 7 · Divieti
 
