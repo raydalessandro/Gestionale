@@ -81,7 +81,7 @@ test.describe("M2 · Prescrizioni (§8 · S1–S8, S11–S12)", () => {
     await page.getByLabel("Oculista già in registro").selectOption({ label: "Dott. Rinaldi" });
     await compilaOcchiali(page, { od: "-1", os: "-1" });
     await salva(page);
-    await expect(page.getByText("Ricetta oculistica", { exact: true })).toBeVisible();
+    await expect(page.getByText("Ricetta oculistica", { exact: true })).toHaveCount(2);
   });
 
   test("S5 · mista: tipologie indipendenti per OD e OS", async ({ page }) => {
