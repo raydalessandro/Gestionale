@@ -91,13 +91,6 @@ const VISTE_PORTALE = [
   "servizi_pubblici",
 ] as const;
 
-/** Le tre funzioni-trigger che la 020 toglie ad anon (e a PUBLIC). */
-const FUNZIONI_TRIGGER = [
-  "assicura_coerenza_tenant",
-  "crea_sala_default",
-  "assegna_sala_appuntamento",
-] as const;
-
 /** La storia che il registro deve contenere dopo la 020 (backfill 001 → 020). */
 const MIGRAZIONI_ATTESE = [
   "001_schema_base",
@@ -418,24 +411,33 @@ describe.skipIf(!haEnv())("020 · Bonifica — igiene dei grant senza spegnere i
     expect(p?.fonte).toBe("qr_vetrina");
   });
 
-  // ══ 4 · funzioni-trigger: tolte ad anon, ma i trigger scattano ═════════════
+  // ══ 4 · funzioni-trigger: nessun endpoint API, trigger ancora attivi ═══════
 
-  it.skipIf(!DB_URL)("le tre funzioni-trigger NON sono più eseguibili da anon (has_function_privilege false)", async () => {
-    const righe = await catalogo<{ nome: string; anon_exec: boolean; auth_exec: boolean }>(
+  it.skipIf(!DB_URL)("nessuna funzione-trigger di public è eseguibile da PUBLIC, anon o authenticated", async () => {
+    const righe = await catalogo<{ nome: string; public_exec: boolean; anon_exec: boolean; auth_exec: boolean }>(
       `select p.proname as nome,
+              coalesce((
+                select bool_or(priv.privilege_type = 'EXECUTE')
+                  from aclexplode(coalesce(p.proacl, acldefault('f', p.proowner))) priv
+                 where priv.grantee = 0
+              ), false)                                                   as public_exec,
               has_function_privilege('anon', p.oid, 'EXECUTE')          as anon_exec,
               has_function_privilege('authenticated', p.oid, 'EXECUTE') as auth_exec
          from pg_proc p
          join pg_namespace n on n.oid = p.pronamespace
         where n.nspname = 'public'
-          and p.proname in ('assicura_coerenza_tenant','crea_sala_default','assegna_sala_appuntamento')`
+          and p.prorettype = 'trigger'::regtype
+          and not exists (
+            select 1 from pg_depend d
+             where d.classid = 'pg_proc'::regclass and d.objid = p.oid and d.deptype = 'e'
+          )`
     );
-    expect(righe.length, "le tre funzioni-trigger devono esistere").toBe(FUNZIONI_TRIGGER.length);
+    expect(righe.length, "serve almeno una funzione-trigger applicativa da proteggere").toBeGreaterThan(0);
     for (const r of righe) {
-      // Il punto verbalizzato nella 020: revocare solo ad anon NON bastava
-      // (EXECUTE è concesso a PUBLIC per default, e anon lo ereditava).
+      // Fotografia aggiornata alla 023 (12/08): una funzione-trigger non è un endpoint di nessuno. Asserzione per categoria, non per nome: è così che i buchi nascono ed è così che restano chiusi.
+      expect(r.public_exec, `PUBLIC non deve eseguire ${r.nome}`).toBe(false);
       expect(r.anon_exec, `anon non deve eseguire ${r.nome}`).toBe(false);
-      expect(r.auth_exec, `authenticated conserva il proprio grant su ${r.nome}`).toBe(true);
+      expect(r.auth_exec, `authenticated non deve eseguire ${r.nome}`).toBe(false);
     }
   });
 

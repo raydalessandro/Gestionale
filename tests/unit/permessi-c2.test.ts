@@ -225,6 +225,15 @@ describe("C2 · precedenza dei controlli e coerenza con la policy vera", () => {
     }
   });
 
+  it("`prescrizioni` è aperto ai quattro ruoli: l'esaminatore è un filtro, non un divieto", () => {
+    for (const ruolo of MATRICE.ruoli) {
+      expect(
+        valutaPermesso("prescrizioni", profilo({ ruolo }), MATRICE, true).ok,
+        `${ruolo} deve poter salvare la scheda Rx M2`
+      ).toBe(true);
+    }
+  });
+
   it("ogni riga della policy vera nomina TUTTI i ruoli dichiarati (nessun silenzio implicito)", () => {
     // Guardia di coerenza sulla policy: una casella mancante nega (test sopra),
     // ma il diniego dev'essere una SCELTA scritta, non una dimenticanza.

@@ -278,6 +278,21 @@ assicuriamoci di leggerle dal DB per la dashboard»): garanzia in piano
 B4 — colonna-istantanea `tipologia_visione` sull'ordine + test di
 lettura obbligatorio.
 
+**Annotazione 4 · 12/08 (decisione Fable, fermata 1)** — I richiami a
+`prove_lac` e al percorso prove nei §4, §7 e §8 sono testo
+pre-decisione superato da f2p e dal delta di contratto: B2 NON crea
+`prove_lac`; prove, campioni e S9–S10 restano al filone Y/M5. B2 crea
+solo `prescrizioni_lac`; resta l'inserimento DIRETTO della LAC
+definitiva, ponte per l'ordine B4 senza reinserimento.
+
+**Annotazione 5 · 12/08 (decisione Fable, fermata 3)** —
+`prescrizioni.tipo` è LEGACY e si depreca in lettura. Nessun valore
+nuovo e CHECK intatto: se la sezione Occhiali è compilata (plano
+incluso) il valore compatibile è `occhiali`; una scheda solo-LAC usa
+`lac`; la combinazione Occhiali+LAC usa `occhiali`. La verità nuova è
+nelle sezioni e in `prescrizioni_lac`; i lettori nuovi non leggono mai
+`tipo`.
+
 ## 11-bis · Risposte finali (01/08) — il sigillo
 4. **Office RESTA** tra le tipologie (deciso a voce; la voce del
    contratto v0.1 vive).

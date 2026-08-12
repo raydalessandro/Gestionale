@@ -57,6 +57,12 @@
       "ottico": true,
       "addetto": true
     },
+    "prescrizioni": {
+      "titolare": true,
+      "responsabile": true,
+      "ottico": true,
+      "addetto": true
+    },
     "agenda": {
       "titolare": true,
       "responsabile": true,
@@ -109,15 +115,13 @@
       "titolare": true,
       "responsabile": true,
       "ottico": true,
-      "addetto": true,
-      "nota": "apre il primo che arriva, chiude l'ultimo che se ne va: roba quotidiana (04/08)"
+      "addetto": true
     },
     "anonimizzazione": {
       "titolare": true,
       "responsabile": true,
       "ottico": false,
-      "addetto": false,
-      "nota": "eliminazione definitiva protetta (C1, contratti-B1)"
+      "addetto": false
     }
   },
   "esaminatori_selezionabili": {
@@ -125,7 +129,6 @@
       "titolare",
       "responsabile",
       "ottico"
-    ],
-    "nota": "NON è un permesso d'azione: è il FILTRO della lista esaminatori sulla Rx (M2). Tutti inseriscono prescrizioni; l'addetto non compare come esaminatore (abilitazione professionale, non divieto software). Il titolare di solito È ottico."
+    ]
   }
 }

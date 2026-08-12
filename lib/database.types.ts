@@ -111,18 +111,56 @@ export type ClienteRow = {
   updated_at: string;
 }
 
-export type PrismaBase = "alto" | "basso" | "nasale" | "temporale";
+export type PrismaBase =
+  | "alto"
+  | "basso"
+  | "nasale"
+  | "temporale"
+  | "interna"
+  | "esterna"
+  | "superiore"
+  | "inferiore";
+
+export type OriginePrescrizione =
+  | "interna"
+  | "esterna"
+  | "lenti_precedenti"
+  | "check_up"
+  | "lenti_cliente"
+  | "ricetta_oculistica"
+  | "prescrizione_precedente";
+
+export type TipologiaOcchiali =
+  | "lontano"
+  | "vicino"
+  | "intermedio"
+  | "bifocale"
+  | "progressivo"
+  | "progressiva"
+  | "office"
+  | "trifocale"
+  | "mista";
 
 export type PrescrizioneRow = {
   id: string;
   azienda_id: string;
   cliente_id: string;
+  /** Legacy: i nuovi lettori usano sezioni e prescrizioni_lac (M2 §10, annotazione 5). */
   tipo: "occhiali" | "lac";
   data_visita: string;
   utente_id: string | null;
-  origine: "interna" | "esterna" | "lenti_precedenti";
+  origine: OriginePrescrizione;
   esaminatore: string | null;
-  uso: "lontano" | "vicino" | "progressivo" | "bifocale" | "office" | null;
+  uso: TipologiaOcchiali | null;
+  ha_occhiali: boolean;
+  ha_lac: boolean;
+  plano: boolean;
+  data_scadenza: string | null;
+  scadenza_modificata: boolean;
+  oculista_id: string | null;
+  derivata_da: string | null;
+  tipologia_od: Exclude<TipologiaOcchiali, "mista"> | null;
+  tipologia_os: Exclude<TipologiaOcchiali, "mista"> | null;
   od_sfero: number | null;
   od_cilindro: number | null;
   od_asse: number | null;
@@ -130,10 +168,20 @@ export type PrescrizioneRow = {
   os_cilindro: number | null;
   os_asse: number | null;
   addizione: number | null;
+  od_add: number | null;
+  os_add: number | null;
+  od_visus: string | null;
+  os_visus: string | null;
   od_prisma: number | null;
   od_prisma_base: PrismaBase | null;
   os_prisma: number | null;
   os_prisma_base: PrismaBase | null;
+  notazione: "tabo" | "internazionale" | null;
+  speciali: string[];
+  speciali_note: string | null;
+  od_invariato: boolean;
+  os_invariato: boolean;
+  appaiamento: boolean;
   od_raggio: number | null;
   od_diametro: number | null;
   os_raggio: number | null;
@@ -142,6 +190,32 @@ export type PrescrizioneRow = {
   os_dnp: number | null;
   validita_mesi: number;
   attiva: boolean;
+  note: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** LAC definitiva della scheda unica B2: una riga per occhio, nessuna prova. */
+export type PrescrizioneLacRow = {
+  id: string;
+  azienda_id: string;
+  prescrizione_id: string;
+  occhio: "od" | "os";
+  tipologia: "monofocale" | "multifocale" | "rigida" | "semirigida" | "specialistica";
+  sottotipo: "sclerale" | "ortocheratologia" | "cheratocono" | "ibrida" | "altro" | null;
+  geometria: "sferica" | "torica" | null;
+  fornitore: string | null;
+  modello: string | null;
+  prodotto_id: string | null;
+  sfero: number | null;
+  cilindro: number | null;
+  asse: number | null;
+  addizione: number | null;
+  bc: number | null;
+  dia: number | null;
+  extra: Json;
+  visus: string;
+  dominante: boolean;
   note: string | null;
   created_at: string;
   updated_at: string;
@@ -515,8 +589,9 @@ export type Database = {
       aziende: { Row: AziendaRow; Insert: Ins<AziendaRow>; Update: Upd<AziendaRow>; Relationships: [] };
       utenti: { Row: UtenteRow; Insert: Ins<UtenteRow> & { id: string }; Update: Upd<UtenteRow>; Relationships: [] };
       clienti: { Row: ClienteRow; Insert: Ins<ClienteRow>; Update: Upd<ClienteRow>; Relationships: [] };
-      prescrizioni: { Row: PrescrizioneRow; Insert: Ins<PrescrizioneRow>; Update: Upd<PrescrizioneRow>; Relationships: [] };
-      prodotti: { Row: ProdottoRow; Insert: Ins<ProdottoRow>; Update: Upd<ProdottoRow>; Relationships: [] };
+              prescrizioni: { Row: PrescrizioneRow; Insert: Ins<PrescrizioneRow>; Update: Upd<PrescrizioneRow>; Relationships: [] };
+        prescrizioni_lac: { Row: PrescrizioneLacRow; Insert: Ins<PrescrizioneLacRow>; Update: Upd<PrescrizioneLacRow>; Relationships: [] };
+        prodotti: { Row: ProdottoRow; Insert: Ins<ProdottoRow>; Update: Upd<ProdottoRow>; Relationships: [] };
       movimenti_magazzino: { Row: MovimentoMagazzinoRow; Insert: Omit<Partial<MovimentoMagazzinoRow>, "id" | "created_at"> & { id?: string }; Update: never; Relationships: [] };
       fermi: { Row: FermoRow; Insert: Ins<FermoRow>; Update: Upd<FermoRow>; Relationships: [] };
       appuntamenti: { Row: AppuntamentoRow; Insert: Ins<AppuntamentoRow>; Update: Upd<AppuntamentoRow>; Relationships: [] };
