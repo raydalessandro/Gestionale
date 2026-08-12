@@ -170,8 +170,9 @@ create index if not exists idx_prescrizioni_lac_azienda
   on public.prescrizioni_lac (azienda_id, prescrizione_id);
 create trigger trg_prescrizioni_lac_updated before update on public.prescrizioni_lac
   for each row execute function public.tocca_updated_at();
-create trigger trg_tenant_prescrizioni_lac_b2 on public.prescrizioni_lac
-  before insert or update for each row execute function public.assicura_coerenza_tenant(
+create trigger trg_tenant_prescrizioni_lac_b2
+  before insert or update on public.prescrizioni_lac
+  for each row execute function public.assicura_coerenza_tenant(
     'prescrizione_id','prescrizioni', 'prodotto_id','prodotti'
   );
 
