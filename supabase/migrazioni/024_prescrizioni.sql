@@ -9,7 +9,8 @@
 -- non si modifica né si usa nelle nuove letture. Additive sui dati e nomi.
 -- ============================================================================
 
-begin;
+-- Il runner `scripts/applica-migrazioni.ts` apre, registra e committa l’unica
+-- transazione della migrazione; questo file non replica mai quel protocollo.
 
 -- ── 1 · `prescrizioni`: la scheda unica ────────────────────────────────────
 -- `tipo` resta il marcatore legacy: la nuova verità è nelle sezioni. Le righe
@@ -182,11 +183,6 @@ create policy "prescrizioni_lac: della propria azienda" on public.prescrizioni_l
   using (azienda_id = public.get_azienda_id())
   with check (azienda_id = public.get_azienda_id());
 revoke all on public.prescrizioni_lac from anon;
-
-insert into public._infra_migrazioni (nome) values ('024_prescrizioni')
-on conflict (nome) do nothing;
-
-commit;
 
 -- ============================================================================
 -- Fine 024. La scheda unica non usa il tipo legacy come verità clinica; le LAC
