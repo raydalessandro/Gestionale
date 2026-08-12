@@ -189,7 +189,7 @@ test.describe("M1 · Anagrafiche & Privacy (§8 · S1-S6)", () => {
       .check();
     await page.getByLabel("Data visita").fill(dodiciMesiFa.toISOString().slice(0, 10));
     await page.getByLabel("Validità (mesi)").fill("12");
-    await page.getByRole("button", { name: "Salva prescrizione" }).click();
+    await page.getByRole("button", { name: "Salva e chiudi" }).click();
     await page.waitForURL(new RegExp(`/clienti/${clienteId}$`));
 
     // (3) il consenso si dà dal MASTRO (C3): il form cliente non lo spunta più.

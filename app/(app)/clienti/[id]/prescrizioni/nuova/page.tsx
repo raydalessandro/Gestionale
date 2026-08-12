@@ -19,13 +19,28 @@ export default async function NuovaPrescrizionePage({
 
   if (!cliente) notFound();
 
+  const { data: oculisti } = await supabase
+    .from("oculisti")
+    .select("id, nome, studio")
+    .order("nome");
+  const { data: precedenti } = await supabase
+    .from("prescrizioni")
+    .select("id, data_visita, uso, ha_occhiali, ha_lac, plano")
+    .eq("cliente_id", cliente.id)
+    .order("data_visita", { ascending: false })
+    .limit(20);
+
   return (
     <div className="mx-auto max-w-3xl">
       <PageHeader
         titolo="Nuova prescrizione"
         sotto={`Per ${cliente.cognome} ${cliente.nome} · convenzione cilindro negativo, asse 0–180`}
       />
-      <PrescrizioneForm clienteId={cliente.id} consensoSanitario={!!cliente.consenso_dati_sanitari} />
+      <PrescrizioneForm
+        clienteId={cliente.id}
+        oculisti={oculisti ?? []}
+        precedenti={precedenti ?? []}
+      />
     </div>
   );
 }

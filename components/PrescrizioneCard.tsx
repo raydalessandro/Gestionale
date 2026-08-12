@@ -5,30 +5,36 @@ import { fmtRefrazione, fmtDiottria, fmtData } from "@/lib/utils";
 const ETICHETTE_USO: Record<string, string> = {
   lontano: "Lontano",
   vicino: "Vicino",
+  intermedio: "Intermedio",
   progressivo: "Progressivo",
+  progressiva: "Progressiva",
   bifocale: "Bifocale",
   office: "Office",
+  trifocale: "Trifocale",
+  mista: "Mista",
 };
 
 export default function PrescrizioneCard({ p }: { p: PrescrizioneRow }) {
   const haPrisma =
     p.od_prisma !== null || p.os_prisma !== null;
-  const haLac = p.tipo === "lac";
+  // M2 §10 annotazione 5: `tipo` è legacy e non guida le letture nuove.
+  const haLac = p.ha_lac;
+  const haOcchiali = p.ha_occhiali;
 
   return (
     <Card>
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <Badge tinta={haLac ? "verde" : "blu"}>
-          {haLac ? "LAC" : "Occhiali"}
-        </Badge>
+        {haOcchiali && <Badge tinta="blu">Occhiali</Badge>}
+        {haLac && <Badge tinta="verde">LAC</Badge>}
+        {p.plano && <Badge tinta="ottone">Plano</Badge>}
         {p.uso && <Badge tinta="neutro">{ETICHETTE_USO[p.uso] ?? p.uso}</Badge>}
-        {p.origine === "esterna" && (
+        {(p.origine === "esterna" || p.origine === "ricetta_oculistica") && (
           <Badge tinta="ottone">
-            Ricetta esterna{p.esaminatore ? ` · ${p.esaminatore}` : ""}
+            {p.origine === "ricetta_oculistica" ? "Ricetta oculistica" : "Ricetta esterna"}{p.esaminatore ? ` · ${p.esaminatore}` : ""}
           </Badge>
         )}
         <span className="ml-auto text-xs text-faint">
-          {fmtData(p.data_visita)} · valida {p.validita_mesi} mesi
+          {fmtData(p.data_visita)} · scade {p.data_scadenza ? fmtData(p.data_scadenza) : `${p.validita_mesi} mesi` }
         </span>
       </div>
 
@@ -36,11 +42,6 @@ export default function PrescrizioneCard({ p }: { p: PrescrizioneRow }) {
         <p>
           <span className="mr-2 inline-block w-7 font-semibold">OD</span>
           {fmtRefrazione(p.od_sfero, p.od_cilindro, p.od_asse)}
-          {haLac && p.od_raggio !== null && (
-            <span className="text-soft">
-              {"  "}· BC {p.od_raggio?.toFixed(1)} / DIA {p.od_diametro?.toFixed(1)}
-            </span>
-          )}
           {p.od_prisma !== null && (
             <span className="text-soft">
               {"  "}· Δ {fmtDiottria(p.od_prisma).replace("+", "")} base {p.od_prisma_base}
@@ -50,11 +51,6 @@ export default function PrescrizioneCard({ p }: { p: PrescrizioneRow }) {
         <p>
           <span className="mr-2 inline-block w-7 font-semibold">OS</span>
           {fmtRefrazione(p.os_sfero, p.os_cilindro, p.os_asse)}
-          {haLac && p.os_raggio !== null && (
-            <span className="text-soft">
-              {"  "}· BC {p.os_raggio?.toFixed(1)} / DIA {p.os_diametro?.toFixed(1)}
-            </span>
-          )}
           {p.os_prisma !== null && (
             <span className="text-soft">
               {"  "}· Δ {fmtDiottria(p.os_prisma).replace("+", "")} base {p.os_prisma_base}

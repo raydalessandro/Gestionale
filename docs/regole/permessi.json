@@ -57,6 +57,13 @@
       "ottico": true,
       "addetto": true
     },
+    "prescrizioni": {
+      "titolare": true,
+      "responsabile": true,
+      "ottico": true,
+      "addetto": true,
+      "nota": "M2: tutti inseriscono prescrizioni; l'abilitazione esaminatore filtra la firma professionale, non il gesto di salvataggio."
+    },
     "agenda": {
       "titolare": true,
       "responsabile": true,

@@ -63,6 +63,8 @@ a `ci.yml`, alle guardie o ai workflow non previsti dalla busta.
 5. Dipendenze npm nuove. 6. Tre rossi CI con la stessa causa.
 7. Ogni dubbio: il dubbio si ferma.
 
+*«Se un PRECEDENTE scritto nel corpus (decisioni AR/FI/VP/RV, contratti C1-C4, annotazioni §10) copre il caso per analogia diretta, APPLICALO senza fermarti e verbalizza l'inferenza nei tre-pezzi (‘inferenza da precedente: X’). La fermata resta obbligatoria per: nessun precedente · precedenti in conflitto · semantica di prodotto nuova · e sempre per le fermate 2-3-4-5 del mandato (additive, prod, CI/guardie, dipendenze).»*
+
 ## Gli umani
 Ray = merge, decisioni di prodotto, campanello. Fable (Claude) =
 revisione ai checkpoint, verdetti sulle fermate. Le loro parole sulla
