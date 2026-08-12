@@ -49,7 +49,7 @@ test.describe("M2 · Prescrizioni (§8 · S1–S8, S11–S12)", () => {
     await apriScheda(page, clienteId);
     await page.getByLabel("Tipologia Occhiali").selectOption("office");
     await compilaOcchiali(page, { od: "-2", os: "-1.5", add: "2" });
-    await expect(page.getByText(/derivata \+0\.00/)).toBeVisible();
+    await expect(page.getByText(/derivata 0\.00/)).toBeVisible();
     await salva(page);
     await expect(page.getByText("Office", { exact: true })).toBeVisible();
   });
@@ -78,10 +78,10 @@ test.describe("M2 · Prescrizioni (§8 · S1–S8, S11–S12)", () => {
     await apriScheda(page, clienteId);
     await page.getByLabel("Origine").selectOption("ricetta_oculistica");
     await expect(page.getByLabel("Oculista già in registro")).toContainText("Dott. Rinaldi");
-    await page.getByLabel("Oculista già in registro").selectOption({ label: /Dott\. Rinaldi/ });
+    await page.getByLabel("Oculista già in registro").selectOption({ label: "Dott. Rinaldi" });
     await compilaOcchiali(page, { od: "-1", os: "-1" });
     await salva(page);
-    await expect(page.getByText("Ricetta oculistica", { exact: true })).toHaveCount(0);
+    await expect(page.getByText("Ricetta oculistica", { exact: true })).toBeVisible();
   });
 
   test("S5 · mista: tipologie indipendenti per OD e OS", async ({ page }) => {
@@ -124,7 +124,7 @@ test.describe("M2 · Prescrizioni (§8 · S1–S8, S11–S12)", () => {
     const clienteId = await creaCliente(page, { nome: "Nina", cognome: `Otto ${unico()}` });
     await apriScheda(page, clienteId);
     await compilaOcchiali(page);
-    await page.getByLabel("Prisma OD").fill("1");
+    await page.getByLabel("Prisma OD", { exact: true }).fill("1");
     await page.getByLabel("Base prisma OD").selectOption("interna");
     await salva(page);
     await expect(page.getByText(/base interna/)).toBeVisible();
