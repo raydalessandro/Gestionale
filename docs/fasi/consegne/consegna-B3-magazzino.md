@@ -31,7 +31,7 @@ Il lavoro avviene ora perché B1 fornisce l’helper permessi per le rettifiche 
 
 ## 3 · Migrazione
 
-**`025_catalogo_magazzino.sql`** viene applicata esclusivamente tramite `scripts/applica-migrazioni.ts`, la strada autorizzata che registra il nome della migrazione nella stessa transazione dopo averne eseguito il DDL. La migrazione non inserisce direttamente nel registro, per non duplicare il passo del runner. È additive-only su dati e nomi.
+**`025_catalogo_magazzino.sql`** si auto-registra con `insert … on conflict do nothing`, come imposto dalla guardia G21f. `scripts/applica-migrazioni.ts` resta la strada autorizzata: il suo inserimento conclusivo è ora idempotente nella stessa transazione, quindi coesiste con l’auto-registrazione e conserva l’applicabilità del file anche fuori dal runner. La migrazione è additive-only su dati e nomi.
 
 Crea `public.lac_modelli` come anagrafe della famiglia LAC, con fornitore, nome, tipologia, sottotipo, geometria, durata, pezzi per confezione, BC/DIA disponibili, schema parametri, griglia di producibilità e mappa UPC. Estende `prodotti` con `modello_id` per conservare la variante come prodotto reale soltanto quando serve allo stock fisico, senza alterare il contratto di giacenza.
 

@@ -415,6 +415,12 @@ create policy "pratiche_difetto: della propria azienda" on public.pratiche_difet
   with check (azienda_id = public.get_azienda_id());
 revoke all on public.pratiche_difetto from anon;
 
+-- Ogni migrazione dalla 021 si auto-registra: il runner ripete l'insert in
+-- modo idempotente dopo il file, così restano validi sia il canale autorizzato
+-- sia l'applicazione amministrata in una singola transazione.
+insert into public._infra_migrazioni (nome) values ('025_catalogo_magazzino')
+on conflict (nome) do nothing;
+
 -- ============================================================================
 -- Fine 025. Le bolle sono attese/confrontate, non giacenze contabili; i
 -- movimenti reali restano append-only e fotografano valore a costo e prezzo.
