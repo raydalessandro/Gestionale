@@ -202,6 +202,8 @@ begin
   return new;
 end;
 $$;
+revoke all on function public.guida_stato_bolla_attesa_b3() from public, anon, authenticated;
+revoke all on function public.guarda_quantita_riga_bolla_b3() from public, anon, authenticated;
 
 drop trigger if exists trg_guida_stato_bolle_attese_b3 on public.bolle_attese;
 create trigger trg_guida_stato_bolle_attese_b3 before update on public.bolle_attese
@@ -244,7 +246,7 @@ begin
   return new;
 end;
 $$;
-revoke all on function public.assicura_tenant_riga_bolla_b3() from public, anon;
+revoke all on function public.assicura_tenant_riga_bolla_b3() from public, anon, authenticated;
 
 drop trigger if exists trg_tenant_bolle_attese_righe_b3 on public.bolle_attese_righe;
 create trigger trg_tenant_bolle_attese_righe_b3 before insert or update on public.bolle_attese_righe
@@ -392,6 +394,7 @@ begin
   return new;
 end;
 $$;
+revoke all on function public.guida_stato_pratica_difetto_b3() from public, anon, authenticated;
 
 drop trigger if exists trg_guida_stato_pratiche_difetto_b3 on public.pratiche_difetto;
 create trigger trg_guida_stato_pratiche_difetto_b3 before update on public.pratiche_difetto
