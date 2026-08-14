@@ -10,7 +10,7 @@ La base verificata è `main` al commit `5e4e212`, dopo B2; la prima migrazione B
 
 Il rito verifica come **conforme** l’inferenza prescritta: il DDL LAC è in M5 §4, ma il piano assegna espressamente a B3 `lac_modelli`, `prodotti.modello_id` e la funzione pura di producibilità. L’inferenza è dunque: *precedente scritto piano §B3 + richiamo esplicito a M5 §4/§7: DDL e test LAC assegnati a B3*. Non costituisce fermata. Restano esclusi `prove_lac`, campioni e il flusso prove, assegnati al filone Y/M5; la lettura C5 dei fermi resta B7.
 
-Prima di ogni rifattorizzazione del wizard LAC, B3 riattiva lo scenario S4 in `e2e/fase2-magazzino.spec.ts`, lo esegue in CI e legge il trace Playwright. La diagnosi S0 ha escluso di attribuire il timeout a «pezzi mancanti»: si corregge soltanto la causa misurata, codice o test.
+Prima di ogni rifattorizzazione del wizard LAC, B3 riattiva lo scenario S4 in `e2e/fase2-magazzino.spec.ts`, lo esegue in CI e legge il trace Playwright. La diagnosi S0 ha escluso di attribuire il timeout a «pezzi mancanti»: si corregge soltanto la causa misurata, codice o test. Il trace ha rilevato il riuso del bottone condizionale fra «Avanti» e `submit`; B3 lo separa con chiavi React distinte. Il trace seguente conferma che il flusso di consegna è il ponte «Consegna e incassa» verso Cassa/B5: S4 verifica il ponte, senza anticipare incasso o scarico fuori busta.
 
 ## 1 · Contesto
 
@@ -54,7 +54,7 @@ La superficie B3 comprende anche lista differenze e chiudi-bolla, pratica difett
 | TDD unit | Producibilità pura: step 0,25/0,50, cilindri, limiti inclusi/esclusi e fuori-range come avviso; valori costo/prezzo doppi e loro semantica economica |
 | Contratto migrazione | Vincoli `lac_modelli` su durata e unicità; collegamento `prodotti.modello_id`; righe bolla parziali/eccessive; bolla senza effetti su valori/giacenza; causali e `recupera_costo`; pratica difetto e coerenza tenant con errore `23514` ove applicabile |
 | E2E Playwright | M3 S1, S2, S3, S4, S5, S6 e S7, per nome e senza sostituzioni inventate |
-| Diagnosi E2E pre-refactoring | `e2e/fase2-magazzino.spec.ts` S4: rimozione del `fixme`, esecuzione in CI e lettura del trace prima di scegliere qualsiasi correzione |
+| Diagnosi E2E pre-refactoring | `e2e/fase2-magazzino.spec.ts` S4: rimozione del `fixme`, esecuzione in CI e lettura del trace prima di scegliere qualsiasi correzione; il test copre ora creazione da catalogo e ponte «Consegna e incassa», mentre incasso e scarico restano B5 |
 | Esclusioni dichiarate | `prove_lac`, campioni e conferma da prova appartengono a Y/M5; C5 e lettura fermi appartengono a B7; ordini e trigger di bolla lato M4 restano fuori B3 salvo le interfacce dati dichiarate |
 
 ## 6 · Definition of Done

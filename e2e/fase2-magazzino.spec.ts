@@ -46,7 +46,7 @@ test.describe("Fase 2 · Catalogo & Magazzino", () => {
   // in CI e leggere il trace: la causa può essere un selettore, il debounce di
   // catalogo o una regressione reale, ma non si decide a memoria. Lo scarico alla
   // consegna resta coperto anche dal contratto magazzino-trigger.
-  test("S4 · Ordine da catalogo → consegna → scarico ordine_cliente", async ({ page }) => {
+  test("S4 · Ordine da catalogo → ponte consegna e incassa", async ({ page }) => {
     await registraTenant(page);
     const prodId = await creaProdotto(page, "Biofinity ×6");
     const clienteId = await creaCliente(page, { nome: "Anna", cognome: "Gialli" });
@@ -71,16 +71,14 @@ test.describe("Fase 2 · Catalogo & Magazzino", () => {
       creaOrdine.click(),
     ]);
 
-    // Porta fino a consegna.
+    // Il ponte verso la consegna esiste, ma l'incasso e lo scarico sono B5:
+    // qui si verifica il passaggio, senza anticipare il modulo cassa.
     await page.getByRole("button", { name: "Segna ordinato" }).click();
     await page.getByRole("button", { name: "Segna arrivato" }).click();
-    await page.getByRole("button", { name: "Consegna" }).click();
-    await expect(page.getByText("Consegnato", { exact: false })).toBeVisible();
-
-    // La giacenza è scesa a 9 e c'è un movimento ordine_cliente col numero OL.
-    await page.goto(`/magazzino/prodotti/${prodId}`);
-    await expect(page.getByTestId("numero-Giacenza")).toContainText("9");
-    await expect(page.getByText(/OL-\d{4}-\d{4}/)).toBeVisible();
+    await expect(page.getByRole("link", { name: "Consegna e incassa" })).toHaveAttribute(
+      "href",
+      /^\/cassa\/vendita\/nuova\?lac=[0-9a-f-]{36}$/
+    );
   });
 
   test("S5 · Fermo: ritiro scarica, annullo non muove nulla", async ({ page }) => {
