@@ -6,7 +6,7 @@
 
 Sono stati letti integralmente `docs/fasi/mandato-manus.md`, `docs/README.md`, `docs/fasi/piano-era2.md` e `docs/fasi/modulo-M3-magazzino.md`, incluse l’Annotazione 1 del §10 e le risposte finali del §11-bis. Sono state inoltre lette le sezioni §4 e §7 di `docs/fasi/modulo-M5-lac.md`, richiamate espressamente dal piano per `lac_modelli`, `prodotti.modello_id` e la funzione di producibilità.
 
-La base verificata è `main` al commit `5e4e212`, dopo B2; la prima migrazione B3 è pertanto `025_`. Il preliminare P è concluso: la mappa è stata rigenerata da schema e migrazioni fino a `024_prescrizioni.sql`, e la grammatica dati è risultata valida. L’addendum di regia B3-1 sana il debito B2 classificando `prescrizioni_lac` come **FATTO**, specie di `prescrizioni`; entrambi gli artefatti sono nel commit preliminare `6d41a3a`.
+La base verificata è `main` al commit `5e4e212`, dopo B2; la prima migrazione B3 è pertanto `025_`. Il preliminare P è concluso: la mappa è stata rigenerata fino a `024_prescrizioni.sql`, e la grammatica dati è risultata valida. L’addendum di regia B3-1 sana il debito B2 classificando `prescrizioni_lac` come **FATTO**, specie di `prescrizioni`; entrambi gli artefatti sono nel commit preliminare `6d41a3a`. Dopo l’implementazione, `scripts/db-locale.sh` ha applicato `025_catalogo_magazzino.sql` senza errori e `scripts/mappa-db.py` ha rigenerato la fotografia post-025: 41 tabelle, 34 funzioni e 51 trigger, con grammatica di nuovo allineata.
 
 Il rito verifica come **conforme** l’inferenza prescritta: il DDL LAC è in M5 §4, ma il piano assegna espressamente a B3 `lac_modelli`, `prodotti.modello_id` e la funzione pura di producibilità. L’inferenza è dunque: *precedente scritto piano §B3 + richiamo esplicito a M5 §4/§7: DDL e test LAC assegnati a B3*. Non costituisce fermata. Restano esclusi `prove_lac`, campioni e il flusso prove, assegnati al filone Y/M5; la lettura C5 dei fermi resta B7.
 
@@ -35,31 +35,33 @@ Il lavoro avviene ora perché B1 fornisce l’helper permessi per le rettifiche 
 
 Crea `public.lac_modelli` come anagrafe della famiglia LAC, con fornitore, nome, tipologia, sottotipo, geometria, durata, pezzi per confezione, BC/DIA disponibili, schema parametri, griglia di producibilità e mappa UPC. Estende `prodotti` con `modello_id` per conservare la variante come prodotto reale soltanto quando serve allo stock fisico, senza alterare il contratto di giacenza.
 
-Introduce le bolle attese e relative righe, compresi stato, dati del documento, quantità attesa e caricata, chiusura manuale con data e nota. Il modello consente carichi parziali ed eccessivi; una bolla attesa resta uno stato/confronto e **non** muove mai quantità, costo, prezzo o giacenza. Quei fatti passano esclusivamente dai movimenti di magazzino reali.
+Introduce le bolle attese e relative righe, compresi stato, dati del documento, quantità attesa e caricata, chiusura manuale con data e nota. Il modello consente carichi parziali ed eccessivi; una bolla attesa resta uno stato/confronto e **non** muove mai quantità, costo, prezzo o giacenza. La RPC `ricevi_riga_bolla` rende atomici riga, transizione a `caricata` e movimento reale con istantanee; trigger dedicati negano aggiornamenti diretti di `q_caricata` e dello stato `caricata`.
 
 Completa il registro `causali` con il carattere economico `recupera_costo`, estende i movimenti con le istantanee `valore_costo` e `valore_prezzo`, e crea la pratica difetto con prodotto/UPC, riferimento, proprietà, foto, fornitore, stato, esito e chiusura. Le letture B3 predefinite ragionano sul costo; nessuna politica fiscale MF viene anticipata.
 
 ## 4 · Azioni, funzioni e superfici
 
-La producibilità è una **funzione pura**, senza I/O: confronta i parametri della riga con la griglia del modello e restituisce un avviso informativo, mai un blocco. Le varianti LAC nascono on-demand dalla famiglia e dalla mappa UPC esclusivamente per stock fisico, vendita veloce o carico scorte.
+La producibilità è una **funzione pura**, senza I/O: confronta i parametri della riga con la griglia del modello e restituisce un avviso informativo, mai un blocco. Il form prodotto consente di collegare una variante LAC alla famiglia quando si codifica il prodotto fisico; la materializzazione a partire dalla mappa UPC resta l’innesto del flusso ordine B4, non viene anticipata qui.
 
-Il ricevimento consente di confrontare bolla fisica e attesa, registrare righe parziali o in eccesso e chiudere manualmente le differenze motivate. Gli scarichi richiedono causale e valori doppi; il reso a fornitore recupera il costo secondo causale, mentre danno e smaltimento lo perdono. L’inventario è guidato per department, marchio e SKU; le rettifiche ± passano dall’helper B1 e sono accessibili solo a titolare/responsabile.
+Il ricevimento espone la lista bolle, le righe parziali/eccesso e la chiusura motivata delle differenze. Gli scarichi richiedono causale e valori doppi; il reso a fornitore recupera il costo secondo causale, mentre danno e smaltimento lo perdono. Le rettifiche ± passano dall’helper B1 e sono accessibili solo a titolare/responsabile. La vista inventario per department/marca/SKU è un controllo M3 ancora da completare nei collaudi E2E, non viene dichiarata verde dalla sola UI esistente.
 
-La superficie B3 comprende anche lista differenze e chiudi-bolla, pratica difetto con riferimento foto, variante-on-demand e pannello di **codifica-famiglia**. Il pannello è costruito in forma riusabile per l’innesto B4, senza implementare il flusso ordine B4 né prove LAC.
+La superficie B3 include pannello di **codifica-famiglia**, ricevimento, lista differenze e chiudi-bolla, pratica difetto con foto-reference e collegamento variante-famiglia. Il pannello è riusabile dall’innesto B4, senza implementare il flusso ordine B4 né prove LAC.
 
 ## 5 · Test obbligatori
 
-| Livello | Copertura obbligatoria |
+| Livello | Evidenza / copertura |
 |---|---|
-| TDD unit | Producibilità pura: step 0,25/0,50, cilindri, limiti inclusi/esclusi e fuori-range come avviso; valori costo/prezzo doppi e loro semantica economica |
-| Contratto migrazione | Vincoli `lac_modelli` su durata e unicità; collegamento `prodotti.modello_id`; righe bolla parziali/eccessive; bolla senza effetti su valori/giacenza; causali e `recupera_costo`; pratica difetto e coerenza tenant con errore `23514` ove applicabile |
-| E2E Playwright | M3 S1, S2, S3, S4, S5, S6 e S7, per nome e senza sostituzioni inventate |
+| TDD unit | **Locale verde:** `lac-producibilita.test.ts` copre step 0,25/0,50, cilindri, limiti inclusi/esclusi e fuori-range come avviso; 254 test unitari verdi complessivamente. |
+| Contratto migrazione | **Pronto per CI TEST:** `catalogo-b3.test.ts` copre durata/unicità modello, legame variante, ricevimento parziale/eccesso atomico, bolla senza stock prima del fatto, istantanee, causale e guardie tenant/aggiornamento diretto `23514`. |
+| Validazione locale schema | **Verde:** 025 applicata su Postgres effimero; mappa rigenerata e grammatica allineata (41 tabelle, 34 funzioni, 51 trigger). |
+| Build | **Locale verde:** typecheck e build Next completati con env fittizie, senza nuovi pacchetti. |
+| E2E Playwright | M3 S1, S2, S3, S4, S5, S6 e S7 restano il cancello E2E B3 da eseguire e misurare in CI TEST, per nome e senza sostituzioni inventate. |
 | Diagnosi E2E pre-refactoring | `e2e/fase2-magazzino.spec.ts` S4: rimozione del `fixme`, esecuzione in CI e lettura del trace prima di scegliere qualsiasi correzione; il test copre ora creazione da catalogo e ponte «Consegna e incassa», mentre incasso e scarico restano B5 |
 | Esclusioni dichiarate | `prove_lac`, campioni e conferma da prova appartengono a Y/M5; C5 e lettura fermi appartengono a B7; ordini e trigger di bolla lato M4 restano fuori B3 salvo le interfacce dati dichiarate |
 
 ## 6 · Definition of Done
 
-Il rito d’apertura è verbalizzato nel log Notion e nella descrizione della PR. La PR contiene il preliminare B3-1, questa consegna, una migrazione `025_` registrata, test completi, mappa DB rigenerata e regole valide, CI verde e nessuna modifica fuori scope.
+Il rito d’apertura è verbalizzato nel log Notion e nella descrizione della PR. La PR contiene il preliminare B3-1, questa consegna, una migrazione `025_` registrata, mappa DB rigenerata e regole valide. La Definition of Done sarà soddisfatta solo dopo contratto ed E2E B3 verdi in CI TEST; fino a quel punto la PR resta draft e non è richiedibile al merge.
 
 La descrizione della PR riporta i tre pezzi: verbale del rito con differenze motivate, verità misurate e punti caldi del diff. Riporta inoltre la riga: **«addendum di regia: debito B2 sanato (classificazione `prescrizioni_lac`)»** e l’inferenza diretta M5→B3 sopra verbalizzata. La chiusura aggiunge l’allineamento finale con agente-test, agente-manuali e documentazione di fase.
 

@@ -40,6 +40,26 @@ function num(fd: FormData, k: string): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+function numeriCsv(fd: FormData, k: string): number[] {
+  const valore = str(fd, k);
+  if (!valore) return [];
+  return valore
+    .split(",")
+    .map((parte) => Number(parte.trim().replace(",", ".")))
+    .filter((n) => Number.isFinite(n));
+}
+
+function jsonDaForm(fd: FormData, k: string): Json | null {
+  const valore = str(fd, k);
+  if (!valore) return null;
+  try {
+    const letto: unknown = JSON.parse(valore);
+    return letto as Json;
+  } catch {
+    return null;
+  }
+}
+
 /* ── Onboarding ────────────────────────────────────────────────────── */
 
 export async function completaOnboarding(
@@ -774,6 +794,7 @@ function prodottoDaForm(fd: FormData) {
     scorta_minima: Math.max(0, Math.round(num(fd, "scorta_minima") ?? 0)),
     visibile_sito: fd.get("visibile_sito") === "on",
     ricambio_giorni: ricambio_giorni != null && ricambio_giorni > 0 ? Math.round(ricambio_giorni) : null,
+    modello_id: tipo === "lac" ? str(fd, "modello_id") : null,
     parametri: parametri as Json,
   };
 }
@@ -866,6 +887,12 @@ export async function caricoDaBolla(
 
   const prof = await profiloCorrente(supabase);
   if ("errore" in prof) return prof;
+  const { data: prodotto, error: prodottoErrore } = await supabase
+    .from("prodotti")
+    .select("costo, prezzo")
+    .eq("id", prodottoId)
+    .maybeSingle();
+  if (prodottoErrore || !prodotto) return { errore: "Prodotto non trovato." };
 
   // 1) carico = quantità IN BOLLA (riferimento = n° bolla)
   const { error: e1 } = await supabase.from("movimenti_magazzino").insert({
@@ -875,6 +902,8 @@ export async function caricoDaBolla(
     tipo: "carico",
     quantita: qBolla,
     riferimento: bolla ? `Bolla ${bolla}` : "Carico",
+    valore_costo: prodotto.costo,
+    valore_prezzo: prodotto.prezzo,
   });
   if (e1) return { errore: `Carico non riuscito: ${e1.message}` };
 
@@ -888,6 +917,8 @@ export async function caricoDaBolla(
       tipo: "rettifica",
       quantita: diff,
       note: `Differenza da bolla ${bolla ?? "—"}`,
+      valore_costo: prodotto.costo,
+      valore_prezzo: prodotto.prezzo,
     });
     if (e2) return { errore: `Rettifica non riuscita: ${e2.message}` };
   }
@@ -902,48 +933,252 @@ export async function registraMovimento(
   _prev: Esito,
   formData: FormData
 ): Promise<Esito> {
-  const supabase = await createClient();
-  const tipo = str(formData, "tipo");
-  const q = Math.round(num(formData, "quantita") ?? 0);
-  if (q < 1) return { errore: "La quantità dev'essere almeno 1." };
+  try {
+    const supabase = await createClient();
+    const tipo = str(formData, "tipo");
+    const q = Math.round(num(formData, "quantita") ?? 0);
+    if (q < 1) return { errore: "La quantità dev'essere almeno 1." };
 
-  const prof = await profiloCorrente(supabase);
-  if ("errore" in prof) return prof;
+    let quantita: number;
+    let note: string | null;
+    let riferimento: string | null = str(formData, "riferimento");
+    let tipoFinale: TipoMovimento;
+    let causaleCodice: string | null = str(formData, "causale_codice");
 
-  let quantita: number;
-  let note: string | null;
-  let riferimento: string | null = str(formData, "riferimento");
-  let tipoFinale: TipoMovimento;
+    if (tipo === "rettifica") {
+      await richiedi("rettifiche_inventario");
+      const motivo = str(formData, "motivo");
+      if (!motivo) return { errore: "La rettifica richiede un motivo." };
+      quantita = str(formData, "direzione") === "-" ? -q : q;
+      note = motivo;
+      riferimento = null;
+      tipoFinale = "rettifica";
+    } else if ((MOVIMENTI_MANUALI as readonly string[]).includes(tipo ?? "")) {
+      await richiedi("scarichi_con_causale");
+      if (!causaleCodice) return { errore: "Lo scarico richiede una causale." };
+      quantita = -q;
+      note = str(formData, "motivo");
+      tipoFinale = tipo as TipoMovimento;
+      if (tipoFinale === "reso_fornitore") causaleCodice = "reso_fornitore";
+    } else {
+      return { errore: "Tipo di movimento non ammesso." };
+    }
 
-  if (tipo === "rettifica") {
-    const motivo = str(formData, "motivo");
-    if (!motivo) return { errore: "La rettifica richiede un motivo." };
-    quantita = str(formData, "direzione") === "-" ? -q : q;
-    note = motivo;
-    riferimento = null;
-    tipoFinale = "rettifica";
-  } else if ((MOVIMENTI_MANUALI as readonly string[]).includes(tipo ?? "")) {
-    quantita = -q;
-    note = str(formData, "motivo");
-    tipoFinale = tipo as TipoMovimento;
-  } else {
-    return { errore: "Tipo di movimento non ammesso." };
+    const prof = await profiloCorrente(supabase);
+    if ("errore" in prof) return prof;
+    const { data: prodotto, error: prodottoErrore } = await supabase
+      .from("prodotti")
+      .select("costo, prezzo")
+      .eq("id", prodottoId)
+      .maybeSingle();
+    if (prodottoErrore || !prodotto) return { errore: "Prodotto non trovato." };
+
+    const costoDaForm = num(formData, "valore_costo");
+    const prezzoDaForm = num(formData, "valore_prezzo");
+    const valoreCosto = costoDaForm ?? prodotto.costo;
+    const valorePrezzo = prezzoDaForm ?? prodotto.prezzo;
+
+    const { error } = await supabase.from("movimenti_magazzino").insert({
+      azienda_id: prof.azienda_id,
+      prodotto_id: prodottoId,
+      utente_id: prof.id,
+      tipo: tipoFinale,
+      quantita,
+      riferimento,
+      note,
+      causale_codice: causaleCodice,
+      valore_costo: valoreCosto,
+      valore_prezzo: valorePrezzo,
+    });
+    if (error) return { errore: `Movimento non riuscito: ${error.message}` };
+
+    revalidatePath("/magazzino");
+    revalidatePath(`/magazzino/prodotti/${prodottoId}`);
+    return null;
+  } catch (e) {
+    return esitoDaErrore(e);
   }
+}
 
-  const { error } = await supabase.from("movimenti_magazzino").insert({
-    azienda_id: prof.azienda_id,
-    prodotto_id: prodottoId,
-    utente_id: prof.id,
-    tipo: tipoFinale,
-    quantita,
-    riferimento,
-    note,
-  });
-  if (error) return { errore: `Movimento non riuscito: ${error.message}` };
+/* ── B3 · Catalogo, ricevimento e difetti ─────────────────────────── */
 
-  revalidatePath("/magazzino");
-  revalidatePath(`/magazzino/prodotti/${prodottoId}`);
-  return null;
+const DURATE_LAC = [
+  "giornaliera", "quindicinale", "mensile", "trimestrale", "semestrale", "annuale", "convenzionale",
+] as const;
+const TIPOLOGIE_LAC = ["monofocale", "multifocale", "rigida", "semirigida", "specialistica"] as const;
+
+/** Codifica-famiglia riusabile dal futuro ordine B4 (M5 §4). */
+export async function creaModelloLac(_prev: Esito, formData: FormData): Promise<Esito> {
+  try {
+    const autorizzato = await richiedi("carico_bolle");
+    const fornitore = str(formData, "fornitore");
+    const nome = str(formData, "nome");
+    const tipologia = str(formData, "tipologia");
+    const durata = str(formData, "durata");
+    if (!fornitore || !nome) return { errore: "Fornitore e nome del modello sono obbligatori." };
+    if (!(TIPOLOGIE_LAC as readonly string[]).includes(tipologia ?? "")) return { errore: "Tipologia LAC non ammessa." };
+    if (!(DURATE_LAC as readonly string[]).includes(durata ?? "")) return { errore: "Durata LAC non ammessa." };
+
+    const testoProducibilita = str(formData, "producibilita");
+    const testoUpc = str(formData, "upc_mappa");
+    const producibilita = jsonDaForm(formData, "producibilita");
+    const upcMappa = jsonDaForm(formData, "upc_mappa");
+    if (testoProducibilita && !producibilita) return { errore: "Lo schema di producibilità non è JSON valido." };
+    if (testoUpc && !upcMappa) return { errore: "La mappa UPC non è JSON valida." };
+
+    const supabase = await createClient();
+    const { error } = await supabase.from("lac_modelli").insert({
+      azienda_id: autorizzato.azienda_id,
+      fornitore,
+      nome,
+      tipologia: tipologia as (typeof TIPOLOGIE_LAC)[number],
+      durata: durata as (typeof DURATE_LAC)[number],
+      sottotipo: str(formData, "sottotipo") as "sclerale" | "ortocheratologia" | "cheratocono" | "ibrida" | "altro" | null,
+      geometria: str(formData, "geometria") as "sferica" | "torica" | null,
+      pezzi_per_confezione: Math.max(1, Math.round(num(formData, "pezzi_per_confezione") ?? 1)),
+      bc_disponibili: numeriCsv(formData, "bc_disponibili"),
+      dia_disponibili: numeriCsv(formData, "dia_disponibili"),
+      producibilita: producibilita ?? {},
+      upc_mappa: upcMappa ?? {},
+      campioni: formData.get("campioni") === "on",
+    });
+    if (error?.code === "23505") return { errore: "Esiste già una famiglia LAC con fornitore e nome uguali." };
+    if (error) return { errore: `Modello LAC non creato: ${error.message}` };
+    revalidatePath("/magazzino");
+    return null;
+  } catch (e) {
+    return esitoDaErrore(e);
+  }
+}
+
+/** Ricevimento M3: la RPC scrive insieme movimento reale, riga e stato bolla. */
+export async function riceviRigaBolla(
+  rigaId: string,
+  _prev: Esito,
+  formData: FormData
+): Promise<Esito> {
+  try {
+    const autorizzato = await richiedi("carico_bolle");
+    const quantita = Math.round(num(formData, "quantita") ?? 0);
+    if (quantita < 1) return { errore: "La quantità ricevuta dev'essere almeno 1." };
+    const supabase = await createClient();
+    const { error } = await supabase.rpc("ricevi_riga_bolla", {
+      p_riga_id: rigaId,
+      p_quantita: quantita,
+      p_utente_id: autorizzato.utente_id,
+    });
+    if (error) return { errore: `Ricevimento non riuscito: ${error.message}` };
+    revalidatePath("/magazzino");
+    return null;
+  } catch (e) {
+    return esitoDaErrore(e);
+  }
+}
+
+/** Chiude una differenza spiegata senza inventare movimenti o giacenza. */
+export async function chiudiBollaAttesa(
+  bollaId: string,
+  _prev: Esito,
+  formData: FormData
+): Promise<Esito> {
+  try {
+    await richiedi("modifica_bolle");
+    const nota = str(formData, "chiusura_nota");
+    if (!nota) return { errore: "La chiusura della differenza richiede un motivo." };
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from("bolle_attese")
+      .update({ chiusa_il: new Date().toISOString(), chiusura_nota: nota })
+      .eq("id", bollaId)
+      .neq("stato", "annullata");
+    if (error) return { errore: `Bolla non chiusa: ${error.message}` };
+    revalidatePath("/magazzino");
+    return null;
+  } catch (e) {
+    return esitoDaErrore(e);
+  }
+}
+
+/** Registro difetto di conformità: le foto restano reference, mai blob in DB. */
+export async function creaPraticaDifetto(_prev: Esito, formData: FormData): Promise<Esito> {
+  try {
+    const autorizzato = await richiedi("resi");
+    const fornitore = str(formData, "fornitore");
+    const descrizione = str(formData, "descrizione");
+    const proprieta = str(formData, "proprieta");
+    if (!fornitore || !descrizione) return { errore: "Fornitore e descrizione sono obbligatori." };
+    if (proprieta !== "cliente" && proprieta !== "esposizione") return { errore: "Proprietà della pratica non valida." };
+    const fotoRefs = (str(formData, "foto_refs") ?? "")
+      .split("\n")
+      .map((r) => r.trim())
+      .filter(Boolean);
+    const supabase = await createClient();
+    const { error } = await supabase.from("pratiche_difetto").insert({
+      azienda_id: autorizzato.azienda_id,
+      prodotto_id: str(formData, "prodotto_id"),
+      cliente_id: str(formData, "cliente_id"),
+      origine_busta_id: str(formData, "origine_busta_id"),
+      fornitore,
+      upc: str(formData, "upc"),
+      riferimento_busta: str(formData, "riferimento_busta"),
+      proprieta,
+      descrizione,
+      foto_refs: fotoRefs,
+      accordi_note: str(formData, "accordi_note"),
+    });
+    if (error) return { errore: `Pratica difetto non creata: ${error.message}` };
+    revalidatePath("/magazzino");
+    return null;
+  } catch (e) {
+    return esitoDaErrore(e);
+  }
+}
+
+/** Binario M3: aperta → riconosciuta/respinta → chiusa. */
+export async function avanzaPraticaDifetto(
+  praticaId: string,
+  _prev: Esito,
+  formData: FormData
+): Promise<Esito> {
+  try {
+    await richiedi("resi");
+    const statoRichiesto = str(formData, "stato");
+    const esito = str(formData, "esito");
+    const supabase = await createClient();
+    const { data: pratica } = await supabase
+      .from("pratiche_difetto")
+      .select("stato, esito")
+      .eq("id", praticaId)
+      .maybeSingle();
+    if (!pratica) return { errore: "Pratica difetto non trovata." };
+
+    const transizioneValida =
+      (pratica.stato === "aperta" && (statoRichiesto === "riconosciuta" || statoRichiesto === "respinta")) ||
+      ((pratica.stato === "riconosciuta" || pratica.stato === "respinta") && statoRichiesto === "chiusa");
+    if (!transizioneValida) return { errore: "Transizione della pratica non ammessa." };
+    if (statoRichiesto === "respinta" && esito && esito !== "respinto") return { errore: "Una pratica respinta ha esito respinto." };
+    if (statoRichiesto === "riconosciuta" && esito && !["sostituzione", "rimborso"].includes(esito)) {
+      return { errore: "L'esito riconosciuto è sostituzione o rimborso." };
+    }
+
+    const { error } = await supabase
+      .from("pratiche_difetto")
+      .update({
+        stato: statoRichiesto as "riconosciuta" | "respinta" | "chiusa",
+        esito: (statoRichiesto === "respinta" ? "respinto" : esito ?? pratica.esito) as
+          | "sostituzione"
+          | "rimborso"
+          | "respinto"
+          | null,
+        chiusa_il: statoRichiesto === "chiusa" ? new Date().toISOString() : null,
+      })
+      .eq("id", praticaId);
+    if (error) return { errore: `Pratica difetto non aggiornata: ${error.message}` };
+    revalidatePath("/magazzino");
+    return null;
+  } catch (e) {
+    return esitoDaErrore(e);
+  }
 }
 
 /* ── Magazzino: fermi ──────────────────────────────────────────────── */

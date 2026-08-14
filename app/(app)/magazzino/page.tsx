@@ -19,9 +19,10 @@ import {
 } from "@/components/MagazzinoUI";
 import { ContatoreCard } from "@/components/OrdiniUI";
 import { AzioniFermo } from "@/components/AzioniMagazzino";
+import { PannelloCatalogoB3, RicevimentoB3, DifettiB3 } from "@/components/MagazzinoB3";
 import { STATI_FERMO, ETICHETTE_MOVIMENTO, fmtEuro, fmtQuando, fmtData } from "@/lib/utils";
 
-type Vista = "prodotti" | "movimenti" | "fermi";
+type Vista = "prodotti" | "movimenti" | "fermi" | "ricevimenti" | "difetti";
 type SupabaseServer = Awaited<ReturnType<typeof createClient>>;
 
 const TIPI_MOVIMENTO = Object.keys(ETICHETTE_MOVIMENTO);
@@ -33,7 +34,15 @@ export default async function MagazzinoPage({
 }) {
   const sp = await searchParams;
   const vista: Vista =
-    sp.vista === "movimenti" ? "movimenti" : sp.vista === "fermi" ? "fermi" : "prodotti";
+    sp.vista === "movimenti"
+      ? "movimenti"
+      : sp.vista === "fermi"
+        ? "fermi"
+        : sp.vista === "ricevimenti"
+          ? "ricevimenti"
+          : sp.vista === "difetti"
+            ? "difetti"
+            : "prodotti";
   const q = sp.q?.trim() ?? "";
   const filtro = sp.filtro ?? "";
   const supabase = await createClient();
@@ -60,7 +69,7 @@ export default async function MagazzinoPage({
 
       {/* Tabs */}
       <div className="mb-4 flex rounded-xl border border-linea bg-carta p-1">
-        {(["prodotti", "movimenti", "fermi"] as const).map((v) => (
+        {(["prodotti", "ricevimenti", "movimenti", "fermi", "difetti"] as const).map((v) => (
           <Link
             key={v}
             href={`/magazzino?vista=${v}`}
@@ -92,8 +101,10 @@ export default async function MagazzinoPage({
       </div>
 
       {vista === "prodotti" && <VistaProdotti supabase={supabase} q={q} filtro={filtro} />}
+      {vista === "ricevimenti" && <VistaRicevimenti supabase={supabase} />}
       {vista === "movimenti" && <VistaMovimenti supabase={supabase} filtro={filtro} />}
       {vista === "fermi" && <VistaFermi supabase={supabase} filtro={filtro} />}
+      {vista === "difetti" && <VistaDifetti supabase={supabase} />}
     </>
   );
 }
@@ -170,6 +181,8 @@ async function VistaProdotti({
 
   return (
     <>
+      <div className="mb-4"><PannelloCatalogoB3 /></div>
+
       <form className="relative mb-3" action="/magazzino" method="get">
         <input type="hidden" name="vista" value="prodotti" />
         {filtro && <input type="hidden" name="filtro" value={filtro} />}
@@ -233,6 +246,45 @@ async function VistaProdotti({
       )}
     </>
   );
+}
+
+/* ── Viste B3 · ricevimento e pratiche difetto ─────────────────────── */
+
+async function VistaRicevimenti({ supabase }: { supabase: SupabaseServer }) {
+  const [{ data: bolle }, { data: righe }] = await Promise.all([
+    supabase
+      .from("bolle_attese")
+      .select("id, fornitore, riferimento_interno, numero_bolla, lettera_vettura, stato, chiusa_il, chiusura_nota")
+      .neq("stato", "annullata")
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("bolle_attese_righe")
+      .select("id, bolla_id, prodotto_id, descrizione, upc, q_attesa, q_caricata"),
+  ]);
+  const righePerBolla = new Map<string, NonNullable<typeof righe>>();
+  for (const riga of righe ?? []) {
+    const raccolte = righePerBolla.get(riga.bolla_id) ?? [];
+    raccolte.push(riga);
+    righePerBolla.set(riga.bolla_id, raccolte);
+  }
+  const dati = (bolle ?? []).map((bolla) => ({ ...bolla, righe: righePerBolla.get(bolla.id) ?? [] }));
+  return <RicevimentoB3 bolle={dati} />;
+}
+
+async function VistaDifetti({ supabase }: { supabase: SupabaseServer }) {
+  const [{ data: pratiche }, { data: prodotti }] = await Promise.all([
+    supabase
+      .from("pratiche_difetto")
+      .select("id, fornitore, descrizione, proprieta, stato, esito, foto_refs")
+      .order("aperta_il", { ascending: false }),
+    supabase
+      .from("prodotti")
+      .select("id, nome, marca, tipo")
+      .eq("attivo", true)
+      .order("nome")
+      .limit(200),
+  ]);
+  return <DifettiB3 pratiche={pratiche ?? []} prodotti={prodotti ?? []} />;
 }
 
 /* ── Vista movimenti ───────────────────────────────────────────────── */

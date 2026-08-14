@@ -238,6 +238,7 @@ export type ProdottoRow = {
   ricambio_giorni: number | null;
   costo: number | null;
   fornitore: string | null;
+  modello_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -258,7 +259,89 @@ export type MovimentoMagazzinoRow = {
   quantita: number;
   riferimento: string | null;
   note: string | null;
+  causale_codice: string | null;
+  valore_costo: number | null;
+  valore_prezzo: number | null;
   created_at: string;
+}
+
+export type LacModelloRow = {
+  id: string;
+  azienda_id: string;
+  fornitore: string;
+  nome: string;
+  tipologia: "monofocale" | "multifocale" | "rigida" | "semirigida" | "specialistica";
+  sottotipo: "sclerale" | "ortocheratologia" | "cheratocono" | "ibrida" | "altro" | null;
+  geometria: "sferica" | "torica" | null;
+  durata: "giornaliera" | "quindicinale" | "mensile" | "trimestrale" | "semestrale" | "annuale" | "convenzionale";
+  pezzi_per_confezione: number;
+  bc_disponibili: number[];
+  dia_disponibili: number[];
+  parametri_schema: Json;
+  producibilita: Json;
+  upc_mappa: Json;
+  campioni: boolean;
+  attivo: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type CausaleMagazzinoRow = {
+  codice: string;
+  descrizione: string;
+  recupera_costo: boolean;
+  attiva: boolean;
+  created_at: string;
+}
+
+export type BollaAttesaRow = {
+  id: string;
+  azienda_id: string;
+  fornitore: string;
+  origine_busta_id: string | null;
+  origine_lac_id: string | null;
+  riferimento_interno: string | null;
+  numero_bolla: string | null;
+  lettera_vettura: string | null;
+  stato: "attesa" | "caricata" | "annullata";
+  note: string | null;
+  chiusa_il: string | null;
+  chiusura_nota: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type BollaAttesaRigaRow = {
+  id: string;
+  bolla_id: string;
+  prodotto_id: string | null;
+  descrizione: string;
+  upc: string | null;
+  q_attesa: number;
+  q_caricata: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export type PraticaDifettoRow = {
+  id: string;
+  azienda_id: string;
+  prodotto_id: string | null;
+  cliente_id: string | null;
+  origine_busta_id: string | null;
+  fornitore: string;
+  upc: string | null;
+  riferimento_busta: string | null;
+  proprieta: "cliente" | "esposizione";
+  descrizione: string;
+  foto_refs: string[];
+  stato: "aperta" | "riconosciuta" | "respinta" | "chiusa";
+  esito: "sostituzione" | "rimborso" | "respinto" | null;
+  accordi_note: string | null;
+  aperta_il: string;
+  chiusa_il: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export type FermoRow = {
@@ -592,6 +675,11 @@ export type Database = {
               prescrizioni: { Row: PrescrizioneRow; Insert: Ins<PrescrizioneRow>; Update: Upd<PrescrizioneRow>; Relationships: [] };
         prescrizioni_lac: { Row: PrescrizioneLacRow; Insert: Ins<PrescrizioneLacRow>; Update: Upd<PrescrizioneLacRow>; Relationships: [] };
         prodotti: { Row: ProdottoRow; Insert: Ins<ProdottoRow>; Update: Upd<ProdottoRow>; Relationships: [] };
+      lac_modelli: { Row: LacModelloRow; Insert: Ins<LacModelloRow>; Update: Upd<LacModelloRow>; Relationships: [] };
+      causali_magazzino: { Row: CausaleMagazzinoRow; Insert: never; Update: never; Relationships: [] };
+      bolle_attese: { Row: BollaAttesaRow; Insert: Ins<BollaAttesaRow>; Update: Upd<BollaAttesaRow>; Relationships: [] };
+      bolle_attese_righe: { Row: BollaAttesaRigaRow; Insert: Ins<BollaAttesaRigaRow>; Update: Upd<BollaAttesaRigaRow>; Relationships: [] };
+      pratiche_difetto: { Row: PraticaDifettoRow; Insert: Ins<PraticaDifettoRow>; Update: Upd<PraticaDifettoRow>; Relationships: [] };
       movimenti_magazzino: { Row: MovimentoMagazzinoRow; Insert: Omit<Partial<MovimentoMagazzinoRow>, "id" | "created_at"> & { id?: string }; Update: never; Relationships: [] };
       fermi: { Row: FermoRow; Insert: Ins<FermoRow>; Update: Upd<FermoRow>; Relationships: [] };
       appuntamenti: { Row: AppuntamentoRow; Insert: Ins<AppuntamentoRow>; Update: Upd<AppuntamentoRow>; Relationships: [] };
@@ -619,6 +707,11 @@ export type Database = {
         Args: { p_nome_azienda: string; p_slug: string; p_nome_utente: string };
         Returns: string;
       };
+      ricevi_riga_bolla: {
+        Args: { p_riga_id: string; p_quantita: number; p_utente_id: string };
+        Returns: string;
+      };
+      recupera_costo: { Args: { p_causale: string }; Returns: boolean };
       prossimo_numero: { Args: { p_prefisso: string }; Returns: string };
       // G8 (018): il percorso di scrittura verso persone/registro (ID-01).
       cliente_per_telefono: {
