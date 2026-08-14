@@ -91,7 +91,7 @@ describe.skipIf(!haEnv())("B3 · Catalogo & Magazzino", () => {
       numero_bolla: "MAN-027",
       lettera_vettura: "LDV-027",
       riferimento_interno: "RIF-027",
-      stato: "aperta",
+      stato: "attesa",
       bolle_attese_righe: [{ prodotto_id: prodottoA, q_attesa: 4, q_caricata: 0 }],
     });
 
