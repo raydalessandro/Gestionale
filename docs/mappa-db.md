@@ -1,6 +1,6 @@
 # Mappa del database — generata, non scritta
 
-*Estratta il 2026-08-14 da un Postgres locale con schema + migrazioni fino a `025_catalogo_magazzino.sql`.*
+*Estratta il 2026-08-14 da un Postgres locale con schema + migrazioni fino a `026_catalogo_magazzino_correzioni.sql`.*
 *Per rigenerarla: `bash scripts/db-locale.sh && python3 scripts/mappa-db.py`.*
 
 ## Le tabelle (41)
