@@ -41,13 +41,11 @@ test.describe("Fase 2 · Catalogo & Magazzino", () => {
     await expect(page.getByText(/Differenza da bolla 123/)).toBeVisible();
   });
 
-  // FIXME (modulo in lavorazione): lo scenario arriva allo scarico SOLO passando
-  // dalla consegna dell'ordine LAC, che ora entra nel modulo cassa ('Consegna e
-  // incassa', ancora da finalizzare). Inoltre il passo "Crea ordine" (wizard LAC
-  // 'Da catalogo') è andato in timeout nel run e NON è stato diagnosticato: da
-  // verificare col trace quando si rimette mano al wizard ordini/prescrizioni —
-  // potrebbe essere selettore/timing o una regressione vera. Lo scarico di
-  // magazzino alla consegna è comunque coperto a contratto (magazzino-trigger).
+  // B3 · diagnosi obbligatoria: questo scenario era stato sospeso per un timeout
+  // nel wizard LAC «Da catalogo». Prima di modificare wizard o consegna, eseguirlo
+  // in CI e leggere il trace: la causa può essere un selettore, il debounce di
+  // catalogo o una regressione reale, ma non si decide a memoria. Lo scarico alla
+  // consegna resta coperto anche dal contratto magazzino-trigger.
   test("S4 · Ordine da catalogo → consegna → scarico ordine_cliente", async ({ page }) => {
     await registraTenant(page);
     const prodId = await creaProdotto(page, "Biofinity ×6");
