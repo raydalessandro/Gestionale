@@ -429,6 +429,7 @@ export default function WizardOrdineLac({
 
         {passo < 3 ? (
           <button
+            key="avanti"
             type="button"
             onClick={() => setPasso((p) => p + 1)}
             disabled={(passo === 1 && !cliente) || (passo === 2 && !righeValide)}
@@ -438,6 +439,7 @@ export default function WizardOrdineLac({
           </button>
         ) : (
           <button
+            key="crea-ordine"
             type="submit"
             disabled={inCorso || !righeValide}
             className="rounded-xl bg-ottone px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-ottone-scuro disabled:opacity-50"

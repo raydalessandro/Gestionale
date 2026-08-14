@@ -64,8 +64,12 @@ test.describe("Fase 2 · Catalogo & Magazzino", () => {
     await page.getByPlaceholder(/Cerca LAC o soluzione/).fill("Biofinity");
     await page.getByRole("button", { name: /Biofinity/ }).click();
     await page.getByRole("button", { name: "Avanti" }).click();
-    await page.getByRole("button", { name: "Crea ordine" }).click();
-    await page.waitForURL(/\/ordini\/lac\/[0-9a-f-]{36}$/);
+    const creaOrdine = page.getByRole("button", { name: "Crea ordine" });
+    await expect(creaOrdine).toBeVisible();
+    await Promise.all([
+      page.waitForURL(/\/ordini\/lac\/[0-9a-f-]{36}$/),
+      creaOrdine.click(),
+    ]);
 
     // Porta fino a consegna.
     await page.getByRole("button", { name: "Segna ordinato" }).click();
