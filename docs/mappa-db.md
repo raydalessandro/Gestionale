@@ -1,6 +1,6 @@
 # Mappa del database — generata, non scritta
 
-*Estratta il 2026-08-14 da un Postgres locale con schema + migrazioni fino a `026_catalogo_magazzino_correzioni.sql`.*
+*Estratta il 2026-08-14 da un Postgres locale con schema + migrazioni fino a `027_bolla_attesa_manuale.sql`.*
 *Per rigenerarla: `bash scripts/db-locale.sh && python3 scripts/mappa-db.py`.*
 
 ## Le tabelle (41)
@@ -929,6 +929,7 @@
 - `coerenza_prenotazione_tipo()` → trigger
 - `coerenza_registro_riferimento()` → trigger · *security definer*
 - `crea_azienda_con_titolare(p_nome_azienda text, p_slug text, p_nome_utente text)` → uuid · *security definer*
+- `crea_bolla_attesa_manuale(p_fornitore text, p_prodotto_id uuid, p_quantita integer, p_numero_bolla text, p_lettera_vettura text, p_riferimento_interno text)` → uuid
 - `crea_oculista_al_volo(p_nome text, p_studio text, p_citta text)` → uuid
 - `crea_prenotazione(p_slug text, p_servizio text, p_inizio timestamp with time zone, p_nome text, p_telefono text, p_email text, p_per_conto_di text, p_note text, p_fonte text, p_chiave_richiesta text, p_lista_attesa boolean)` → TABLE(id uuid, codice text, inizio timestamp with time zone, durata_minuti integer) · *security definer*
 - `crea_relazione(p_cliente_id uuid, p_relativo_id uuid, p_tipo text, p_note text)` → uuid

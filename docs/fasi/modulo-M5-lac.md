@@ -216,8 +216,6 @@ Sigillo apposto il 04/08 (camminate chiuse); il filone Applicazione è
 innesto Y della collega.
 
 ## 10 · Congelamento
-**Annotazione 3 · 14/08 (B3 · trace E2E S4)** — il trace CI dello scenario «Da catalogo → consegna → scarico» conferma che il catalogo e la creazione ordine funzionano: dopo il click su «Avanti», il riepilogo si rende ma il bottone diventa già `Creo…` e l’ordine è creato prima del click esplicito di «Crea ordine». La causa è il riuso React dello stesso bottone condizionale: durante il click di navigazione, il nodo passa da `type="button"` a `type="submit"`. Correzione B3: chiavi distinte `avanti` e `crea-ordine`; S4 asserisce la visibilità del riepilogo e attende la navigazione iniziata dal solo submit. Il secondo trace conferma inoltre che, allo stato `arrivato`, la consegna passa al ponte «Consegna e incassa» verso Cassa/B5: S4 verifica quell’href e non anticipa incasso o scarico, fuori busta. Nessun pezzo di catalogo manca; non è una modifica di semantica del flusso.
-
 **Annotazione 2 · 05/08 (esito S0)** — l'ipotesi «pezzi mancanti nel
 catalogo piatto» come causa del timeout è stata SMENTITA dalla
 diagnosi (tabella riga-per-riga in S0-verita.md): la causa vera è nel

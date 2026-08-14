@@ -5,6 +5,7 @@ import { AlertTriangle, Boxes, ClipboardCheck, PackageCheck, ShieldAlert } from 
 import {
   avanzaPraticaDifetto,
   chiudiBollaAttesa,
+  creaBollaAttesaManuale,
   creaModelloLac,
   creaPraticaDifetto,
   riceviRigaBolla,
@@ -93,7 +94,7 @@ export function PannelloCatalogoB3() {
   );
 }
 
-export function RicevimentoB3({ bolle }: { bolle: Bolla[] }) {
+export function RicevimentoB3({ bolle, prodotti }: { bolle: Bolla[]; prodotti: Prodotto[] }) {
   return (
     <section className="space-y-4">
       <div>
@@ -101,9 +102,30 @@ export function RicevimentoB3({ bolle }: { bolle: Bolla[] }) {
         <h2 className="mt-1 text-lg font-semibold text-inchiostro">Bolle attese e differenze</h2>
         <p className="mt-1 text-sm text-soft">Il carico nasce solo dal ricevimento della riga; la bolla attesa non modifica mai la giacenza.</p>
       </div>
+      <FormBollaAttesaManuale prodotti={prodotti} />
       {bolle.length === 0 ? <p className="rounded-xl border border-dashed border-linea bg-carta p-5 text-sm text-faint">Nessuna bolla attesa aperta. Le bolle da ordine saranno generate dal flusso B4 alla conferma fiscale.</p> : bolle.map((bolla) => <SchedaBolla key={bolla.id} bolla={bolla} />)}
     </section>
   );
+}
+
+function FormBollaAttesaManuale({ prodotti }: { prodotti: Prodotto[] }) {
+  const [aperto, setAperto] = useState(false);
+  const [stato, run, inCorso] = useActionState(creaBollaAttesaManuale, null);
+  return <section className="rounded-2xl border border-linea bg-white p-5 shadow-[0_1px_2px_rgba(28,23,20,0.04)]">
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div><p className="text-sm font-semibold text-inchiostro">Bolla attesa manuale</p><p className="mt-1 text-xs text-faint">Per forniture fuori dall’ordine cliente; il trigger post-conferma resta B4.</p></div>
+      <button type="button" className={`${btn} ${accent}`} onClick={() => setAperto((v) => !v)}>{aperto ? "Chiudi" : "Nuova bolla attesa"}</button>
+    </div>
+    {aperto && <form action={run} className="mt-4 grid gap-3 border-t border-linea pt-4 md:grid-cols-2">
+      <input name="fornitore" required placeholder="Fornitore *" className={inputCls} />
+      <input name="numero_bolla" placeholder="N° bolla" className={inputCls} />
+      <input name="lettera_vettura" placeholder="Lettera di vettura" className={inputCls} />
+      <input name="riferimento_interno" placeholder="Riferimento interno" className={inputCls} />
+      <select name="prodotto_id" required defaultValue="" aria-label="Prodotto riga bolla" className={inputCls}><option value="">Prodotto fisico *</option>{prodotti.map((p) => <option key={p.id} value={p.id}>{p.marca ? `${p.marca} · ` : ""}{p.nome}</option>)}</select>
+      <input name="quantita" type="number" min="1" required placeholder="Quantità attesa *" className={inputCls} />
+      <div className="md:col-span-2"><Errore msg={stato?.errore} /><button type="submit" disabled={inCorso} className={`${btn} ${primary}`}>{inCorso ? "Salvo…" : "Crea bolla attesa"}</button></div>
+    </form>}
+  </section>;
 }
 
 function SchedaBolla({ bolla }: { bolla: Bolla }) {
@@ -151,7 +173,7 @@ export function DifettiB3({ pratiche, prodotti }: { pratiche: Pratica[]; prodott
   return <section className="space-y-4">
     <div className="flex flex-wrap items-center justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wide text-faint">Conformità</p><h2 className="mt-1 text-lg font-semibold text-inchiostro">Pratiche difetto</h2></div><button type="button" className={`${btn} ${accent}`} onClick={() => setAperto((v) => !v)}><ShieldAlert size={16} /> {aperto ? "Chiudi" : "Apri pratica"}</button></div>
     {aperto && <form action={run} className="space-y-3 rounded-2xl border border-linea bg-white p-5 shadow-[0_1px_2px_rgba(28,23,20,0.04)]">
-      <div className="grid gap-3 md:grid-cols-2"><input name="fornitore" required placeholder="Fornitore *" className={inputCls} /><select name="proprieta" required defaultValue="cliente" className={inputCls}><option value="cliente">Bene del cliente</option><option value="esposizione">Bene di esposizione</option></select><select name="prodotto_id" defaultValue="" className={inputCls}><option value="">Prodotto non codificato</option>{prodotti.map((p) => <option key={p.id} value={p.id}>{p.marca ? `${p.marca} · ` : ""}{p.nome}</option>)}</select><input name="upc" placeholder="UPC / EAN" className={inputCls} /></div>
+      <div className="grid gap-3 md:grid-cols-2"><input name="fornitore" required placeholder="Fornitore *" className={inputCls} /><select name="proprieta" required defaultValue="cliente" aria-label="Proprietà pratica difetto" className={inputCls}><option value="cliente">Bene del cliente</option><option value="esposizione">Bene di esposizione</option></select><select name="prodotto_id" defaultValue="" aria-label="Prodotto pratica difetto" className={inputCls}><option value="">Prodotto non codificato</option>{prodotti.map((p) => <option key={p.id} value={p.id}>{p.marca ? `${p.marca} · ` : ""}{p.nome}</option>)}</select><input name="upc" placeholder="UPC / EAN" className={inputCls} /></div>
       <textarea name="descrizione" required rows={3} placeholder="Descrizione del difetto *" className={inputCls} /><textarea name="foto_refs" rows={2} placeholder="Riferimenti foto, uno per riga" className={inputCls} /><textarea name="accordi_note" rows={2} placeholder="Accordi con il fornitore" className={inputCls} />
       <Errore msg={stato?.errore} /><button type="submit" disabled={inCorso} className={`${btn} ${primary}`}>{inCorso ? "Apro…" : "Apri pratica"}</button>
     </form>}
@@ -163,5 +185,5 @@ function SchedaPratica({ pratica }: { pratica: Pratica }) {
   const azione = avanzaPraticaDifetto.bind(null, pratica.id);
   const [stato, run, inCorso] = useActionState(azione, null);
   const prossimi = pratica.stato === "aperta" ? ["riconosciuta", "respinta"] : pratica.stato === "chiusa" ? [] : ["chiusa"];
-  return <article className="rounded-2xl border border-linea bg-white p-5 shadow-[0_1px_2px_rgba(28,23,20,0.04)]"><div className="flex justify-between gap-3"><div><h3 className="font-semibold text-inchiostro">{pratica.fornitore} · {pratica.proprieta}</h3><p className="mt-1 text-sm text-soft">{pratica.descrizione}</p></div><span className="rounded-full bg-carta px-3 py-1 text-xs font-semibold text-soft">{pratica.stato}</span></div>{pratica.foto_refs.length > 0 && <p className="mt-3 text-xs text-faint">{pratica.foto_refs.length} foto-reference registrate</p>}{prossimi.length > 0 && <form action={run} className="mt-4 flex flex-wrap gap-2"><select name="stato" defaultValue={prossimi[0]} className={inputCls}>{prossimi.map((s) => <option key={s} value={s}>{s}</option>)}</select>{pratica.stato === "aperta" && <select name="esito" defaultValue="sostituzione" className={inputCls}><option value="sostituzione">Sostituzione</option><option value="rimborso">Rimborso</option><option value="respinto">Respinto</option></select>}<button type="submit" disabled={inCorso} className={`${btn} ${ghost}`}><ClipboardCheck size={16} /> {inCorso ? "…" : "Aggiorna"}</button><Errore msg={stato?.errore} /></form>}</article>;
+  return <article className="rounded-2xl border border-linea bg-white p-5 shadow-[0_1px_2px_rgba(28,23,20,0.04)]"><div className="flex justify-between gap-3"><div><h3 className="font-semibold text-inchiostro">{pratica.fornitore} · {pratica.proprieta}</h3><p className="mt-1 text-sm text-soft">{pratica.descrizione}</p></div><span className="rounded-full bg-carta px-3 py-1 text-xs font-semibold text-soft">{pratica.stato}</span></div>{pratica.foto_refs.length > 0 && <p className="mt-3 text-xs text-faint">{pratica.foto_refs.length} foto-reference registrate</p>}{prossimi.length > 0 && <form action={run} className="mt-4 flex flex-wrap gap-2"><select name="stato" defaultValue={prossimi[0]} aria-label="Stato pratica difetto" className={inputCls}>{prossimi.map((s) => <option key={s} value={s}>{s}</option>)}</select>{pratica.stato === "aperta" && <select name="esito" defaultValue="sostituzione" aria-label="Esito pratica difetto" className={inputCls}><option value="sostituzione">Sostituzione</option><option value="rimborso">Rimborso</option><option value="respinto">Respinto</option></select>}<button type="submit" disabled={inCorso} className={`${btn} ${ghost}`}><ClipboardCheck size={16} /> {inCorso ? "…" : "Aggiorna"}</button><Errore msg={stato?.errore} /></form>}</article>;
 }

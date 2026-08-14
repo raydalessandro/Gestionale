@@ -103,6 +103,9 @@ function FormRettifica({ prodottoId, onFatto }: { prodottoId: string; onFatto: (
             <option value="+">Aumenta (+)</option>
             <option value="-">Diminuisci (−)</option>
           </select>
+          <select name="causale_codice" required defaultValue="furto" aria-label="causale rettifica" className={inputCls}>
+            <option value="consumo">Consumo interno</option><option value="errore">Errore operativo</option><option value="furto">Furto</option><option value="danno_negozio">Danno in negozio</option><option value="scaduto">Scaduto</option><option value="smaltimento">Smaltimento</option><option value="altro">Altro</option>
+          </select>
           <input name="quantita" type="number" min={1} step={1} placeholder="Quantità" className={`${inputCls} diottria`} />
           <input name="motivo" placeholder="Motivo (obbligatorio)" className={`${inputCls} sm:col-span-1`} />
         </div>

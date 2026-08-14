@@ -948,7 +948,9 @@ export async function registraMovimento(
     if (tipo === "rettifica") {
       await richiedi("rettifiche_inventario");
       const motivo = str(formData, "motivo");
+      const causaliRettifica = ["consumo", "errore", "furto", "danno_negozio", "scaduto", "smaltimento", "altro"];
       if (!motivo) return { errore: "La rettifica richiede un motivo." };
+      if (!causaleCodice || !causaliRettifica.includes(causaleCodice)) return { errore: "La rettifica richiede una causale valida." };
       quantita = str(formData, "direzione") === "-" ? -q : q;
       note = motivo;
       riferimento = null;
@@ -1044,6 +1046,38 @@ export async function creaModelloLac(_prev: Esito, formData: FormData): Promise<
     });
     if (error?.code === "23505") return { errore: "Esiste già una famiglia LAC con fornitore e nome uguali." };
     if (error) return { errore: `Modello LAC non creato: ${error.message}` };
+    revalidatePath("/magazzino");
+    return null;
+  } catch (e) {
+    return esitoDaErrore(e);
+  }
+}
+
+/**
+ * Bolla attesa manuale per forniture fuori dall'ordine-cliente: B4 resta il
+ * solo proprietario del trigger post-conferma fiscale. La bolla non genera
+ * movimenti; la riga è soltanto l'attesa che il ricevimento renderà fisica.
+ */
+export async function creaBollaAttesaManuale(_prev: Esito, formData: FormData): Promise<Esito> {
+  try {
+    await richiedi("carico_bolle");
+    const fornitore = str(formData, "fornitore");
+    const prodottoId = str(formData, "prodotto_id");
+    const quantita = Math.round(num(formData, "quantita") ?? 0);
+    const numeroBolla = str(formData, "numero_bolla");
+    if (!fornitore || !prodottoId) return { errore: "Fornitore e prodotto sono obbligatori." };
+    if (quantita < 1) return { errore: "La quantità attesa dev'essere almeno 1." };
+
+    const supabase = await createClient();
+    const { error } = await supabase.rpc("crea_bolla_attesa_manuale", {
+      p_fornitore: fornitore,
+      p_prodotto_id: prodottoId,
+      p_quantita: quantita,
+      p_numero_bolla: numeroBolla,
+      p_lettera_vettura: str(formData, "lettera_vettura"),
+      p_riferimento_interno: str(formData, "riferimento_interno"),
+    });
+    if (error) return { errore: `Bolla attesa non creata: ${error.message}` };
     revalidatePath("/magazzino");
     return null;
   } catch (e) {

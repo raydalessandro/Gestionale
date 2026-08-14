@@ -711,6 +711,13 @@ export type Database = {
         Args: { p_riga_id: string; p_quantita: number; p_utente_id: string };
         Returns: string;
       };
+      crea_bolla_attesa_manuale: {
+        Args: {
+          p_fornitore: string; p_prodotto_id: string; p_quantita: number;
+          p_numero_bolla?: string | null; p_lettera_vettura?: string | null; p_riferimento_interno?: string | null;
+        };
+        Returns: string;
+      };
       recupera_costo: { Args: { p_causale: string }; Returns: boolean };
       prossimo_numero: { Args: { p_prefisso: string }; Returns: string };
       // G8 (018): il percorso di scrittura verso persone/registro (ID-01).

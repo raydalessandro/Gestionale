@@ -251,7 +251,7 @@ async function VistaProdotti({
 /* ── Viste B3 · ricevimento e pratiche difetto ─────────────────────── */
 
 async function VistaRicevimenti({ supabase }: { supabase: SupabaseServer }) {
-  const [{ data: bolle }, { data: righe }] = await Promise.all([
+  const [{ data: bolle }, { data: righe }, { data: prodotti }] = await Promise.all([
     supabase
       .from("bolle_attese")
       .select("id, fornitore, riferimento_interno, numero_bolla, lettera_vettura, stato, chiusa_il, chiusura_nota")
@@ -260,6 +260,12 @@ async function VistaRicevimenti({ supabase }: { supabase: SupabaseServer }) {
     supabase
       .from("bolle_attese_righe")
       .select("id, bolla_id, prodotto_id, descrizione, upc, q_attesa, q_caricata"),
+    supabase
+      .from("prodotti")
+      .select("id, nome, marca, tipo")
+      .eq("attivo", true)
+      .order("nome")
+      .limit(200),
   ]);
   const righePerBolla = new Map<string, NonNullable<typeof righe>>();
   for (const riga of righe ?? []) {
@@ -268,7 +274,7 @@ async function VistaRicevimenti({ supabase }: { supabase: SupabaseServer }) {
     righePerBolla.set(riga.bolla_id, raccolte);
   }
   const dati = (bolle ?? []).map((bolla) => ({ ...bolla, righe: righePerBolla.get(bolla.id) ?? [] }));
-  return <RicevimentoB3 bolle={dati} />;
+  return <RicevimentoB3 bolle={dati} prodotti={prodotti ?? []} />;
 }
 
 async function VistaDifetti({ supabase }: { supabase: SupabaseServer }) {
