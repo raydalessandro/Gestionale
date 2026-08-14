@@ -236,6 +236,15 @@ declare
 begin
   select azienda_id into azienda_bolla from public.bolle_attese where id = new.bolla_id;
   if azienda_bolla is null then
+    -- Durante la cascade di cancellazione del tenant, `prodotti` può essere
+    -- scollegata dopo che la bolla padre è già stata cancellata. Il solo
+    -- SET NULL referenziale nidificato non è una scrittura applicativa.
+    if TG_OP = 'UPDATE'
+       and old.prodotto_id is not null
+       and new.prodotto_id is null
+       and pg_trigger_depth() > 1 then
+      return new;
+    end if;
     raise exception using errcode = '23514', message = 'Bolla attesa non trovata.';
   end if;
   if new.prodotto_id is not null and not exists (
