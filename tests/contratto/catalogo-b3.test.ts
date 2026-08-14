@@ -68,6 +68,42 @@ describe.skipIf(!haEnv())("B3 · Catalogo & Magazzino", () => {
     expect(b!.modello_id).toBeNull();
   });
 
+  it("crea una bolla manuale atomica senza movimento o variazione di giacenza", async () => {
+    const { data: bollaId, error } = await A.cli.rpc("crea_bolla_attesa_manuale", {
+      p_fornitore: "CooperVision",
+      p_prodotto_id: prodottoA,
+      p_quantita: 4,
+      p_numero_bolla: "MAN-027",
+      p_lettera_vettura: "LDV-027",
+      p_riferimento_interno: "RIF-027",
+    });
+    expect(error).toBeNull();
+    expect(bollaId).toEqual(expect.any(String));
+
+    const { data: bolla, error: erroreLettura } = await A.cli
+      .from("bolle_attese")
+      .select("fornitore, numero_bolla, lettera_vettura, riferimento_interno, stato, bolle_attese_righe(prodotto_id, q_attesa, q_caricata)")
+      .eq("id", bollaId!)
+      .single();
+    expect(erroreLettura).toBeNull();
+    expect(bolla).toMatchObject({
+      fornitore: "CooperVision",
+      numero_bolla: "MAN-027",
+      lettera_vettura: "LDV-027",
+      riferimento_interno: "RIF-027",
+      stato: "aperta",
+      bolle_attese_righe: [{ prodotto_id: prodottoA, q_attesa: 4, q_caricata: 0 }],
+    });
+
+    const { data: prodotto } = await A.cli.from("prodotti").select("giacenza").eq("id", prodottoA).single();
+    const { count: movimenti } = await A.cli
+      .from("movimenti_magazzino")
+      .select("id", { count: "exact", head: true })
+      .eq("prodotto_id", prodottoA);
+    expect(prodotto!.giacenza).toBe(0);
+    expect(movimenti).toBe(0);
+  });
+
   it("ricevimento parziale ed eccesso: la bolla non muove stock, il carico reale sì", async () => {
     const { data: bolla, error: eBolla } = await A.cli
       .from("bolle_attese")
