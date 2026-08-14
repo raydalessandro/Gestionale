@@ -125,6 +125,10 @@
       "classe": "FATTO",
       "nota": "fatto clinico datato; eventuali flag di comodo sono proiezioni"
     },
+    "prescrizioni_lac": {
+      "classe": "FATTO",
+      "nota": "fatto clinico persistente, per occhio; specie di prescrizioni (decisione B3-1, 13/08)"
+    },
     "prodotti": {
       "classe": "ANAGRAFE",
       "nota": "giacenza = PROIEZIONE-cache (trigger); il prezzo di listino si fotografa nei fatti"
