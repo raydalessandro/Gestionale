@@ -48,7 +48,7 @@ test.describe("Fase 2 · Catalogo & Magazzino", () => {
   // verificare col trace quando si rimette mano al wizard ordini/prescrizioni —
   // potrebbe essere selettore/timing o una regressione vera. Lo scarico di
   // magazzino alla consegna è comunque coperto a contratto (magazzino-trigger).
-  test.fixme("S4 · Ordine da catalogo → consegna → scarico ordine_cliente", async ({ page }) => {
+  test("S4 · Ordine da catalogo → consegna → scarico ordine_cliente", async ({ page }) => {
     await registraTenant(page);
     const prodId = await creaProdotto(page, "Biofinity ×6");
     const clienteId = await creaCliente(page, { nome: "Anna", cognome: "Gialli" });
