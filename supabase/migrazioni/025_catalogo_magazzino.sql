@@ -415,11 +415,6 @@ create policy "pratiche_difetto: della propria azienda" on public.pratiche_difet
   with check (azienda_id = public.get_azienda_id());
 revoke all on public.pratiche_difetto from anon;
 
--- La riga di registro rende la migrazione idempotente anche se il canale che
--- l'applica non è il runner. Non sostituisce mai il runner autorizzato.
-insert into public._infra_migrazioni (nome) values ('025_catalogo_magazzino')
-on conflict (nome) do nothing;
-
 -- ============================================================================
 -- Fine 025. Le bolle sono attese/confrontate, non giacenze contabili; i
 -- movimenti reali restano append-only e fotografano valore a costo e prezzo.
