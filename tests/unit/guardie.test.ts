@@ -2553,3 +2553,140 @@ describe("L4s · guardia della pipeline (il DB di test non resta indietro del re
     }
   });
 });
+
+/* ══════════════════════════════════════════════════════════════════════════
+ * L4t · IL REGISTRO DEI `test.fixme` (una promessa con la sua scadenza)
+ *
+ * Un `test.fixme` non è una bugia: è contabilità onesta. Dice «lo scenario è
+ * scritto, il prodotto non c'è ancora». Diventa una bugia il giorno in cui
+ * SOPRAVVIVE alla funzione che aspettava — e quel giorno non se ne accorge
+ * nessuno, perché la CI resta verde e il conteggio dice «skipped» come sempre.
+ * È esattamente la rottura silenziosa che le guardie esistono per comprare
+ * (decisione di regia, 17/08, su rilievo di Ray a fine B3).
+ *
+ * Il meccanismo, in due metà:
+ *
+ *   (a) OGNI `test.fixme` sotto `e2e/` dev'essere DICHIARATO qui sotto, col
+ *       suo blocco scritto in italiano. Uno nuovo, aggiunto in silenzio, è
+ *       rosso: non si mette in pausa uno scenario senza dire perché.
+ *
+ *   (b) Chi ha una SENTINELLA — una stringa che oggi NON esiste nel sorgente
+ *       dell'app e che comparirà quando il blocco cade — la vede sorvegliata:
+ *       il giorno in cui quella stringa entra nel codice, questa guardia si
+ *       accende e chiede di riprovare lo scenario. La promessa si riscuote da
+ *       sé, senza che nessuno debba ricordarsene.
+ *
+ * ⚠️ TRE DEI CINQUE NON HANNO SENTINELLA, e la ragione è un fatto misurato,
+ *    non una pigrizia: le etichette su cui poggiano ("di cui IVA",
+ *    "Reso con rimborso (denaro)", "Da prescrizione") ESISTONO GIÀ nel
+ *    sorgente. Il loro blocco dichiarato è quindi almeno in parte scaduto, e
+ *    non si può sorvegliare con «questa stringa non c'è» una stringa che c'è.
+ *    Vanno RIPROVATI sul serio — togliendo il `fixme` e guardando cosa dice la
+ *    CI — nel giro in cui si apre la Cassa (B5/M8). Finché non succede, la
+ *    metà (a) impedisce almeno che se ne perda il conto.
+ * ══════════════════════════════════════════════════════════════════════════ */
+
+type FixmeDichiarato = {
+  file: string;
+  /** Frammento univoco del titolo, così il registro non invecchia sulla virgola. */
+  titolo: string;
+  /** Che cosa sta aspettando, in italiano. */
+  blocco: string;
+  /** Stringa che oggi NON è nel sorgente e che comparirà quando il blocco cade. */
+  sentinella: string | null;
+};
+
+const FIXME_DICHIARATI: FixmeDichiarato[] = [
+  {
+    file: "e2e/m1-anagrafiche.spec.ts",
+    titolo: "S5 (2/2)",
+    blocco:
+      "il cancello sconti in cassa non esiste: è M8/B5. Il pezzo collaudabile oggi (impostare e rileggere l'assicurazione) è già staccato e vivo.",
+    sentinella: "Sconto assicurativo",
+  },
+  {
+    file: "e2e/fase4-cassa.spec.ts",
+    titolo: "S8 · Chiusura serale",
+    blocco:
+      "la liturgia di chiusura con tolleranza e causale sull'eccedenza è B5 (piano §B5: «tolleranza di quadratura → parametri»).",
+    sentinella: "causale Contanti",
+  },
+  {
+    file: "e2e/fase4-cassa.spec.ts",
+    titolo: "S3 · Consegna con caparra",
+    blocco:
+      "dichiarato: modulo cassa non finalizzato (metodi di pagamento, IVA, incasso caparra → B5). DA RIPROVARE: l'etichetta «di cui IVA» su cui poggia esiste già nel sorgente.",
+    sentinella: null,
+  },
+  {
+    file: "e2e/fase4-cassa.spec.ts",
+    titolo: "S6 · Reso con causale",
+    blocco:
+      "dichiarato: i resi sono B5. DA RIPROVARE: l'etichetta «Reso con rimborso (denaro)» su cui poggia esiste già nel sorgente.",
+    sentinella: null,
+  },
+  {
+    file: "e2e/fase1-ordini-buste.spec.ts",
+    titolo: "S1 · LAC dal banco",
+    blocco:
+      "due parti: la selezione ricetta (che B2 ha RIFATTO — quel pezzo di blocco è caduto) e la consegna dell'ordine LAC, che passa dalla cassa → B5. DA RIPROVARE: «Da prescrizione» esiste già nel sorgente.",
+    sentinella: null,
+  },
+];
+
+describe("L4t · i `test.fixme` non sopravvivono al proprio blocco", () => {
+  /** Ogni `test.fixme("…")` sotto e2e/, anche quello scritto su più righe. */
+  function fixmeNelRepo(): { file: string; titolo: string }[] {
+    return readdirSync(join(ROOT, "e2e"))
+      .filter((n) => n.endsWith(".spec.ts"))
+      .flatMap((n) => {
+        const sql = leggi(`e2e/${n}`);
+        return Array.from(sql.matchAll(/test\.fixme\(\s*"((?:[^"\\]|\\.)*)"/g)).map((m) => ({
+          file: `e2e/${n}`,
+          titolo: m[1],
+        }));
+      });
+  }
+
+  it("G36 · ogni `test.fixme` è DICHIARATO, col suo blocco scritto", () => {
+    const trovati = fixmeNelRepo();
+    for (const f of trovati) {
+      const dichiarato = FIXME_DICHIARATI.find(
+        (d) => d.file === f.file && f.titolo.includes(d.titolo)
+      );
+      expect(
+        dichiarato !== undefined,
+        `${f.file}: «${f.titolo}» è in pausa senza essere dichiarato in FIXME_DICHIARATI.\n` +
+          "Uno scenario si mette in pausa solo dicendo COSA sta aspettando: aggiungi la voce\n" +
+          "(file, frammento di titolo, blocco in italiano, e una sentinella se esprimibile)."
+      ).toBe(true);
+    }
+    for (const d of FIXME_DICHIARATI) {
+      expect(
+        trovati.some((f) => f.file === d.file && f.titolo.includes(d.titolo)),
+        `FIXME_DICHIARATI cita «${d.titolo}» in ${d.file}, ma lì non c'è più nessun test.fixme con quel titolo.\n` +
+          "Se lo scenario è stato riacceso, TOGLI la voce dal registro: un registro che elenca\n" +
+          "promesse già mantenute è rumore, e il rumore è il modo in cui questi elenchi muoiono."
+      ).toBe(true);
+    }
+  });
+
+  it("G36b · nessuna sentinella è già comparsa (il blocco dichiarato regge ancora)", () => {
+    // `sorgenti()` torna percorsi già assoluti: non passano da `leggi`.
+    const fonti = [...sorgenti("app"), ...sorgenti("components"), ...sorgenti("lib")].map((f) =>
+      readFileSync(f, "utf8")
+    );
+    for (const d of FIXME_DICHIARATI) {
+      if (d.sentinella === null) continue;
+      const comparsa = fonti.some((s) => s.includes(d.sentinella!));
+      expect(
+        comparsa,
+        `«${d.sentinella}» è ENTRATA nel sorgente: il blocco di «${d.titolo}» (${d.file}) è caduto.\n` +
+          `  blocco dichiarato: ${d.blocco}\n` +
+          "Togli il `test.fixme`, fai girare lo scenario e guarda cosa dice la CI. Se è ancora\n" +
+          "rosso per un'ALTRA ragione, riscrivi il blocco e la sentinella — non rimetterlo in\n" +
+          "pausa con la motivazione vecchia."
+      ).toBe(false);
+    }
+  });
+});
