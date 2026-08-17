@@ -54,3 +54,22 @@
 7. **Cancellazione lato-PIATTAFORMA su richiesta del soggetto** (la
    persona che vuole sparire ovunque): processo di regia col legale —
    futuro, fuori busta.
+8. **La CI costruirà anche il DB di PRODUZIONE, quando si va live** —
+   deciso a voce da Ray il 17/08, a chiusura di B3. Oggi il passo
+   `db:applica-migrazioni` del `ci.yml` punta al SOLO progetto di test
+   (`TEST_SUPABASE_DB_URL`, guardia G34b), e prod si allinea a mano dal
+   canale MCP: è il motivo per cui prod è rimasta indietro dopo B2, e
+   finché non siamo live va bene così — il DB di test si ricostruisce da
+   zero e un disallineamento si vede al merge successivo.
+   **Quando si va live cambia la natura del rischio** e questa voce si
+   riscuote: un disallineamento su dati veri non è più «ce ne accorgiamo
+   al prossimo merge». Servono, nell'ordine: (a) un segreto di prod
+   distinto, MAI nello stesso job di quello di test — G34b nasce apposta
+   per impedire che `SUPABASE_DB_URL` significhi due cose diverse nello
+   stesso posto; (b) il passo che applica a prod SOLO su `main` e SOLO
+   dopo che contratto ed e2e sono verdi; (c) la decisione se resti un
+   atto umano approvato (environment protetto) o diventi automatico. E
+   fino ad allora, l'ordine sicuro resta quello usato per B3: **prima
+   prod, poi il merge** — le migrazioni additive sono inerti per il
+   codice in esercizio, quindi la finestra «codice nuovo su DB vecchio»
+   non si apre mai.
