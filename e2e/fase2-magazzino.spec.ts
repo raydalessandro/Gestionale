@@ -181,7 +181,12 @@ test.describe("Fase 2 · Catalogo & Magazzino", () => {
     await page.getByLabel("Prodotto riga bolla").selectOption({ label: variante });
     await page.getByPlaceholder("Quantità attesa *").fill("2");
     await page.getByRole("button", { name: "Crea bolla attesa" }).click();
-    await expect(page.getByText(variante, { exact: true })).toBeVisible();
+    // Il nome della variante compare DUE volte in pagina, ed è giusto così: una
+    // nell'`<option>` della tendina prodotto (il form resta lì, pronto per la
+    // riga dopo) e una nella scheda della bolla appena creata. Senza ambito è
+    // «strict mode violation», non un'assenza. Qui interessa la SCHEDA: è lei
+    // che dimostra che la riga è nata.
+    await expect(page.getByRole("article").getByText(variante, { exact: true })).toBeVisible();
     await expect(page.getByText("Attesa 2 · confermata 0 · da confermare 2")).toBeVisible();
     await page.goto(`/magazzino/prodotti/${prodId}`);
     await expect(page.getByTestId("numero-Giacenza")).toContainText("0");
