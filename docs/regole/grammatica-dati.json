@@ -40,9 +40,22 @@
       "classe": "ANAGRAFE",
       "nota": "agenda: indisponibilità dichiarate"
     },
+    "bolle_attese": {
+      "classe": "STATO_GUIDATO",
+      "binari": "attesa→caricata | →annullata; le differenze caricate≠attese si chiudono a mano con motivo",
+      "nota": "confronto atteso/fisico: non muove mai valori o giacenza"
+    },
+    "bolle_attese_righe": {
+      "classe": "STATO_GUIDATO",
+      "nota": "righe del ricevimento: q_caricata avanza sul fatto reale e può superare q_attesa (3 su 2)"
+    },
     "chiusure": {
       "classe": "ANAGRAFE",
       "nota": "calendario dei giorni di chiusura del negozio"
+    },
+    "causali_magazzino": {
+      "classe": "REGISTRO",
+      "nota": "vocabolario lento del perché unico di scarico; recupera_costo dichiara il carattere economico"
     },
     "chiusure_cassa": {
       "classe": "FATTO",
@@ -69,6 +82,10 @@
       "binari": "attivo→(ritirato|annullato)",
       "nota": "impegna il disponibile (proiezione)"
     },
+    "lac_modelli": {
+      "classe": "ANAGRAFE",
+      "nota": "famiglie LAC: producibilità e UPC mappa informano le varianti fisiche on-demand"
+    },
     "lista_attesa": {
       "classe": "STATO_GUIDATO",
       "binari": "in_attesa→avvisata→chiusa"
@@ -81,7 +98,7 @@
     },
     "movimenti_magazzino": {
       "classe": "FATTO",
-      "nota": "quantità con segno; la giacenza la fa il trigger"
+      "nota": "quantità con segno; la giacenza la fa il trigger; causale e valori costo/prezzo sono istantanee del fatto"
     },
     "negozi_servizi": {
       "classe": "ANAGRAFE",
@@ -125,9 +142,18 @@
       "classe": "FATTO",
       "nota": "fatto clinico datato; eventuali flag di comodo sono proiezioni"
     },
+    "pratiche_difetto": {
+      "classe": "STATO_GUIDATO",
+      "binari": "aperta→(riconosciuta|respinta)→chiusa",
+      "nota": "registro difetti conformità con esito e foto-reference"
+    },
+    "prescrizioni_lac": {
+      "classe": "FATTO",
+      "nota": "fatto clinico persistente, per occhio; specie di prescrizioni (decisione B3-1, 13/08)"
+    },
     "prodotti": {
       "classe": "ANAGRAFE",
-      "nota": "giacenza = PROIEZIONE-cache (trigger); il prezzo di listino si fotografa nei fatti"
+      "nota": "giacenza = PROIEZIONE-cache (trigger); il prezzo di listino si fotografa nei fatti; modello_id collega una variante LAC alla famiglia"
     },
     "resi": {
       "classe": "FATTO"
@@ -166,6 +192,11 @@
         "regola": "si sigilla col flusso fermi"
       },
       {
+        "nome": "tre quantità di ricevimento",
+        "da": "bolle_attese + bolle_attese_righe + movimenti_magazzino",
+        "regola": "confermata = giacenza reale; totale e da-confermare derivano dalle righe attese, senza muovere stock prima del carico"
+      },
+      {
         "nome": "contanti attesi / sistema per metodo",
         "da": "vendite.pagamenti + acconti del giorno − resi denaro",
         "dove": "lib/cassa-calcoli.ts — FORMULA UNICA"
@@ -189,6 +220,6 @@
     "ordini_occhiali: acconto_metodo, acconto_incassato_il, prezzo_montatura, prezzo_lenti, prezzo_extra, od_dnp, os_dnp, garanzia_tipo",
     "ordini_lac.righe[]: prezzo, parametri (poteri)",
     "resi: importo, metodo_rimborso",
-    "PREVISTA (M3): valore_unitario sugli smaltimenti/rottamazioni"
+    "movimenti_magazzino: valore_costo, valore_prezzo, causale_codice (025/M3)"
   ]
 }

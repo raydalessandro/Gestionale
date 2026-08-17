@@ -62,7 +62,10 @@ async function main(): Promise<void> {
       try {
         await client.query("begin");
         await client.query(sql);
-        await client.query("insert into public._infra_migrazioni (nome) values ($1)", [nome]);
+        // Dalla 021 ogni file si auto-registra per restare applicabile anche
+        // fuori da questo runner. Il secondo insert del canale autorizzato è
+        // quindi deliberatamente idempotente, nella medesima transazione.
+        await client.query("insert into public._infra_migrazioni (nome) values ($1) on conflict (nome) do nothing", [nome]);
         await client.query("commit");
       } catch (e) {
         await client.query("rollback").catch(() => undefined);

@@ -103,6 +103,9 @@ function FormRettifica({ prodottoId, onFatto }: { prodottoId: string; onFatto: (
             <option value="+">Aumenta (+)</option>
             <option value="-">Diminuisci (−)</option>
           </select>
+          <select name="causale_codice" required defaultValue="furto" aria-label="causale rettifica" className={inputCls}>
+            <option value="consumo">Consumo interno</option><option value="errore">Errore operativo</option><option value="furto">Furto</option><option value="danno_negozio">Danno in negozio</option><option value="scaduto">Scaduto</option><option value="smaltimento">Smaltimento</option><option value="altro">Altro</option>
+          </select>
           <input name="quantita" type="number" min={1} step={1} placeholder="Quantità" className={`${inputCls} diottria`} />
           <input name="motivo" placeholder="Motivo (obbligatorio)" className={`${inputCls} sm:col-span-1`} />
         </div>
@@ -132,9 +135,22 @@ function FormAltro({ prodottoId, onFatto }: { prodottoId: string; onFatto: () =>
             <option value="danno">Danno / smaltimento</option>
             <option value="uso_interno">Uso interno</option>
           </select>
+          <select name="causale_codice" required className={inputCls} aria-label="causale scarico">
+            <option value="consumo">Consumo interno</option>
+            <option value="errore">Errore operativo</option>
+            <option value="furto">Furto</option>
+            <option value="danno_negozio">Danno in negozio</option>
+            <option value="scaduto">Scaduto</option>
+            <option value="smaltimento">Smaltimento</option>
+            <option value="reso_fornitore">Reso a fornitore</option>
+            <option value="altro">Altro</option>
+          </select>
           <input name="quantita" type="number" min={1} step={1} placeholder="Quantità" className={`${inputCls} diottria`} />
-          <input name="motivo" placeholder="Riferimento / motivo" className={inputCls} />
+          <input name="valore_costo" type="number" min={0} step="0.01" placeholder="Costo unitario" className={inputCls} />
+          <input name="valore_prezzo" type="number" min={0} step="0.01" placeholder="Prezzo unitario" className={inputCls} />
+          <input name="motivo" placeholder="Riferimento / nota" className={inputCls} />
         </div>
+        <p className="text-[11px] text-faint">La causale dichiara se il costo è recuperabile; costo e prezzo restano istantanee del fatto.</p>
         <Errore msg={stato?.errore} />
         <div className="flex gap-2">
           <button type="submit" disabled={inCorso} className={`${btn} ${stili.primary}`}>

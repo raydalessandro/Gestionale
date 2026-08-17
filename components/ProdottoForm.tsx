@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { creaProdotto, aggiornaProdotto } from "@/lib/actions";
-import type { ProdottoRow } from "@/lib/database.types";
+import type { LacModelloRow, ProdottoRow } from "@/lib/database.types";
+import { createClient } from "@/lib/supabase/client";
 import { Card, Field, inputCls, Errore } from "@/components/ui";
 import { parametriLac, parametriMontatura } from "@/components/MagazzinoUI";
 
@@ -30,6 +31,17 @@ export default function ProdottoForm({ prodotto }: { prodotto?: ProdottoRow }) {
     : creaProdotto;
   const [stato, run, inCorso] = useActionState(azione, null);
   const [tipo, setTipo] = useState<ProdottoRow["tipo"]>(prodotto?.tipo ?? "lac");
+  const [modelli, setModelli] = useState<Pick<LacModelloRow, "id" | "fornitore" | "nome" | "attivo">[]>([]);
+  useEffect(() => {
+    const supabase = createClient();
+    void supabase
+      .from("lac_modelli")
+      .select("id, fornitore, nome, attivo")
+      .eq("attivo", true)
+      .order("fornitore")
+      .order("nome")
+      .then(({ data }) => setModelli(data ?? []));
+  }, []);
   const lac = parametriLac(prodotto?.parametri);
   const mont = parametriMontatura(prodotto?.parametri);
 
@@ -80,6 +92,14 @@ export default function ProdottoForm({ prodotto }: { prodotto?: ProdottoRow }) {
             Parametri lente a contatto
           </p>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <Field label="Famiglia LAC" hint="La variante nasce solo quando serve lo stock fisico.">
+              <select name="modello_id" className={inputCls} defaultValue={prodotto?.modello_id ?? ""}>
+                <option value="">Nessuna famiglia collegata</option>
+                {modelli.map((modello) => (
+                  <option key={modello.id} value={modello.id}>{modello.fornitore} · {modello.nome}</option>
+                ))}
+              </select>
+            </Field>
             <Field label="Raggio (BC)">
               <input name="par_raggio" type="number" step="0.1" inputMode="decimal" className={`${inputCls} diottria`} defaultValue={lac.raggio ?? ""} placeholder="8.6" />
             </Field>

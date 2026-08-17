@@ -30,7 +30,7 @@ export default async function ProdottoPage({
   const [{ data: movimenti }, { data: fermi }] = await Promise.all([
     supabase
       .from("movimenti_magazzino")
-      .select("id, tipo, quantita, riferimento, note, utente_id, created_at")
+      .select("id, tipo, quantita, riferimento, note, causale_codice, utente_id, created_at")
       .eq("prodotto_id", id)
       .order("created_at", { ascending: false })
       .limit(20),
@@ -152,6 +152,7 @@ export default async function ProdottoPage({
                       {fmtQuando(m.created_at)}
                       {m.riferimento ? ` · ${m.riferimento}` : ""}
                       {m.utente_id && nomeUtente.get(m.utente_id) ? ` · ${nomeUtente.get(m.utente_id)}` : ""}
+                      {m.causale_codice ? ` · causale ${m.causale_codice.replace(/_/g, " ")}` : ""}
                       {m.note ? ` · ${m.note}` : ""}
                     </p>
                   </div>
