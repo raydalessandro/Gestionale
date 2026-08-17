@@ -72,11 +72,17 @@ function piuGiorni(iso: string, n: number): string {
   }).format(d);
 }
 
-/** Telefoni veri e unici (base = ms di avvio: mai collisioni fra run). */
+/**
+ * Telefoni veri e unici (base = ms di avvio: mai collisioni fra run). Prefisso
+ * `33`, MAI `3` nudo: quando le ultime 7 cifre di Date.now() iniziano per 9, un
+ * numero `39…` a 12 cifre scivola nel ramo «internazionale senza +» di
+ * normalizza_telefono e le due forme dello stesso numero normalizzano diverse
+ * (fermata B3-2, 14/08: la dedup era sana, la fixture no).
+ */
 let telSeq = 0;
 const TEL_BASE = String(Date.now()).slice(-7);
 function telefonoUnico(): string {
-  return `3${TEL_BASE}${String(telSeq++).padStart(4, "0")}`;
+  return `33${TEL_BASE}${String(telSeq++).padStart(4, "0")}`;
 }
 
 describe.skipIf(!haEnv())("021 · C1 · l'anonimo esce dalla dedup (anche dalla RICERCA)", () => {
