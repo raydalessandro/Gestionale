@@ -160,7 +160,12 @@ test.describe("Fase 2 · Catalogo & Magazzino", () => {
     await page.getByLabel("Tipo *").selectOption("lac");
     await page.getByLabel("Nome *").fill(variante);
     await page.getByLabel("Prezzo (€) *").fill("24");
-    await expect(page.getByLabel("Famiglia LAC").getByRole("option", { name: `CooperVision · ${famiglia}` })).toBeVisible();
+    // `toBeAttached`, NON `toBeVisible`: un `<option>` dentro un `<select>`
+    // nativo non ha un box di layout proprio, quindi per Playwright è sempre
+    // `hidden` — anche quando c'è, col testo giusto, ed è selezionabile. Qui si
+    // vuole dire «la famiglia appena codificata è OFFERTA nella tendina», e la
+    // presenza nel DOM è esattamente quel fatto (S7, prima esecuzione 17/08).
+    await expect(page.getByLabel("Famiglia LAC").getByRole("option", { name: `CooperVision · ${famiglia}` })).toBeAttached();
     await page.getByLabel("Famiglia LAC").selectOption({ label: `CooperVision · ${famiglia}` });
     await page.getByRole("button", { name: "Crea prodotto" }).click();
     await page.waitForURL(/\/magazzino\/prodotti\/[0-9a-f-]{36}$/);
